@@ -5,10 +5,10 @@ export default function Home() {
       <table className="table-fixed  text-center">
         <thead>
           <tr>
-            <th className="w-2/4 px-3">Pracownik</th>
-            <th className="w-2/4 px-3">Pozostały czas:</th>
-            <th className="w-1/4 px-3">Przyjście:</th>
-            <th className="w-1/4 px-3">Wyjście:</th>
+            <th className="w-2/5 px-3">Pracownik</th>
+            <th className="w-2/5 px-3">Pozostały czas:</th>
+            <th className="w-1/5 px-3">Przyjście:</th>
+            <th className="w-1/5 px-3">Wyjście:</th>
           </tr>
         </thead>
         <tbody className="font-mono">
@@ -16,12 +16,12 @@ export default function Home() {
             <td className="py-3 ">Michał Sypniewski</td>
             <td>07:52:00</td>
             <td>
-              <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-green-500 hover:bg-green-600">
+              <button className="block w-28 rounded-lg font-bold shadow-lg mx-auto px-4 py-2 bg-green-500 hover:bg-green-600">
                 START
               </button>
             </td>
             <td>
-              <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-red-500 hover:bg-red-600">
+              <button className="block w-28 rounded-lg font-bold shadow-lg mx-auto px-4 py-2 bg-red-500 hover:bg-red-600">
                 STOP
               </button>
             </td>
@@ -31,7 +31,7 @@ export default function Home() {
             <td>07:52:00</td>
             <td>
               <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-green-500 hover:bg-green-600">
-                START
+                06:45
               </button>
             </td>
             <td>
@@ -95,11 +95,8 @@ export default function Home() {
           <h2 className="py-1 text-2xl">Jacek Tomczak</h2>
           <p className="py-1 text-4xl">07:35:00</p>
           <div className="flex py-3">
-            <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-green-500 hover:bg-green-600">
+            <button className="block w-28 rounded-lg font-bold shadow-lg mx-auto px-4 py-2 bg-green-500 hover:bg-green-600">
               START
-            </button>
-            <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-red-500 hover:bg-red-600">
-              STOP
             </button>
           </div>
         </div>
@@ -107,10 +104,7 @@ export default function Home() {
           <h2 className="py-1 text-2xl">Jacek Tomczak</h2>
           <p className="py-1 text-4xl">07:35:00</p>
           <div className="flex py-3">
-            <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-green-500 hover:bg-green-600">
-              START
-            </button>
-            <button className="block w-20 rounded-lg font-bold shadow-lg mx-auto px-4 py-1 bg-red-500 hover:bg-red-600">
+            <button className="block w-28 rounded-lg font-bold shadow-lg mx-auto px-4 py-2 bg-red-500 hover:bg-red-600">
               STOP
             </button>
           </div>
