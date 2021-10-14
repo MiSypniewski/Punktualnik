@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import moment from "moment";
 
-const Person = ({ name }) => {
+const Person = ({ name, section, location }) => {
   moment.locale("pl");
 
   const [status, setStatus] = useState("PRZYJŚCIE");
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
-  const [time, setTime] = useState(" ");
+  const [time, setTime] = useState(0);
   const [intervalID, setIntervalID] = useState(null);
   const [overtime, setOverTime] = useState(false);
 
@@ -25,11 +25,36 @@ const Person = ({ name }) => {
     }
   });
 
+  // useEffect(() => {
+  //   saveToDB();
+  // }, [startTime]);
+
   // GOTOWY na przyjście --> Guzik wyświtla napis "przyjście" - status - WAIT
   // OBECNY W PRACY --> Guzik wyświtla napis "wcześniejsze wyjście" - status - STARTWORK
   // WYJŚCIE PRZED CZASEM --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
   // WYJŚCIE PO 8h --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
   // czy były nadgodziny? --> status - FALSE - wcześniejsze wyjście; status - TRUE - wyjście po 8h
+
+  const saveToDB = async () => {
+    const payload = {
+      User: name,
+      Section: section,
+      Location: location,
+      Data: moment().format("DD-MM-YYYY"),
+      StartTime: startTime,
+      EndTime: endTime,
+      TotalTime: time,
+      OverTime: overtime,
+    };
+
+    await fetch("/api/times", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  };
 
   const changeStatus = (status) => {
     if (status === "PRZYJŚCIE") {
@@ -80,7 +105,7 @@ const Person = ({ name }) => {
     <div className="w-full h-48 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
       <h2 className="mt-2 text-2xl font-bold">{name}</h2>
       <p className="py-1 text-3xl mt-1">
-        {time !== " " ? moment(time).format("HH:mm:ss") : moment().format("DD-MM-YYYY")}
+        {time !== 0 ? moment(time).format("HH:mm:ss") : moment().format("DD-MM-YYYY")}
       </p>
       <div className="flex py-3 mt-1">
         {status === "PRZYJŚCIE" ? (

@@ -1,14 +1,14 @@
 import airDB from "../services/airtableClient";
 
-const getRecent = async (maxRecords) => {
-  const timers = await airDB("Times")
+const getTime = async (maxRecords) => {
+  const times = await airDB("Times")
     .select({
       sort: [{ field: "ID", direction: "desc" }],
       maxRecords,
     })
     .firstPage();
 
-  return timers.map((time) => time.fields);
+  return times.map((time) => time.fields);
 };
 
-export default getRecent;
+export default getTime;

@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { jsonFetcher } from "../utils";
 
 export const getStaticProps = async () => {
-  const times = await getRecentTimes(4);
+  const times = await getRecentTimes(20);
 
   return {
     props: {
@@ -27,7 +27,6 @@ export default function Home({ times }) {
     "Mateusz Mikołajczak",
     "Szymon Ziemak",
   ];
-  console.log(times);
   const { data } = useSWR("/api/times", jsonFetcher, { initialData: times });
   console.log(data);
   return (
@@ -36,7 +35,7 @@ export default function Home({ times }) {
       {/* <p className="text-center">13-10-2021 09:11</p> */}
       <div className="grid grid-cols-3 gap-4 mt-4">
         {userList.map((user) => (
-          <Person name={user} key={user} />
+          <Person name={user} location="Chlebowa 26" section="Biedronka" key={user} />
         ))}
       </div>
       {/* <div className="grid grid-cols-3 gap-4 justify-items-center mt-4">
