@@ -3,8 +3,6 @@ import moment from "moment";
 
 const Person = ({ name }) => {
   moment.locale("pl");
-  // const startTime = moment.now();
-  // const endTime = moment(startTime).add(8, "hours");
 
   const [status, setStatus] = useState("PRZYJŚCIE");
   const [startTime, setStartTime] = useState(0);
@@ -27,11 +25,17 @@ const Person = ({ name }) => {
     }
   });
 
+  // GOTOWY na przyjście --> Guzik wyświtla napis "przyjście" - status - WAIT
+  // OBECNY W PRACY --> Guzik wyświtla napis "wcześniejsze wyjście" - status - STARTWORK
+  // WYJŚCIE PRZED CZASEM --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
+  // WYJŚCIE PO 8h --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
+  // czy były nadgodziny? --> status - FALSE - wcześniejsze wyjście; status - TRUE - wyjście po 8h
+
   const changeStatus = (status) => {
     if (status === "PRZYJŚCIE") {
       const timeNow = moment.now();
-      // const timeEnd = moment(timeNow).add(10, "seconds");
-      const timeEnd = moment(timeNow).add(8, "hours");
+      const timeEnd = moment(timeNow).add(10, "seconds");
+      // const timeEnd = moment(timeNow).add(8, "hours");
       const tmp = moment(timeEnd).subtract(timeNow);
       const remanig = moment(tmp).subtract(1, "hour");
       setStartTime(timeNow);
@@ -109,9 +113,9 @@ const Person = ({ name }) => {
         {status === "KONIEC PRACY" ? (
           <button
             value={status}
-            className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-16 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
           >
-            {status}
+            👍
           </button>
         ) : null}
       </div>
