@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import moment from "moment";
 
-const Person = ({ name, section, location }) => {
+const Person = ({ name, surname, section, location }) => {
   moment.locale("pl");
 
   const [status, setStatus] = useState("PRZYJŚCIE");
@@ -37,13 +37,14 @@ const Person = ({ name, section, location }) => {
 
   const saveToDB = async () => {
     const payload = {
-      User: name,
+      Name: name,
+      Surname: surname,
       Section: section,
       Location: location,
       Data: moment().format("DD-MM-YYYY"),
-      StartTime: startTime,
-      EndTime: endTime,
-      TotalTime: time,
+      StartTime: moment(startTime).format("HH:mm:ss"),
+      EndTime: moment(endTime).format("HH:mm:ss"),
+      DifferenceTime: moment(time).format("HH:mm:ss"),
       OverTime: overtime,
     };
 
@@ -58,7 +59,8 @@ const Person = ({ name, section, location }) => {
 
   const changeStatus = (status) => {
     if (status === "PRZYJŚCIE") {
-      const timeNow = moment.now();
+      const now = moment.now();
+      const timeNow = moment(now);
       const timeEnd = moment(timeNow).add(10, "seconds");
       // const timeEnd = moment(timeNow).add(8, "hours");
       const tmp = moment(timeEnd).subtract(timeNow);
@@ -103,7 +105,9 @@ const Person = ({ name, section, location }) => {
 
   return (
     <div className="w-full h-48 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
-      <h2 className="mt-2 text-2xl font-bold">{name}</h2>
+      <h2 className="mt-2 text-2xl font-bold">
+        {name} {surname}
+      </h2>
       <p className="py-1 text-3xl mt-1">
         {time !== 0 ? moment(time).format("HH:mm:ss") : moment().format("DD-MM-YYYY")}
       </p>
@@ -143,6 +147,12 @@ const Person = ({ name, section, location }) => {
             👍
           </button>
         ) : null}
+        <button
+          onClick={() => saveToDB()}
+          className="block w-40 h-16 rounded-lg font-bold text-white text-lg shadow-lg mx-auto px-4 py-2 bg-yellow-600 hover:bg-yellow-700"
+        >
+          Zapisz
+        </button>
       </div>
     </div>
   );
