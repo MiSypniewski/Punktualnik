@@ -6,10 +6,36 @@ import useSWR from "swr";
 import { jsonFetcher } from "../utils";
 import moment from "moment";
 
-export const getStaticProps = async () => {
+// export const getStaticProps = async () => {
+//   const times = await getRecentTimes(moment().format("DD-MM-YYYY"));
+//   const users = await getUsers("Biedronka");
+
+//   users.forEach((user) => {
+//     user.Password = ":)";
+//     user.SaltPassword = ":)";
+//     return user;
+//   });
+
+//   console.log(users);
+//   return {
+//     props: {
+//       times,
+//       users,
+//     },
+//   };
+// };
+
+export const getServerSideProps = async () => {
   const times = await getRecentTimes(moment().format("DD-MM-YYYY"));
   const users = await getUsers("Biedronka");
 
+  users.forEach((user) => {
+    user.Password = ":)";
+    user.SaltPassword = ":)";
+    return user;
+  });
+
+  console.log(users);
   return {
     props: {
       times,
@@ -20,8 +46,8 @@ export const getStaticProps = async () => {
 
 export default function Home({ times, users }) {
   const { data } = useSWR("/api/times", jsonFetcher, { initialData: times });
-  console.log(data);
-
+  // console.log(data);
+  console.log(users);
   return (
     <div className="lg:container mx-auto bg-white">
       {/* <h1 className="text-center font-bold text-3xl py-1 px-2">Punktualnik</h1> */}
