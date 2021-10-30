@@ -1,11 +1,12 @@
-import getRecentTimes from "../../../services/getTime";
+import getTime from "../../../services/getTime";
 import saveTimes from "../../../services/saveTime";
+import moment from "moment";
 
 export default async (req, res) => {
   switch (req.method) {
     case "GET": {
       console.log(`req data: ${req.query.user}`);
-      const offers = await getRecentTimes("Kamil Milczarek", "15-10-2021");
+      const offers = await getTime(req.query.user, moment().format("DD-MM-YYYY"));
       res.status(200).json(offers);
 
       break;
