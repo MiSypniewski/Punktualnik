@@ -1,9 +1,9 @@
 import airDB from "../services/airtableClient";
 
-const getTime = async (data) => {
+const getTime = async (userID, data) => {
   const times = await airDB("Times")
-    // .select({ filterByFormula: `AND(User="${user}", Data="${data}")` })
-    .select({ filterByFormula: `Data="${data}"` })
+    .select({ filterByFormula: `AND(userID="${userID}", data="${data}")` })
+    // .select({ filterByFormula: `Data="${data}"` })
     .firstPage();
 
   return times.map((time) => time.fields);
