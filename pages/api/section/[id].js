@@ -12,14 +12,14 @@ export default async (req, res) => {
 
       break;
     }
-    case "POST": {
-      const payload = req.body;
-      console.log("payload on backend", payload);
-      const time = await saveTimes(payload);
-      res.status(200).json({ status: "created", time });
+    // case "POST": {
+    //   const payload = req.body;
+    //   console.log("payload on backend", payload);
+    //   const time = await saveTimes(payload);
+    //   res.status(200).json({ status: "created", time });
 
-      break;
-    }
+    //   break;
+    // }
     default:
       res.status(400);
   }
