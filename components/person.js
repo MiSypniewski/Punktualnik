@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
+import { jsonFetcher } from "../utils";
 import moment from "moment";
 
-const Person = ({ name, surname, section, location }) => {
+const Person = ({ user }) => {
   moment.locale("pl");
+  console.log(user);
+  // const curentTime = jsonFetcher(`/api/user/${user.userID}`);
+  // console.log(curentTime);
 
   const [status, setStatus] = useState("PRZYJŚCIE");
   const [startTime, setStartTime] = useState(0);
@@ -37,15 +41,16 @@ const Person = ({ name, surname, section, location }) => {
 
   const saveToDB = async () => {
     const payload = {
-      Name: name,
-      Surname: surname,
-      Section: section,
-      Location: location,
-      Data: moment().format("DD-MM-YYYY"),
-      StartTime: moment(startTime).format("HH:mm:ss"),
-      EndTime: moment(endTime).format("HH:mm:ss"),
-      DifferenceTime: moment(time).format("HH:mm:ss"),
-      OverTime: overtime,
+      userID: user.ID,
+      name: user.name,
+      surname: user.surname,
+      section: user.section,
+      location: user.location,
+      data: moment().format("DD-MM-YYYY"),
+      startTime: moment(startTime).format("HH:mm:ss"),
+      endTime: moment(endTime).format("HH:mm:ss"),
+      differenceTime: moment(time).format("HH:mm:ss"),
+      overTime: overtime,
     };
 
     await fetch("/api/times", {
@@ -106,7 +111,7 @@ const Person = ({ name, surname, section, location }) => {
   return (
     <div className="w-full h-48 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
       <h2 className="mt-2 text-2xl font-bold">
-        {name} {surname}
+        {user.name} {user.surname}
       </h2>
       <p className="py-1 text-3xl mt-1">
         {time !== 0 ? moment(time).format("HH:mm:ss") : moment().format("DD-MM-YYYY")}
