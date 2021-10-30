@@ -6,7 +6,11 @@ const getUsers = async (section) => {
     .select({ filterByFormula: `AND(Section="${section}", IsActive="Active")` })
     .firstPage();
 
-  return users.map((user) => user.fields);
+  return users.map((user) => {
+    user.fields.password = ";)";
+    user.fields.saltPassword = ";)";
+    return user.fields;
+  });
 };
 
 export default getUsers;
