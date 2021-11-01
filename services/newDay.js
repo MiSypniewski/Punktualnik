@@ -22,26 +22,32 @@ const newDay = async (section) => {
     moment.locale("pl");
     const now = moment().hours(0).minutes(0).seconds(0).milliseconds(0).format();
     const addHours = moment(now).hours(3).format();
-    const pyload = {
-      userID: user.ID,
-      name: user.name,
-      surname: user.surname,
-      section: user.section,
-      location: user.location,
-      data: addHours,
-      startTime: addHours,
-      endTime: addHours,
-      differenceTime: moment(now).hours(8).format(),
-      status: "wait",
-      overTime: false,
-    };
-    await airDB("Times").create([
-      {
-        fields: {
-          ...pyload,
+
+    for (let i = 0; i <= 10; i++) {
+      const newDay = moment(addHours).add(i, "days").format();
+      console.log(moment(newDay).format());
+
+      const pyload = {
+        userID: user.ID,
+        name: user.name,
+        surname: user.surname,
+        section: user.section,
+        location: user.location,
+        data: newDay,
+        startTime: newDay,
+        endTime: newDay,
+        differenceTime: moment(newDay).hours(8).format(),
+        status: "wait",
+        overTime: false,
+      };
+      await airDB("Times").create([
+        {
+          fields: {
+            ...pyload,
+          },
         },
-      },
-    ]);
+      ]);
+    }
   });
 };
 
