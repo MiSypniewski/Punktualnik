@@ -32,7 +32,7 @@ export default function Home({ times, id }) {
   // console.log(times);
   return (
     <div className="lg:container mx-auto bg-white">
-      <h1 className="text-center font-bold text-3xl py-1 px-2">Punktualnik</h1>
+      {/* <h1 className="text-center font-bold text-3xl py-1 px-2">Punktualnik</h1> */}
       <div className="grid grid-cols-3 gap-4 mt-4">
         {times.map((time) => (
           <Person time={time} key={time.ID} />
