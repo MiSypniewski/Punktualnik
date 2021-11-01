@@ -1,5 +1,4 @@
 import getSectionTime from "../../../services/getSectionTime";
-import saveTimes from "../../../services/saveTime";
 import moment from "moment";
 
 export default async (req, res) => {
@@ -7,7 +6,9 @@ export default async (req, res) => {
     case "GET": {
       // req.query.id;
       // req.query.section;
-      const time = await getSectionTime(req.query.id, moment().format("DD-MM-YYYY"));
+      const now = moment().hours(0).minutes(0).seconds(0).milliseconds(0).format();
+      const data = moment(now).hours(3).format();
+      const time = await getSectionTime(req.query.id, data);
       res.status(200).json(time);
 
       break;

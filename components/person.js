@@ -1,60 +1,96 @@
 import { useState, useEffect } from "react";
-import { jsonFetcher } from "../utils";
 import moment from "moment";
 
-const Person = ({ user }) => {
+const Person = ({ time }) => {
   moment.locale("pl");
-  console.log(user);
-  // const curentTime = jsonFetcher(`/api/user/${user.userID}`);
-  // console.log(curentTime);
 
-  const [status, setStatus] = useState("PRZYJŚCIE");
-  const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState(0);
-  const [time, setTime] = useState(0);
+  const [status, setStatus] = useState(time.status);
+  const [startTime, setStartTime] = useState(moment(time.startTime).format());
+  const [endTime, setEndTime] = useState(moment(time.endTime).format());
+  const [timeNow, setTimeNow] = useState(moment(time.differenceTime).format());
   const [intervalID, setIntervalID] = useState(null);
-  const [overtime, setOverTime] = useState(false);
+  const [overTime, setOverTime] = useState(time.overTime);
 
   useEffect(() => {
-    if (moment(time).format("HH:mm:ss") === "00:00:00") {
-      // console.log(`OVERTIME!`);
+    if (moment(timeNow).format("HH:mm:ss") === "00:00:00" && !overTime) {
       clearInterval(intervalID);
-      setStatus("WYJŚCIE");
       setOverTime(true);
-      setTime((prevState) => {
-        const newState = moment(prevState).add(1, "seconds");
-        return newState;
-      });
-      UpTimer();
+      setStatus("overTime");
+    }
+    if (moment(timeNow).format("HH:mm:ss") === "23:59:50" && overTime) {
+      setStatus("finishWork");
     }
   });
 
-  // useEffect(() => {
-  //   saveToDB();
-  // }, [startTime]);
+  useEffect(() => {
+    switch (status) {
+      // case "startWork": {
+      //
+      // break;
+      // }
+      case "workInProgress": {
+        const timeNow = moment();
+        const tmp = moment(endTime).subtract(timeNow).format();
+        const diff = moment(tmp).subtract(1, "hour").format();
+        setTimeNow(diff);
+        DownTimer();
+        saveToDB();
+        break;
+      }
+      case "finishWork": {
+        setEndTime(moment().format());
+        clearInterval(intervalID);
+        saveToDB();
+        break;
+      }
+      case "overTime": {
+        const timeNow = moment();
+        const diff = moment(timeNow).diff(moment(endTime));
+        setTimeNow(checkDiff(timeNow, diff));
+        UpTimer();
+        saveToDB();
+        break;
+      }
+      default:
+        console.log("nieobsługiwany status");
+    }
+  }, [status]);
+
+  const checkDiff = (timeNow, diff) => {
+    console.log(`diff`);
+    console.log(diff);
+    if (diff <= 0) {
+      const tmp = moment(endTime).add(1, "hours").format();
+      return moment(timeNow).diff(moment(tmp));
+    } else {
+      return moment(diff).format();
+    }
+  };
 
   // GOTOWY na przyjście --> Guzik wyświtla napis "przyjście" - status - WAIT
   // OBECNY W PRACY --> Guzik wyświtla napis "wcześniejsze wyjście" - status - STARTWORK
+  // PRACA ---> Guzik wyświtla napis "wcześniejsze wyjście" - status - workInProgress
   // WYJŚCIE PRZED CZASEM --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
   // WYJŚCIE PO 8h --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
   // czy były nadgodziny? --> status - FALSE - wcześniejsze wyjście; status - TRUE - wyjście po 8h
 
   const saveToDB = async () => {
     const payload = {
-      userID: user.ID,
-      name: user.name,
-      surname: user.surname,
-      section: user.section,
-      location: user.location,
-      data: moment().format("DD-MM-YYYY"),
-      startTime: moment(startTime).format("HH:mm:ss"),
-      endTime: moment(endTime).format("HH:mm:ss"),
-      differenceTime: moment(time).format("HH:mm:ss"),
-      overTime: overtime,
+      userID: time.userID,
+      name: time.name,
+      surname: time.surname,
+      section: time.section,
+      location: time.location,
+      data: moment(time.data).format(),
+      startTime: moment(startTime).format(),
+      endTime: moment(endTime).format(),
+      differenceTime: moment(timeNow).format(),
+      status: status,
+      overTime: overTime,
     };
 
-    await fetch("/api/times", {
-      method: "POST",
+    await fetch(`/api/time/${time.airtableID}`, {
+      method: "PUT",
       body: JSON.stringify(payload),
       headers: {
         "Content-Type": "application/json",
@@ -63,34 +99,27 @@ const Person = ({ user }) => {
   };
 
   const changeStatus = (status) => {
-    if (status === "PRZYJŚCIE") {
-      const now = moment.now();
-      const timeNow = moment(now);
-      const timeEnd = moment(timeNow).add(10, "seconds");
-      // const timeEnd = moment(timeNow).add(8, "hours");
-      const tmp = moment(timeEnd).subtract(timeNow);
-      const remanig = moment(tmp).subtract(1, "hour");
+    if (status === "startWork") {
+      const timeNow = moment().format();
+      const timeEnd = moment(timeNow).add(8, "hours").format();
       setStartTime(timeNow);
       setEndTime(timeEnd);
-      setTime(remanig);
-      DownTimer();
-      setStatus("WCZEŚNIEJSZE WYJŚCIE");
+      setStatus("workInProgress");
     }
-    if (status === "WCZEŚNIEJSZE WYJŚCIE") {
-      setEndTime(moment.now());
-      clearInterval(intervalID);
-      setStatus("KONIEC PRACY");
+    // if (status === "workInProgress") {
+    //   DownTimer();
+    // }
+    if (status === "endWork") {
+      setStatus("finishWork");
     }
-    if (status === "WYJŚCIE") {
-      setEndTime(moment.now());
-      clearInterval(intervalID);
-      setStatus("KONIEC PRACY");
+    if (status === "overTime") {
+      setStatus("finishWork");
     }
   };
 
   const UpTimer = () => {
     const intervalID = setInterval(() => {
-      setTime((prevState) => {
+      setTimeNow((prevState) => {
         const newState = moment(prevState).add(1, "seconds");
         return newState;
       });
@@ -100,7 +129,7 @@ const Person = ({ user }) => {
 
   const DownTimer = () => {
     const intervalID = setInterval(() => {
-      setTime((prevState) => {
+      setTimeNow((prevState) => {
         const newState = moment(prevState).subtract(1, "seconds");
         return newState;
       });
@@ -111,40 +140,39 @@ const Person = ({ user }) => {
   return (
     <div className="w-full h-48 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
       <h2 className="mt-2 text-2xl font-bold">
-        {user.name} {user.surname}
+        {time.name} {time.surname}
       </h2>
-      <p className="py-1 text-3xl mt-1">
-        {time !== 0 ? moment(time).format("HH:mm:ss") : moment().format("DD-MM-YYYY")}
-      </p>
+      <p className="py-1 text-3xl mt-1">{moment(timeNow).format("HH:mm:ss")}</p>
       <div className="flex py-3 mt-1">
-        {status === "PRZYJŚCIE" ? (
+        {status === "wait" ? (
           <button
-            value={status}
+            value="startWork"
             onClick={(e) => changeStatus(e.target.value)}
             className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
           >
-            {status}
+            PRZYJŚCIE
           </button>
         ) : null}
-        {status === "WCZEŚNIEJSZE WYJŚCIE" ? (
+
+        {status === "workInProgress" ? (
           <button
-            value={status}
+            value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
             className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-red-600 hover:bg-red-700"
           >
-            {status}
+            WCZEŚNIEJSZE WYJŚCIE
           </button>
         ) : null}
-        {status === "WYJŚCIE" ? (
+        {status === "overTime" ? (
           <button
-            value={status}
+            value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
             className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
           >
-            {status}
+            WYJŚCIE
           </button>
         ) : null}
-        {status === "KONIEC PRACY" ? (
+        {status === "finishWork" ? (
           <button
             value={status}
             className="block w-40 h-16 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
@@ -152,12 +180,6 @@ const Person = ({ user }) => {
             👍
           </button>
         ) : null}
-        <button
-          onClick={() => saveToDB()}
-          className="block w-40 h-16 rounded-lg font-bold text-white text-lg shadow-lg mx-auto px-4 py-2 bg-yellow-600 hover:bg-yellow-700"
-        >
-          Zapisz
-        </button>
       </div>
     </div>
   );

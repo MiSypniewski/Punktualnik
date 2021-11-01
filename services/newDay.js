@@ -2,9 +2,9 @@ import airDB from "../services/airtableClient";
 import moment from "moment";
 
 const newDay = async (section) => {
+  moment.locale("pl");
   const getUsers = async (section) => {
     const users = await airDB("Users")
-      // .select({ filterByFormula: `AND(User="${user}", Data="${data}")` })
       .select({ filterByFormula: `AND(Section="${section}", IsActive="Active")` })
       .firstPage();
 
@@ -15,19 +15,23 @@ const newDay = async (section) => {
     });
   };
 
+  //zmienić na zmienną section
   const users = await getUsers("biedronka");
 
   users.forEach(async (user) => {
+    moment.locale("pl");
+    const now = moment().hours(0).minutes(0).seconds(0).milliseconds(0).format();
+    const addHours = moment(now).hours(3).format();
     const pyload = {
       userID: user.ID,
       name: user.name,
       surname: user.surname,
       section: user.section,
       location: user.location,
-      data: moment().format("DD-MM-YYYY"),
-      startTime: moment({ h: 0, m: 0, s: 0, ms: 0 }).format("HH:mm:ss"),
-      endTime: moment({ h: 0, m: 0, s: 0, ms: 0 }).format("HH:mm:ss"),
-      differenceTime: moment({ h: 0, m: 0, s: 0, ms: 0 }).format("HH:mm:ss"),
+      data: addHours,
+      startTime: addHours,
+      endTime: addHours,
+      differenceTime: moment(now).hours(8).format(),
       status: "wait",
       overTime: false,
     };

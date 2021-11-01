@@ -1,31 +1,23 @@
 import Person from "../components/person";
 import Clock from "../components/clock";
-import getRecentTimes from "../services/getTime";
-import getUsers from "../services/getUsers";
+// import getRecentTimes from "../services/getTime";
+// import getUsers from "../services/getUsers";
 import useSWR from "swr";
 import { jsonFetcher } from "../utils";
 import moment from "moment";
 
-export const getStaticProps = async () => {
-  const times = await getRecentTimes(moment().format("DD-MM-YYYY"));
-  const users = await getUsers("Biedronka");
+// export const getStaticProps = async () => {
+// const times = await getRecentTimes(moment().format("DD-MM-YYYY"));
+// const users = await getUsers("Biedronka");
 
-  //zmemić na pobieranie lokalizacji , działów lub możliwość wszystkich!!!
+//zmemić na pobieranie lokalizacji , działów lub możliwość wszystkich!!!
 
-  users.forEach((user) => {
-    user.Password = ":)";
-    user.SaltPassword = ":)";
-    return user;
-  });
-
-  console.log(users);
-  return {
-    props: {
-      times,
-      users,
-    },
-  };
-};
+//   return {
+//     props: {
+//       users: ":]",
+//     },
+//   };
+// };
 
 // export const getServerSideProps = async () => {
 //   const times = await getRecentTimes(moment().format("DD-MM-YYYY"));
@@ -46,10 +38,9 @@ export const getStaticProps = async () => {
 //   };
 // };
 
-export default function Home({ times, users }) {
-  const { data } = useSWR("/api/times", jsonFetcher, { initialData: times });
+export default function Home({}) {
   // console.log(data);
-  console.log(users);
+  // console.log(users);
   return (
     <div className="lg:container mx-auto bg-white">
       <h1 className="text-center font-bold text-3xl py-1 px-2">Punktualnik</h1>

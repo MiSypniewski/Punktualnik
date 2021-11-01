@@ -11,7 +11,7 @@ export default async (req, res) => {
     // case "POST": {
     //   const payload = req.body;
     //   console.log("payload on backend", payload);
-    //   const offer = await saveTimes(payload);
+    //   const offer = await newDay();
     //   res.status(200).json({ status: "created", offer });
 
     //   break;
