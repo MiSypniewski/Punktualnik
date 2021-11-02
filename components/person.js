@@ -138,17 +138,17 @@ const Person = ({ time }) => {
   };
 
   return (
-    <div className="w-full h-48 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
-      <h2 className="mt-2 text-2xl font-bold">
+    <div className="w-full h-40 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
+      <h2 className="mt-1 text-xl font-bold">
         {time.name} {time.surname}
       </h2>
-      <p className="py-1 text-3xl mt-1">{moment(timeNow).format("HH:mm:ss")}</p>
-      <div className="flex py-3 mt-1">
+      <p className="py-1 text-2xl mt-1">{moment(timeNow).format("HH:mm:ss")}</p>
+      <div className="flex py-3">
         {status === "wait" ? (
           <button
             value="startWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
           >
             PRZYJŚCIE
           </button>
@@ -158,7 +158,7 @@ const Person = ({ time }) => {
           <button
             value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-red-600 hover:bg-red-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-1 bg-red-600 hover:bg-red-700"
           >
             WCZEŚNIEJSZE WYJŚCIE
           </button>
@@ -167,7 +167,7 @@ const Person = ({ time }) => {
           <button
             value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-16 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
           >
             WYJŚCIE
           </button>
@@ -175,7 +175,7 @@ const Person = ({ time }) => {
         {status === "finishWork" ? (
           <button
             value={status}
-            className="block w-40 h-16 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-2 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
           >
             👍
           </button>
