@@ -138,7 +138,7 @@ const Person = ({ time }) => {
   };
 
   return (
-    <div className="w-full h-40 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
+    <div className="sm:w-auto md:w-auto lg:w-full h-40 rounded-lg bg-blue-300 text-center p-2 shadow-xl">
       <h2 className="mt-1 text-xl font-bold">
         {time.name} {time.surname}
       </h2>
