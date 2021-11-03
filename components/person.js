@@ -7,19 +7,26 @@ const Person = ({ time }) => {
   const [status, setStatus] = useState(time.status);
   const [startTime, setStartTime] = useState(moment(time.startTime).format());
   const [endTime, setEndTime] = useState(moment(time.endTime).format());
-  const [timeNow, setTimeNow] = useState(moment(time.differenceTime).format());
+  const [timeNow, setTimeNow] = useState(moment(time.differenceTime).format()); //<--- zmienić nazwę zmiennej!!!
   const [intervalID, setIntervalID] = useState(null);
   const [overTime, setOverTime] = useState(time.overTime);
+  const [message, setMessage] = useState("Dzień Dobry");
 
   useEffect(() => {
-    if (moment(timeNow).format("HH:mm:ss") === "00:00:00" && !overTime) {
+    // checktime(endTime);
+    if (moment(timeNow).zone(0).format("HH:mm:ss") === "00:00:00" && !overTime) {
+      console.log();
       clearInterval(intervalID);
       setOverTime(true);
       setStatus("overTime");
+      // checktime(endTime);
     }
-    if (moment(timeNow).format("HH:mm:ss") === "23:59:50" && overTime) {
+    if (moment(timeNow).zone(0).format("HH:mm:ss") === "23:59:50" && overTime) {
       setStatus("finishWork");
     }
+    // setInterval(() => {
+    //   checktime(time.endTime);
+    // }, 1000);
   });
 
   useEffect(() => {
@@ -30,25 +37,33 @@ const Person = ({ time }) => {
       // }
       case "workInProgress": {
         const timeNow = moment();
-        const tmp = moment(endTime).subtract(timeNow).format();
-        const diff = moment(tmp).subtract(1, "hour").format();
+        const diff = moment(endTime).subtract(timeNow).format();
+        // const diff = moment(tmp).subtract(1, "hour").format();
         setTimeNow(diff);
-        DownTimer();
-        saveToDB();
+        // setTimeNow(checktime(endTime));
+        if (checktime(endTime)) {
+          setStatus("overTime");
+        } else {
+          DownTimer();
+        }
+
+        // checktime(endTime);
+        // saveToDB();
         break;
       }
       case "finishWork": {
         setEndTime(moment().format());
         clearInterval(intervalID);
-        saveToDB();
+        setMessage("Do widzenia!");
         break;
       }
       case "overTime": {
         const timeNow = moment();
         const diff = moment(timeNow).diff(moment(endTime));
-        setTimeNow(checkDiff(timeNow, diff));
+        setTimeNow(diff);
+        // setTimeNow(checktime(endTime));
         UpTimer();
-        saveToDB();
+        // saveToDB();
         break;
       }
       default:
@@ -56,15 +71,38 @@ const Person = ({ time }) => {
     }
   }, [status]);
 
-  const checkDiff = (timeNow, diff) => {
-    console.log(`diff`);
-    console.log(diff);
-    if (diff <= 0) {
-      const tmp = moment(endTime).add(1, "hours").format();
-      return moment(timeNow).diff(moment(tmp));
-    } else {
-      return moment(diff).format();
+  //zmienić wyśtalnie na moment().to i moment().toNow()
+
+  const checktime = (endTime) => {
+    const check = moment().isSameOrAfter(endTime);
+    //false = "za 2 minuty"
+    moment.locale("pl");
+    setMessage(moment().to(endTime));
+    console.log(moment().to(endTime));
+
+    return check;
+    if (check) {
+      clearInterval(intervalID);
+      setStatus("overTime");
+      setOverTime(true);
     }
+    // const check = moment(moment().format()).diff(endTime);
+    // const check = moment(moment().format()).isAfter(endTime);
+    // console.log(check);
+    // if (check > 0) {
+    //   console.log(`check dodatni: ${check}`);
+    //   setOverTime(true);
+    //   setStatus("overTime");
+    //   return moment(check).format();
+    // } else if (check < 0) {
+    //   console.log(`check ujemny: ${check}`);
+    //   return moment(check).format();
+    // } else {
+    //   console.log(`check taki sam: ${check}`);
+    //   setStatus("overTime");
+    //   setOverTime(true);
+    //   return moment(check).subtract(1, "hours").format();
+    // }
   };
 
   // GOTOWY na przyjście --> Guzik wyświtla napis "przyjście" - status - WAIT
@@ -74,7 +112,7 @@ const Person = ({ time }) => {
   // WYJŚCIE PO 8h --> Guzik wyświtla napis "koniec pracy" - status - ENDHOME
   // czy były nadgodziny? --> status - FALSE - wcześniejsze wyjście; status - TRUE - wyjście po 8h
 
-  const saveToDB = async () => {
+  const saveToDB = async (timeStart, timeEnd, differenceTime, status, overTime = false) => {
     const payload = {
       userID: time.userID,
       name: time.name,
@@ -82,9 +120,9 @@ const Person = ({ time }) => {
       section: time.section,
       location: time.location,
       data: moment(time.data).format(),
-      startTime: moment(startTime).format(),
-      endTime: moment(endTime).format(),
-      differenceTime: moment(timeNow).format(),
+      startTime: moment(timeStart).format(),
+      endTime: moment(timeEnd).format(),
+      differenceTime: moment(differenceTime).format(),
       status: status,
       overTime: overTime,
     };
@@ -100,20 +138,38 @@ const Person = ({ time }) => {
 
   const changeStatus = (status) => {
     if (status === "startWork") {
-      const timeNow = moment().format();
-      const timeEnd = moment(timeNow).add(8, "hours").format();
-      setStartTime(timeNow);
+      const timeStart = moment().format();
+      const timeEnd = moment(timeStart).add(8, "hours").format();
+      const differenceTime = moment(timeStart).hours(8).format();
+      const status = "workInProgress";
+      setStartTime(timeStart);
       setEndTime(timeEnd);
-      setStatus("workInProgress");
+      setStatus(status);
+      saveToDB(timeStart, timeEnd, differenceTime, status);
     }
     // if (status === "workInProgress") {
     //   DownTimer();
     // }
     if (status === "endWork") {
-      setStatus("finishWork");
+      const timeStart = moment(startTime).format();
+      const timeEnd = moment().format();
+      const differenceTime = moment(timeEnd).diff(moment(timeStart)); // zmienić na pradziwą wartość z OBLICZENIA!!!!
+      const status = "finishWork";
+      console.log(differenceTime);
+      setEndTime(timeEnd);
+      setStatus(status);
+      saveToDB(timeStart, timeEnd, differenceTime, status, overTime);
     }
     if (status === "overTime") {
-      setStatus("finishWork");
+      const timeStart = moment(startTime).format();
+      const timeEnd = moment().format();
+      const differenceTime = moment(timeEnd).diff(moment(timeStart)); // zmienić na pradziwą wartość z OBLICZENIA!!!!
+      const status = "finishWork";
+      const overTime = true;
+      console.log(differenceTime);
+      setEndTime(timeEnd);
+      setStatus(status);
+      saveToDB(timeStart, timeEnd, differenceTime, status, overTime);
     }
   };
 
@@ -124,6 +180,7 @@ const Person = ({ time }) => {
         return newState;
       });
     }, 1000);
+    // checktime(time.endTime);
     setIntervalID(intervalID);
   };
 
@@ -133,6 +190,7 @@ const Person = ({ time }) => {
         const newState = moment(prevState).subtract(1, "seconds");
         return newState;
       });
+      // checktime(time.endTime);
     }, 1000);
     setIntervalID(intervalID);
   };
@@ -142,7 +200,8 @@ const Person = ({ time }) => {
       <h2 className="mt-1 text-xl font-bold">
         {time.name} {time.surname}
       </h2>
-      <p className="py-1 text-2xl mt-1">{moment(timeNow).format("HH:mm:ss")}</p>
+      <p className="py-1 text-2xl mt-1">{moment(timeNow).zone(0).format("HH:mm:ss")}</p>
+      {/* <p className="py-1 text-2xl mt-1">{message}</p> */}
       <div className="flex py-3">
         {status === "wait" ? (
           <button
