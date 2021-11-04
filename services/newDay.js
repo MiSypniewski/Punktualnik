@@ -36,7 +36,7 @@ const newDay = async (section) => {
         data: newDay,
         startTime: newDay,
         endTime: newDay,
-        differenceTime: moment(newDay).hours(8).format(),
+        differenceTime: moment(newDay).add(8, "hours").format(),
         status: "wait",
         overTime: false,
       };
