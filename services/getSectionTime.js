@@ -1,7 +1,6 @@
 import airDB from "./airtableClient";
 
 const getSectionTime = async (section, data) => {
-  console.log(data);
   const times = await airDB("Times")
     .select({ filterByFormula: `AND(section="${section}", data="${data}")` })
     // .select({ filterByFormula: `Data="${data}"` })
