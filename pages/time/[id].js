@@ -54,8 +54,8 @@ export default function Home({ times, id }) {
       {/* <h1 className="text-center font-bold text-3xl py-1 px-2">{firtstRun ? "Prawda" : "Fałsz"}</h1> */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-1 p-2">
         {data
-          ? data.map((time) => <Person time={time} key={time.ID} tmp="dataMap" />)
-          : times.map((time) => <Person time={time} key={time.ID} tmp="timesMap" />)}
+          ? data.map((time) => <Person time={time} key={time.ID} />)
+          : times.map((time) => <Person time={time} key={time.ID} />)}
         {/* {times.map((time) => (
           <Person time={time} key={time.ID} />
         ))} */}
