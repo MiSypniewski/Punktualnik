@@ -157,16 +157,18 @@ const Person = ({ time }) => {
       <h2 className="mt-1 text-xl font-bold">
         {time.name} {time.surname}
       </h2>
-      <p className="py-1 text-2xl mt-1">{moment(timeNow).utcOffset(0).format("HH:mm:ss")}</p>
+      <p className="py-1 text-2xl mt-1">
+        {status === "wait" ? "Miłego dnia!" : moment(timeNow).utcOffset(0).format("HH:mm:ss")}
+      </p>
       {/* <p className="py-1 text-2xl mt-1">{message}</p> */}
       <div className="flex py-3">
         {status === "wait" ? (
           <button
             value="startWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-14 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
           >
-            PRZYJŚCIE
+            👊
           </button>
         ) : null}
 
@@ -174,24 +176,32 @@ const Person = ({ time }) => {
           <button
             value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-14 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-1 bg-red-600 hover:bg-red-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-red-600 hover:bg-red-700"
           >
-            WCZEŚNIEJSZE WYJŚCIE
+            ⏱
           </button>
         ) : null}
         {status === "overTime" ? (
           <button
             value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-14 rounded-lg font-bold text-white shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
           >
-            WYJŚCIE
+            👋
           </button>
         ) : null}
-        {status === "finishWork" ? (
+        {status === "finishWork" && overTime ? (
           <button
             value={status}
             className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
+          >
+            👍
+          </button>
+        ) : null}
+        {status === "finishWork" && !overTime ? (
+          <button
+            value={status}
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-red-600 hover:bg-red-700"
           >
             👍
           </button>
