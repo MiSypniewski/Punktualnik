@@ -23,7 +23,7 @@ const newDay = async (section) => {
     const now = moment().hours(0).minutes(0).seconds(0).milliseconds(0).format();
     const addHours = moment(now).hours(3).format();
 
-    for (let i = 0; i <= 10; i++) {
+    for (let i = 0; i <= 60; i++) {
       const newDay = moment(addHours).add(i, "days").format();
       console.log(moment(newDay).format());
 
@@ -36,7 +36,7 @@ const newDay = async (section) => {
         data: newDay,
         startTime: newDay,
         endTime: newDay,
-        differenceTime: moment(newDay).add(8, "hours").format(),
+        differenceTime: moment(newDay).hours(8).minutes(0).seconds(0).milliseconds(0).format(),
         status: "wait",
         overTime: false,
       };
