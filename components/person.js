@@ -166,7 +166,7 @@ const Person = ({ time }) => {
           <button
             value="startWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-blue-600 hover:bg-blue-700"
           >
             👊
           </button>
@@ -185,7 +185,7 @@ const Person = ({ time }) => {
           <button
             value="endWork"
             onClick={(e) => changeStatus(e.target.value)}
-            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-green-600 hover:bg-green-700"
+            className="block w-40 h-14 rounded-lg font-bold text-white text-4xl shadow-lg mx-auto px-4 py-1 bg-yellow-600 hover:bg-yellow-700"
           >
             👋
           </button>
