@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import router, { useRouter } from "next/router";
 import Person from "../../components/person";
+import NewPerson from "../../components/newPerson";
 import getSectionTime from "../../services/getSectionTime";
 import useSWR from "swr";
 import { jsonFetcher } from "../../utils";
@@ -22,6 +23,9 @@ export const getServerSideProps = async (context) => {
 };
 
 export default function Home({ times, id }) {
+  // moment.locale("pl");
+  // const t = moment().format("LLLL");
+  // console.log(t);
   // const router = useRouter();
   // if (!users.length) {
   // router.push(`/`);
@@ -50,14 +54,19 @@ export default function Home({ times, id }) {
   }, [firtstRun]);
 
   return (
-    <div className="lg:container mx-auto bg-white">
+    <div className="bg-white">
       {/* <h1 className="text-center font-bold text-3xl py-1 px-2">{firtstRun ? "Prawda" : "Fałsz"}</h1> */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-1 p-2">
+      <div className="flex gap-6 w-full px-4 py-1">
+        <p className="font-bold">{moment().locale("pl").format("LLLL")}</p>
+        <p className="text-center flex-grow">Pysznej kawusi --- jebać kapusi </p>
+        <p className="capitalize font-bold">{id}</p>
+      </div>
+      <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-1 p-2">
         {data
-          ? data.map((time) => <Person time={time} key={time.ID} />)
-          : times.map((time) => <Person time={time} key={time.ID} />)}
+          ? data.map((time) => <NewPerson time={time} key={time.ID} />)
+          : times.map((time) => <NewPerson time={time} key={time.ID} />)}
         {/* {times.map((time) => (
-          <Person time={time} key={time.ID} />
+          <NewPerson time={time} key={time.ID} />
         ))} */}
       </div>
     </div>
