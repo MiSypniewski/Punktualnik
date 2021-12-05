@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import moment from "moment";
 
-const newPerson = ({ time }) => {
+const NewPerson = ({ time }) => {
   moment.locale("pl");
 
   const [status, setStatus] = useState(time.status);
@@ -238,4 +238,4 @@ const newPerson = ({ time }) => {
   return <div>{display(status)}</div>;
 };
 
-export default newPerson;
+export default NewPerson;
