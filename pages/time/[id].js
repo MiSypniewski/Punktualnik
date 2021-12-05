@@ -27,7 +27,7 @@ export const getServerSideProps = async (context) => {
 
 export default function Home({ times, id, date }) {
   moment.locale("pl");
-  const time = moment().format("HH:MM:ss");
+  const time = moment().format("HH:mm:ss");
 
   // const router = useRouter();
   // if (!users.length) {
