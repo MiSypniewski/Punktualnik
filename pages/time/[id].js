@@ -6,35 +6,35 @@ import getSectionTime from "../../services/getSectionTime";
 import useSWR from "swr";
 import { jsonFetcher } from "../../utils";
 import moment from "moment";
+moment.locale("pl");
 
 export const getServerSideProps = async (context) => {
   moment.locale("pl");
   const now = moment().hours(0).minutes(0).seconds(0).milliseconds(0).format();
   const data = moment(now).hours(3).format();
   const times = await getSectionTime(context.params.id, data);
+  const date = moment().format("dddd, D MMMM YYYY, ");
   // console.log(times);
 
   return {
     props: {
+      date,
       times,
       id: context.params.id,
     },
   };
 };
 
-export default function Home({ times, id }) {
-  // moment.locale("pl");
-  // const t = moment().format("LLLL");
-  // console.log(t);
+export default function Home({ times, id, date }) {
+  moment.locale("pl");
+  const time = moment().format("HH:MM:ss");
+
   // const router = useRouter();
   // if (!users.length) {
   // router.push(`/`);
   // }
 
   const { data } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: times });
-  // console.log(`data:`);
-  // console.log(data);
-  // console.log(times);
   const [intervalID, setIntervalID] = useState(null);
   const [firtstRun, setFirstRun] = useState(false);
   const [counter, setCounter] = useState(0);
@@ -55,13 +55,12 @@ export default function Home({ times, id }) {
 
   return (
     <div className="bg-white">
-      {/* <h1 className="text-center font-bold text-3xl py-1 px-2">{firtstRun ? "Prawda" : "Fałsz"}</h1> */}
       <div className="flex gap-6 w-full px-4 py-1">
-        <p className="font-bold">{moment().locale("pl").format("LLLL")}</p>
-        <p className="text-center flex-grow">Pysznej kawusi --- jebać kapusi </p>
+        <p className="capitalize flex-grow font-bold">{`${date} ${time}`}</p>
+        {/* <p className="text-center flex-grow">Pysznej kawusi...</p> */}
         <p className="capitalize font-bold">{id}</p>
       </div>
-      <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-1 p-2">
+      <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-1 p-2">
         {data
           ? data.map((time) => <NewPerson time={time} key={time.ID} />)
           : times.map((time) => <NewPerson time={time} key={time.ID} />)}
