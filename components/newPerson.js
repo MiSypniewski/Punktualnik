@@ -192,7 +192,9 @@ const NewPerson = ({ time }) => {
             className="flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-center p-2 shadow-xl"
             onClick={() => changeStatus("endWork")}
           >
-            <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">👋</div>
+            <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3 font-normal">
+              👋
+            </div>
             <div className="flex-grow">
               <h2 className="mt-5 text-xl font-bold">
                 {time.name} {time.surname}
@@ -210,7 +212,6 @@ const NewPerson = ({ time }) => {
                 ? "bg-green-600 hover:bg-green-700 flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl"
                 : "bg-red-500 hover:bg-red-600 flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl"
             }
-            onClick={() => changeStatus("endWork")}
           >
             <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">
               {overTime ? "👍" : "👎"}
