@@ -33,8 +33,8 @@ export default function Home({ times, id, date }) {
   // if (!users.length) {
   // router.push(`/`);
   // }
-
   const { data } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: times });
+  // const { data } = useSWR(`/api/section/${id}`, jsonFetcher);
   const [intervalID, setIntervalID] = useState(null);
   const [firtstRun, setFirstRun] = useState(false);
   const [counter, setCounter] = useState(0);
@@ -61,9 +61,9 @@ export default function Home({ times, id, date }) {
         <p className="capitalize font-bold">{id}</p>
       </div>
       <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-1 p-2">
-        {data
-          ? data.map((time) => <NewPerson time={time} key={time.ID} />)
-          : times.map((time) => <NewPerson time={time} key={time.ID} />)}
+        {data != undefined
+          ? data.map((user) => <NewPerson time={user} key={time.ID} />)
+          : times.map((user) => <NewPerson time={user} key={time.ID} />)}
         {/* {times.map((time) => (
           <NewPerson time={time} key={time.ID} />
         ))} */}
