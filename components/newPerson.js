@@ -12,6 +12,7 @@ const NewPerson = ({ time }) => {
   const [intervalID, setIntervalID] = useState(null);
   const [overTime, setOverTime] = useState(time.overTime);
   const [message, setMessage] = useState("Dzień Dobry");
+  const [refresh, setRefresh] = useState(false);
 
   useEffect(() => {
     if (moment(timeNow).utcOffset(0).format("HH:mm:ss") === "00:00:00" && !overTime) {
@@ -26,7 +27,7 @@ const NewPerson = ({ time }) => {
 
   useEffect(() => {
     clearInterval(intervalID);
-    console.log(`uruchamiam useEffect`);
+    // console.log(`uruchamiam useEffect`);
     switch (status) {
       case "workInProgress": {
         const timeNow = moment();
@@ -56,6 +57,13 @@ const NewPerson = ({ time }) => {
         console.log("nieobsługiwany status");
     }
   }, [status]);
+
+  useEffect(() => {
+    if (refresh) {
+      setRefresh(false);
+      setStatus(time.status);
+    }
+  }, [refresh]);
 
   const checktime = (endTime) => {
     const check = moment().isSameOrAfter(endTime);
@@ -175,6 +183,9 @@ const NewPerson = ({ time }) => {
     if (status === "wait") return "Dzień Dobry";
     else return moment(timeNow).utcOffset(0).format("HH:mm:ss");
   };
+  // console.log(`${time.surname} : ${time.status}`);
+  // console.log(`${time.surname} : ${status}`);
+  // if (status !== time.status && !refresh) setRefresh(true);
 
   return (
     <div className={statusClass} onClick={() => changeStatus()}>
