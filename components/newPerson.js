@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import moment from "moment";
+import classNames from "classnames";
 
 const NewPerson = ({ time }) => {
   moment.locale("pl");
@@ -11,6 +12,7 @@ const NewPerson = ({ time }) => {
   const [intervalID, setIntervalID] = useState(null);
   const [overTime, setOverTime] = useState(time.overTime);
   const [message, setMessage] = useState("Dzień Dobry");
+  const [refresh, setRefresh] = useState(false);
 
   useEffect(() => {
     if (moment(timeNow).utcOffset(0).format("HH:mm:ss") === "00:00:00" && !overTime) {
@@ -24,11 +26,9 @@ const NewPerson = ({ time }) => {
   });
 
   useEffect(() => {
+    clearInterval(intervalID);
+    // console.log(`uruchamiam useEffect`);
     switch (status) {
-      // case "startWork": {
-      //
-      // break;
-      // }
       case "workInProgress": {
         const timeNow = moment();
         const diff = moment(endTime).subtract(timeNow).format();
@@ -57,6 +57,13 @@ const NewPerson = ({ time }) => {
         console.log("nieobsługiwany status");
     }
   }, [status]);
+
+  useEffect(() => {
+    if (refresh) {
+      setRefresh(false);
+      setStatus(time.status);
+    }
+  }, [refresh]);
 
   const checktime = (endTime) => {
     const check = moment().isSameOrAfter(endTime);
@@ -95,8 +102,8 @@ const NewPerson = ({ time }) => {
     });
   };
 
-  const changeStatus = (status) => {
-    if (status === "startWork") {
+  const changeStatus = () => {
+    if (status === "wait") {
       const timeStart = moment().format();
       const timeEnd = moment(timeStart).add(8, "hours").format();
       const differenceTime = moment(timeStart).add(8, "hours").format();
@@ -106,9 +113,16 @@ const NewPerson = ({ time }) => {
       setStatus(status);
       saveToDB(timeStart, timeEnd, differenceTime, status);
     }
-    // if (status === "workInProgress") {
-    //   DownTimer();
-    // }
+    if (status === "workInProgress") {
+      const timeStart = moment(startTime).format();
+      const timeEnd = moment().format();
+      const differenceTime = moment(timeEnd).diff(moment(timeStart));
+      const status = "finishWork";
+      setEndTime(timeEnd);
+      setStatus(status);
+      saveToDB(timeStart, timeEnd, differenceTime, status, overTime);
+    }
+
     if (status === "overTime") {
       const timeStart = moment(startTime).format();
       const timeEnd = moment().format();
@@ -119,6 +133,7 @@ const NewPerson = ({ time }) => {
       setStatus(status);
       saveToDB(timeStart, timeEnd, differenceTime, status, overTime);
     }
+    //ten status nie powienien działać -- zostawiam wrazie awarii
     if (status === "endWork") {
       const timeStart = moment(startTime).format();
       const timeEnd = moment().format();
@@ -132,105 +147,57 @@ const NewPerson = ({ time }) => {
 
   const UpTimer = () => {
     const intervalID = setInterval(() => {
-      setTimeNow((prevState) => {
-        const newState = moment(prevState).add(1, "seconds");
-        return newState;
-      });
+      const timeNow = moment();
+      const diff = moment(timeNow).diff(moment(endTime));
+      setTimeNow(diff);
     }, 1000);
-    // checktime(time.endTime);
     setIntervalID(intervalID);
   };
 
   const DownTimer = () => {
     const intervalID = setInterval(() => {
-      setTimeNow((prevState) => {
-        const newState = moment(prevState).subtract(1, "seconds");
-        return newState;
-      });
-      // checktime(time.endTime);
+      const timeNow = moment();
+      const diff = moment(endTime).subtract(timeNow).format();
+      setTimeNow(diff);
     }, 1000);
     setIntervalID(intervalID);
   };
 
-  const display = (status) => {
-    switch (status) {
-      case "wait":
-        return (
-          <div
-            className="flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg bg-blue-400 hover:bg-blue-500 text-center p-2 shadow-xl"
-            onClick={() => changeStatus("startWork")}
-          >
-            <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">👊</div>
-            <div className="flex-grow">
-              <h2 className="mt-5 text-xl font-bold">
-                {time.name} {time.surname}
-              </h2>
-              <p className="py-1 text-2xl mt-1">Miłego dnia!</p>
-            </div>
-          </div>
-        );
-        break;
-      case "workInProgress":
-        return (
-          <div
-            className="flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg bg-red-500 hover:bg-red-600 text-center p-2 shadow-xl"
-            onClick={() => changeStatus("endWork")}
-          >
-            <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">⏱</div>
-            <div className="flex-grow">
-              <h2 className="mt-5 text-xl font-bold">
-                {time.name} {time.surname}
-              </h2>
-              <p className="py-1 text-2xl mt-1">{moment(timeNow).utcOffset(0).format("HH:mm:ss")}</p>
-            </div>
-          </div>
-        );
-        break;
-      case "overTime":
-        return (
-          <div
-            className="flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-center p-2 shadow-xl"
-            onClick={() => changeStatus("endWork")}
-          >
-            <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3 font-normal">
-              👋
-            </div>
-            <div className="flex-grow">
-              <h2 className="mt-5 text-xl font-bold">
-                {time.name} {time.surname}
-              </h2>
-              <p className="py-1 text-2xl mt-1">{moment(timeNow).utcOffset(0).format("HH:mm:ss")}</p>
-            </div>
-          </div>
-        );
-        break;
-      case "finishWork":
-        return (
-          <div
-            className={
-              overTime
-                ? "bg-green-600 hover:bg-green-700 flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl"
-                : "bg-red-500 hover:bg-red-600 flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl"
-            }
-          >
-            <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">
-              {overTime ? "👍" : "👎"}
-            </div>
-            <div className="flex-grow">
-              <h2 className="mt-5 text-xl font-bold">
-                {time.name} {time.surname}
-              </h2>
-              <p className="py-1 text-2xl mt-1">{moment(timeNow).utcOffset(0).format("HH:mm:ss")}</p>
-            </div>
-          </div>
-        );
-        break;
-      default:
-        console.log(`Sorry, we are out of ${status}.`);
-    }
+  let statusClass = classNames("flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl", {
+    "bg-blue-400 hover:bg-blue-500": status === "wait",
+    "bg-red-500 hover:bg-red-600": status === "workInProgress",
+    "bg-yellow-600 hover:bg-yellow-700": status === "overTime",
+    "bg-green-600 hover:bg-green-700": status === "finishWork" && overTime,
+    "bg-red-600 hover:bg-red-700": status === "finishWork" && !overTime,
+  });
+
+  const icon = () => {
+    if (status === "wait") return "👊";
+    if (status === "workInProgress") return "⏱";
+    if (status === "overTime") return "👋";
+    if (status === "finishWork" && overTime) return "👍";
+    if (status === "finishWork" && !overTime) return "👎";
   };
 
-  return <div>{display(status)}</div>;
+  const textDisplay = () => {
+    if (status === "wait") return "Dzień Dobry";
+    else return moment(timeNow).utcOffset(0).format("HH:mm:ss");
+  };
+  // console.log(`${time.surname} : ${time.status}`);
+  // console.log(`${time.surname} : ${status}`);
+  // if (status !== time.status && !refresh) setRefresh(true);
+
+  return (
+    <div className={statusClass} onClick={() => changeStatus()}>
+      <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">{icon()}</div>
+      <div className="flex-grow">
+        <h2 className="mt-5 text-xl font-bold">
+          {time.name} {time.surname}
+        </h2>
+        <p className="py-1 text-2xl mt-1">{textDisplay()}</p>
+      </div>
+    </div>
+  );
 };
 
 export default NewPerson;
