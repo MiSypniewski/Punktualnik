@@ -23,11 +23,13 @@ const authorizeUser = async (payload) => {
 
   const passwordHash = crypto.pbkdf2Sync(password, user.fields.passwordSalt, 2137, 256, `sha512`).toString(`hex`);
 
+  // console.log(user.fields);
+
   if (passwordHash !== user.fields.passwordHash) {
     return null;
   }
 
-  if (user.fields.isActive === "Inactive") {
+  if (!user.fields.isActive) {
     return null;
   }
 
@@ -36,6 +38,7 @@ const authorizeUser = async (payload) => {
     email: user.fields.email,
     name: user.fields.name,
     role: user.fields.role,
+    section: user.fields.section,
   };
 };
 

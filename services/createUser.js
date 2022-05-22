@@ -38,7 +38,7 @@ const createUser = async (payload) => {
         passwordHash,
         passwordSalt,
         role: "user",
-        isActive: "Inactive",
+        isActive: false,
       },
     },
   ]);
