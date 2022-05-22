@@ -17,6 +17,8 @@ export default function CreateUser() {
     const form = new FormData(userForm.current);
     const payload = {
       email: form.get("email"),
+      name: form.get("name"),
+      surname: form.get("surname"),
       password: form.get("password"),
       location: form.get("location"),
       section: form.get("section"),
@@ -28,9 +30,25 @@ export default function CreateUser() {
       return;
     }
 
-    console.log(payload);
+    const response = await fetch("/api/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-    setFormProcessing(false);
+    if (response.ok) {
+      router.push("/users/comfirm");
+    } else {
+      const payload = await response.json();
+      setFormProcessing(false);
+      setError(payload.error);
+    }
+
+    // console.log(payload);
+
+    // setFormProcessing(false);
   };
 
   return (
