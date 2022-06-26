@@ -3,6 +3,7 @@ import newDay from "../../services/newDay";
 export default async (req, res) => {
   // switch (req.method) {
   //   case "GET": {
+  //     console.log(`metoda GET`);
   //     const newDays = await newDay();
   //     res.status(200).json(newDays);
   //     break;

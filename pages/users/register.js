@@ -1,10 +1,12 @@
 import { useState, useRef } from "react";
 import { jsonFetcher } from "../../utils";
 import { useRouter } from "next/router";
+import { fromJSON } from "postcss";
 
 export default function CreateUser() {
   const userForm = useRef();
   const [error, setError] = useState();
+  const [cashregisterNumbers, setCashRegisterNumbers] = useState(0);
   const [formProcessing, setFormProcessing] = useState(false);
   const router = useRouter();
 
@@ -15,6 +17,10 @@ export default function CreateUser() {
     setError(null);
     setFormProcessing(true);
     const form = new FormData(userForm.current);
+    console.log(`checkboxy: `);
+    console.log(form.getAll("numerKasy"));
+    console.log(`range input:`);
+    console.log(form.getAll("iloscKas"));
     const payload = {
       email: form.get("email"),
       name: form.get("name"),
@@ -22,6 +28,8 @@ export default function CreateUser() {
       password: form.get("password"),
       location: form.get("location"),
       section: form.get("section"),
+      iloscKas: form.get("iloscKas"),
+      numeryKas: form.getAll("numerKasy"),
     };
 
     if (payload.password !== form.get("passwordConfirm")) {
@@ -46,14 +54,14 @@ export default function CreateUser() {
       setError(payload.error);
     }
 
-    // console.log(payload);
+    console.log(payload);
 
     // setFormProcessing(false);
   };
 
   return (
     <section className="sm:container mx-auto p-2 mt-3 mb-8">
-      <div className="mt-16">
+      <div className="sm:mt-4 md:mt-8 lg:mt-16">
         <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-gray-900 text-center">Nowy użytkownik</h2>
       </div>
       <div>
@@ -156,6 +164,106 @@ export default function CreateUser() {
                 <option value="chlebowa 26">Chlebowa 26</option>
               </select>
             </div>
+          </div>
+          <div className="p-2 w-full">
+            <fieldset className="flex">
+              <div className="p-2">
+                <input
+                  type="checkbox"
+                  id="K15"
+                  name="numerKasy"
+                  value="K15"
+                  className="appearance-none indeterminate:bg-gray-300 h-4 w-4 border border-gray-300 rounded-sm bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                />
+                <label htmlFor="K15" className="inline-block leading-7 text-sm text-gray-600">
+                  K15
+                </label>
+              </div>
+
+              <div className="p-2">
+                <input
+                  type="checkbox"
+                  id="K16"
+                  name="numerKasy"
+                  value="K16"
+                  className="indeterminate:bg-gray-300 h-4 w-4 border border-gray-300 rounded-sm bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                />
+                <label htmlFor="K16" className="leading-7 text-sm text-gray-600">
+                  K16
+                </label>
+              </div>
+              <div className="p-2">
+                <input
+                  type="checkbox"
+                  id="K17"
+                  name="numerKasy"
+                  value="K17"
+                  className=" indeterminate:bg-gray-300 h-4 w-4 border border-gray-300 rounded-sm bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                />
+                <label htmlFor="K17" className="leading-7 text-sm text-gray-600">
+                  K17
+                </label>
+              </div>
+            </fieldset>
+          </div>
+          <div className="p-2 w-full">
+            <p className="leading-7 text-sm text-gray-600">Podaj liczbę kas:</p>
+            <input
+              type="range"
+              id="iloscKas"
+              name="iloscKas"
+              step="1"
+              min="0"
+              max="15"
+              value={cashregisterNumbers}
+              onChange={(e) => {
+                setCashRegisterNumbers(e.target.value);
+              }}
+              className="w-full  accent-indigo-500  focus:accent-indigo-600 slider-thumb:bg-red-500"
+            />
+            <p className="leading-7 text-sm text-gray-600">{cashregisterNumbers}</p>
+          </div>
+          <div className="p-2 w-full">
+            <p className="leading-7 text-sm text-gray-600">Czy będziesz głosować na PiS?</p>
+            <fieldset className="md:flex">
+              <div className="p-2 md:mx-4 ">
+                <input
+                  type="radio"
+                  id="tak"
+                  name="glosowanie"
+                  value="tak"
+                  className="appearance-none indeterminate:bg-gray-300 h-4 w-4 rounded-full border border-gray-300  bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                />
+                <label htmlFor="tak" className="inline-block leading-3 text-sm text-gray-600 cursor-pointer">
+                  Tak, jestem pedałem
+                </label>
+              </div>
+
+              <div className="p-2 md:mx-4">
+                <input
+                  type="radio"
+                  id="nie"
+                  name="glosowanie"
+                  value="nie"
+                  className="indeterminate:bg-gray-300 h-4 w-4 rounded-full border border-gray-300 bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                />
+                <label htmlFor="nie" className="leading-3 text-sm text-gray-600">
+                  Nie, jebać PiS!
+                </label>
+              </div>
+              <div className="p-2 md:mx-4">
+                <input
+                  type="radio"
+                  id="nieumiem"
+                  name="glosowanie"
+                  value="nieumiem"
+                  className=" indeterminate:bg-gray-300 h-4 w-4 border rounded-full border-gray-300 bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                />
+                <label htmlFor="nieumiem" className="leading-3 text-sm text-gray-600">
+                  Nie umiem
+                </label>
+              </div>
+            </fieldset>
           </div>
           <div className="p-6 w-full">
             <button
