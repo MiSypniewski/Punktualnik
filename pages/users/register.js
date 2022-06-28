@@ -6,21 +6,17 @@ import { fromJSON } from "postcss";
 export default function CreateUser() {
   const userForm = useRef();
   const [error, setError] = useState();
-  const [cashregisterNumbers, setCashRegisterNumbers] = useState(0);
   const [formProcessing, setFormProcessing] = useState(false);
   const router = useRouter();
+  // potrzebne do innego projektu - Raportowacz master
+  // const [cashregisterNumbers, setCashRegisterNumbers] = useState(0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // console.log(e);
     if (formProcessing) return;
     setError(null);
     setFormProcessing(true);
     const form = new FormData(userForm.current);
-    console.log(`checkboxy: `);
-    console.log(form.getAll("numerKasy"));
-    console.log(`range input:`);
-    console.log(form.getAll("iloscKas"));
     const payload = {
       email: form.get("email"),
       name: form.get("name"),
@@ -28,8 +24,9 @@ export default function CreateUser() {
       password: form.get("password"),
       location: form.get("location"),
       section: form.get("section"),
-      iloscKas: form.get("iloscKas"),
-      numeryKas: form.getAll("numerKasy"),
+      // potrzebne do innego projektu! (raportowacz master)
+      // iloscKas: form.get("iloscKas"),
+      // numeryKas: form.getAll("numerKasy"),
     };
 
     if (payload.password !== form.get("passwordConfirm")) {
@@ -53,10 +50,6 @@ export default function CreateUser() {
       setFormProcessing(false);
       setError(payload.error);
     }
-
-    console.log(payload);
-
-    // setFormProcessing(false);
   };
 
   return (
@@ -165,7 +158,8 @@ export default function CreateUser() {
               </select>
             </div>
           </div>
-          <div className="p-2 w-full">
+          {/* Potrzebne do projektu Raportowacz - master */}
+          {/* <div className="p-2 w-full">
             <fieldset className="flex">
               <div className="p-2">
                 <input
@@ -264,7 +258,7 @@ export default function CreateUser() {
                 </label>
               </div>
             </fieldset>
-          </div>
+          </div> */}
           <div className="p-6 w-full">
             <button
               disabled={formProcessing}
