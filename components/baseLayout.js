@@ -3,18 +3,21 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import moment from "moment";
 import { getCurrentTime } from "../utils";
+import { useRouter } from "next/router";
 
-const TopNavigation = () => {
+const TopNavigation = ({ section }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: session, status } = useSession();
-  const loading = status === "loading";
+
+  // const loading = status === "loading";
   const [intervalID, setIntervalID] = useState(null);
   const [firtstRun, setFirstRun] = useState(false);
   const [counter, setCounter] = useState(0);
 
-  moment.locale("pl");
-  const date = moment().locale("pl").format("dddd, D MMMM YYYY, ");
-  const time = getCurrentTime();
+  // console.log(loading);
+
+  // moment.locale("pl");
+  // const date = moment().locale("pl").format("dddd, D MMMM YYYY, ");
+  // const time = getCurrentTime();
 
   // useEffect(() => {
   //   if (!firtstRun) {
@@ -32,17 +35,36 @@ const TopNavigation = () => {
 
   return (
     <div className="flex gap-6 w-full px-4 py-1">
-      <p className="capitalize flex-grow font-bold">{`${date} ${time}`}</p>
+      {/* <p className="capitalize flex-grow font-bold">{`${moment().format("dddd, D MMMM YYYY, HH:mm:ss")}`}</p> */}
+      <p className="capitalize flex-grow font-bold">{`Tutaj będzie data i godzina`}</p>
       {/* <p className="text-center flex-grow">Pysznej kawusi...</p> */}
-      <p className="capitalize font-bold">{session ? session.user.section : "Zaloguj się"}</p>
+      <p className="capitalize font-bold">{section}</p>
     </div>
   );
 };
 
 export default function BaseLayout({ children }) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/users/signin");
+    }
+  }, [session, status]);
+
+  if (status === "loading") {
+    console.log(`loading`);
+    return <div> ładowanie ...</div>;
+  }
+
+  if (session === null && status === "unauthenticated") {
+    return <div>przekierowanie ...</div>;
+  }
+
   return (
     <>
-      <TopNavigation />
+      <TopNavigation section={session.user.name} />
       {children}
       {/* <Footer /> */}
     </>
