@@ -6,6 +6,8 @@ import getSectionTime from "../../services/getSectionTime";
 import useSWR from "swr";
 import { jsonFetcher } from "../../utils";
 import moment from "moment";
+import BaseLayout from "../../components/baseLayout";
+
 moment.locale("pl");
 
 export const getServerSideProps = async (context) => {
@@ -54,12 +56,7 @@ export default function Home({ times, id, date }) {
   }, [firtstRun]);
 
   return (
-    <div className="bg-white">
-      <div className="flex gap-6 w-full px-4 py-1">
-        <p className="capitalize flex-grow font-bold">{`${date} ${time}`}</p>
-        {/* <p className="text-center flex-grow">Pysznej kawusi...</p> */}
-        <p className="capitalize font-bold">{id}</p>
-      </div>
+    <BaseLayout>
       <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-1 p-2">
         {data != undefined
           ? data.map((user) => <NewPerson time={user} key={time.ID} />)
@@ -68,6 +65,6 @@ export default function Home({ times, id, date }) {
           <NewPerson time={time} key={time.ID} />
         ))} */}
       </div>
-    </div>
+    </BaseLayout>
   );
 }
