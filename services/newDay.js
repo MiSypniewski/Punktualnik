@@ -5,8 +5,8 @@ const newDay = async (section) => {
   moment.locale("pl");
   const getUsers = async (section) => {
     const users = await airDB("Users")
-      // w nowej wersji ma być "true" oraz passwordHash i passwordSalt
-      .select({ filterByFormula: `AND(Section="${section}", IsActive="true")` })
+      // w nowej wersji ma być "1 - true" ("" oznacza false) oraz passwordHash i passwordSalt
+      .select({ filterByFormula: `AND(Section="${section}", IsActive="1")` })
       // .select({ filterByFormula: `AND(Section="${section}", IsActive="Active")` })
       .firstPage();
 
@@ -30,7 +30,7 @@ const newDay = async (section) => {
     const now = moment().hours(0).minutes(0).seconds(0).milliseconds(0).format();
     const addHours = moment(now).hours(3).format();
 
-    for (let i = 1; i <= 30; i++) {
+    for (let i = 0; i <= 30; i++) {
       // 1 = zacznij od "jutro"
       //przetestować na jakiś jednym dniu "IsActive" z góry ^^^^^^^
       const newDay = moment(addHours).add(i, "days").format();
