@@ -55,13 +55,13 @@ export default function CreateUser() {
 
   return (
     <BaseLayout>
-      <section className="sm:container mx-auto p-2 mt-3 mb-8">
+      <section className="mx-auto p-2 mt-3 mb-8">
         <div className="sm:mt-4 md:mt-8 lg:mt-16">
           <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-gray-900 text-center">
             Nowy użytkownik
           </h2>
         </div>
-        <div>
+        <div className="container mx-auto lg:w-2/3">
           <form ref={userForm} onSubmit={handleSubmit}>
             <div className="p-2 w-full">
               <label htmlFor="email" className="leading-7 text-sm text-gray-600">
