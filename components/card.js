@@ -11,7 +11,7 @@ const Card = ({ data }) => {
   const [status, setStatus] = useState(data.status);
   const [startTime, setStartTime] = useState(data.startTime);
   const [endTime, setEndTime] = useState(data.endTime);
-  const [goHomeTime, setGoHomeTime] = useState("");
+  const [totalWorkTime, setTotalWorkTime] = useState(data.totalWorkTime);
   const [displayTime, setDisplayTime] = useState("");
   const [overTime, setOverTime] = useState(false);
   const [intervalID, setIntervalID] = useState(null);
@@ -23,6 +23,30 @@ const Card = ({ data }) => {
     "bg-green-600 hover:bg-green-700": status === "finishWork" && overTime,
     "bg-red-600 hover:bg-red-700": status === "finishWork" && !overTime,
   });
+
+  const saveToDB = async (startTime, endTime, totalWorkTime, status, overTime) => {
+    const payload = {
+      userID: data.userID,
+      name: data.name,
+      surname: data.surname,
+      section: data.section,
+      location: data.location,
+      data: data.data,
+      startTime: dayjs(startTime).format(),
+      endTime: dayjs(endTime).format(),
+      totalWorkTime: totalWorkTime,
+      status: status,
+      overTime: overTime,
+    };
+
+    await fetch(`/api/time/${data.airtableID}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  };
 
   const icon = () => {
     if (status === "wait") return "👊";
@@ -71,6 +95,7 @@ const Card = ({ data }) => {
       case "workInProgress": {
         if (intervalID === null) checker(endTime);
         if (overTime) setStatus("overTime");
+        saveToDB(startTime, endTime, `00:00:00`, status, overTime);
         break;
       }
       case "overTime": {
@@ -80,8 +105,10 @@ const Card = ({ data }) => {
       case "finishWork": {
         clearInterval(intervalID);
         const res = DifferenceTime(startTime, endTime);
+        setTotalWorkTime(res.time);
         setOverTime(res.overtime);
         setDisplayTime(res.time);
+        saveToDB(startTime, endTime, res.time, status, res.overtime);
         break;
       }
       default:
