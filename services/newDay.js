@@ -23,8 +23,8 @@ const newDay = async (section) => {
 
   //zmienić na zmienną section
   const users = await getUsers("biedronka");
-  console.log(`użytkowicy: `);
-  console.log(users);
+  // console.log(`użytkowicy: `);
+  // console.log(users);
 
   users.forEach(async (user) => {
     // moment.locale("pl");
@@ -45,7 +45,7 @@ const newDay = async (section) => {
       startTime: toDay,
       endTime: toDay,
       // differenceTime: moment(newDay).hours(8).minutes(0).seconds(0).milliseconds(0).format(),
-      differenceTime: toDay,
+      totalWorkTime: `00:00:00`,
       status: "wait",
       overTime: false,
     };
