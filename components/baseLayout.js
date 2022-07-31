@@ -15,6 +15,7 @@ const TopNavigation = ({ section }) => {
   const [intervalID, setIntervalID] = useState(null);
   const [firtstRun, setFirstRun] = useState(false);
   const [counter, setCounter] = useState(0);
+  const router = useRouter();
   // dayjs.locale("pl");
 
   // console.log(loading);
@@ -26,7 +27,7 @@ const TopNavigation = ({ section }) => {
   useEffect(() => {
     if (!firtstRun) {
       setInterval(() => {
-        if (dayjs().format("HH:mm:ss") === "03:15:00") router.reload();
+        if (dayjs().format("HH:mm:ss") === "08:30:00") router.reload();
         setCounter((prevState) => {
           const newState = (prevState += 1);
           return newState;
