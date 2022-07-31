@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import classNames from "classnames";
+import { useSession } from "next-auth/react";
 import { DifferenceTime, Timer } from "../utils";
 
 import dayjs from "dayjs";
@@ -8,6 +9,7 @@ dayjs.locale("pl");
 
 const Card = ({ data }) => {
   // console.log(data);
+  const { data: session } = useSession();
   const [status, setStatus] = useState(data.status);
   const [startTime, setStartTime] = useState(data.startTime);
   const [endTime, setEndTime] = useState(data.endTime);
@@ -57,6 +59,9 @@ const Card = ({ data }) => {
   };
 
   const changeStatus = () => {
+    if (session.user.role === "user") {
+      return;
+    }
     if (status === "wait") {
       const endTime = dayjs().add(8, "hour").format();
       setStartTime(dayjs().format());
