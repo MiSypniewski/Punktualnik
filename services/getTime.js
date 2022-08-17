@@ -1,4 +1,4 @@
-import airDB from "../services/airtableClient";
+import airDB from "./airtableClient";
 
 const getTime = async (userID, data) => {
   const times = await airDB("Times")
