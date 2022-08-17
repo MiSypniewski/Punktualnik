@@ -1,25 +1,26 @@
 import airDB from "../services/airtableClient";
+import getUsers from "./getUsers";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
 
 const newDay = async (section) => {
-  const getUsers = async (section) => {
-    const users = await airDB("Users")
-      // w nowej wersji ma być "1 - true" ("" oznacza false) oraz passwordHash i passwordSalt
-      .select({ filterByFormula: `AND(Section="${section}", IsActive="1")` })
-      // .select({ filterByFormula: `AND(Section="${section}", IsActive="Active")` })
-      .firstPage();
+  // const getUsers = async (section) => {
+  //   const users = await airDB("Users")
+  //     // w nowej wersji ma być "1 - true" ("" oznacza false) oraz passwordHash i passwordSalt
+  //     .select({ filterByFormula: `AND(Section="${section}", role="user", IsActive="1")` })
+  //     // .select({ filterByFormula: `AND(Section="${section}", IsActive="Active")` })
+  //     .firstPage();
 
-    return users.map((user) => {
-      user.fields.passwordHash = ";)";
-      user.fields.passwordSalt = ";)";
-      user.email = ";)";
-      // user.fields.password = ";)";
-      // user.fields.saltPassword = ";)";
-      return user.fields;
-    });
-  };
+  //   return users.map((user) => {
+  //     user.fields.passwordHash = ";)";
+  //     user.fields.passwordSalt = ";)";
+  //     user.email = ";)";
+  //     // user.fields.password = ";)";
+  //     // user.fields.saltPassword = ";)";
+  //     return user.fields;
+  //   });
+  // };
 
   //zmienić na zmienną section
   const users = await getUsers("biedronka");
