@@ -10,6 +10,7 @@ dayjs.locale("pl");
 const Card = ({ data }) => {
   // console.log(data);
   const { data: session } = useSession();
+  const [airtableID, setAirtableID] = useState(data.airtableID);
   const [status, setStatus] = useState(data.status);
   const [startTime, setStartTime] = useState(data.startTime);
   const [endTime, setEndTime] = useState(data.endTime);
@@ -41,13 +42,40 @@ const Card = ({ data }) => {
       overTime: overTime,
     };
 
-    await fetch(`/api/time/${data.airtableID}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    if (airtableID) {
+      const res = await fetch(`/api/time/${airtableID}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // console.log(`update response: `, res);
+    }
+
+    // jeżeli nie ma wpisu w bazie, tworzy nowy wpis i aktualizuje ID w komponencie
+    if (!airtableID) {
+      // console.log(airtableID);
+      const res = await fetch(`/api/time/${data.ID}`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // console.log(`create response: `, res);
+
+      fetch(`/api/time/${data.userID}`, {
+        method: "GET",
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          // console.log(`Pobrane dane po utworzeniu: `, data);
+          setAirtableID(data[0].airtableID);
+        });
+    }
   };
 
   const icon = () => {
