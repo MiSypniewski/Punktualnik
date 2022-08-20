@@ -50,7 +50,6 @@ export const getServerSideProps = async (context) => {
 
   // znalezione czasy użytkowników w bazie
   if (Array.isArray(cardData) && cardData.length > 0) {
-    console.log(`cardData pełne`);
     // sprawdza który użytkownik z danej sekcji zapisaj już swój czas wejścia w bazie
     users.forEach((user) => {
       cardData.forEach((card) => {
