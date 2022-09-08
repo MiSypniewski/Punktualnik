@@ -41,13 +41,21 @@ import { useEffect, useState } from "react";
 // };
 
 export default function Home({}) {
+  const { data: session, status } = useSession();
   const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push(`/time/${session.user.section}`);
+    }
+  }, [session, status]);
 
   return (
     <BaseLayout>
       <div className="lg:container mx-auto bg-white">
         <h1 className="text-center font-bold text-3xl py-1 px-2">opss.pl</h1>
-        <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4 mt-1 p-2">
+        <p>Zaraz zostaniesz przekierowany na odpowiednią sekcję</p>
+        {/* <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4 mt-1 p-2">
           <button
             onClick={() => {
               router.push("/users/register");
@@ -64,7 +72,7 @@ export default function Home({}) {
               Biedronka
             </a>
           </Link>
-        </div>
+        </div> */}
       </div>
     </BaseLayout>
   );
