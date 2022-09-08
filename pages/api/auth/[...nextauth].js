@@ -45,6 +45,8 @@ export default NextAuth({
         token.role = user?.role;
         token.id = user?.id;
         token.section = user?.section;
+        token.location = user?.location;
+        token.userID = user?.userID;
       }
 
       return token;
@@ -54,6 +56,8 @@ export default NextAuth({
       session.user.role = token?.role;
       session.user.section = token?.section;
       session.user.id = token?.id;
+      session.user.location = token?.location;
+      session.user.userID = token?.userID;
 
       return session;
     },
