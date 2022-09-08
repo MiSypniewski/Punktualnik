@@ -1,3 +1,6 @@
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
 import getSectionTime from "../../services/getSectionTime";
 import getUsers from "../../services/getUsers";
 import useSWR from "swr";
@@ -85,8 +88,21 @@ export const getServerSideProps = async (context) => {
 };
 
 export default function Home({ newCardData, id }) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated" && session.user.section !== id) {
+      router.push("/");
+    }
+  }, [session, status]);
   // const { data } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: cardData });
   const data = undefined;
+
+  if (status !== "authenticated") {
+    // console.log(`loading`);
+    return <div> ładowanie ...</div>;
+  }
 
   return (
     <BaseLayout>
