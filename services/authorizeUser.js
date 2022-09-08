@@ -35,10 +35,12 @@ const authorizeUser = async (payload) => {
 
   return {
     id: user.id,
+    userID: user.fields.ID,
     email: user.fields.email,
     name: user.fields.name,
     role: user.fields.role,
     section: user.fields.section,
+    location: user.fields.location,
   };
 };
 
