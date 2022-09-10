@@ -1,5 +1,7 @@
+import Link from "next/link";
 import getUserData from "../../services/getUserData";
 import BaseLayout from "../../components/baseLayout";
+import Spinner from "../../components/spinner";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
@@ -29,6 +31,9 @@ export default function UserData({ userData, id }) {
 
   //wywalenie użytkownika o innym ID
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/");
+    }
     if (status === "authenticated" && session.user.userID.toString() !== id) {
       router.push("/");
     }
@@ -76,13 +81,30 @@ export default function UserData({ userData, id }) {
     }
   };
 
+  if (status !== "authenticated") {
+    // console.log(`loading`);
+    return (
+      <div>
+        <p className="text-center mt-20"> Ładowanie ...</p>
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <BaseLayout>
       <section className="container mx-auto p-2 mt-3 mb-8">
-        <div className="sm:mt-8 md:mt-8">
-          <h2 className="sm:text-3xl text-3xl font-medium title-font mb-4 text-gray-900 text-center">
+        <div className="sm:mt-8 md:mt-8 md:w-2/3 mx-auto flex justify-between">
+          <h2 className="block grow mx-auto sm:text-3xl text-3xl font-medium title-font mb-4 text-gray-900 text-center">
             {user.name} {user.surname}
           </h2>
+          <div className="block grow-0">
+            <Link href={`/api/auth/signout`}>
+              <a className="disabled:opacity-50 text-white bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg">
+                Wyloguj się
+              </a>
+            </Link>
+          </div>
         </div>
         <div className="container mx-auto md:w-2/3">
           <form ref={userForm} onSubmit={handleSubmit}>

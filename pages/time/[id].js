@@ -6,6 +6,7 @@ import getUsers from "../../services/getUsers";
 import useSWR from "swr";
 import BaseLayout from "../../components/baseLayout";
 import Card from "../../components/card";
+import Spinner from "../../components/spinner";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -92,6 +93,9 @@ export default function Home({ newCardData, id }) {
   const router = useRouter();
 
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/");
+    }
     if (status === "authenticated" && session.user.section !== id) {
       router.push("/");
     }
@@ -101,7 +105,12 @@ export default function Home({ newCardData, id }) {
 
   if (status !== "authenticated") {
     // console.log(`loading`);
-    return <div> ładowanie ...</div>;
+    return (
+      <div>
+        <p className="text-center mt-20"> Ładowanie ...</p>
+        <Spinner />
+      </div>
+    );
   }
 
   return (

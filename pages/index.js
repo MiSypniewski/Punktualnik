@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BaseLayout from "../components/baseLayout";
+import Spinner from "../components/spinner";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -53,8 +54,9 @@ export default function Home({}) {
   return (
     <BaseLayout>
       <div className="lg:container mx-auto bg-white">
-        <h1 className="text-center font-bold text-3xl py-1 px-2">opss.pl</h1>
-        <p>Zaraz zostaniesz przekierowany na odpowiednią sekcję</p>
+        <h1 className="text-center mt-10 font-bold text-3xl py-1 px-2">Punktualnik</h1>
+        <p className="text-center mt-20">Za chwilę zostaniesz przekierowany na odpowiednią sekcję</p>
+        <Spinner />
         {/* <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4 mt-1 p-2">
           <button
             onClick={() => {

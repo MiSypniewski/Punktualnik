@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
+import Spinner from "./spinner";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -58,11 +59,21 @@ export default function BaseLayout({ children }) {
 
   if (status === "loading") {
     // console.log(`loading`);
-    return <div> ładowanie ... </div>;
+    return (
+      <div>
+        <p className="text-center mt-20"> Ładowanie ...</p>
+        <Spinner />
+      </div>
+    );
   }
 
   if (session === null && status === "unauthenticated") {
-    return <div>przekierowanie ...</div>;
+    return (
+      <div>
+        <p className="text-center mt-20"> Przekierowanie ...</p>
+        <Spinner />
+      </div>
+    );
   }
 
   // console.log(session.user);
