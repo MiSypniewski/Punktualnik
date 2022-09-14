@@ -128,7 +128,7 @@ const Card = ({ data }) => {
       case "workInProgress": {
         if (intervalID === null) checker(endTime);
         if (overTime) setStatus("overTime");
-        saveToDB(startTime, endTime, `00:00:00`, status, overTime);
+        // saveToDB(startTime, endTime, `00:00:00`, status, overTime);
         break;
       }
       case "overTime": {
