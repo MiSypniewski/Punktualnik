@@ -1,0 +1,11 @@
+POST http://localhost:3000/api/users/
+content-type: application/json
+
+{
+  "email": "michal.sypniewsski@forcom.com.pl",
+  "name": "michal",
+  "surname": "sobstyl",
+  "section": "cns",
+  "location": "chlebowa 22",
+  "password": "jebacpis"
+}

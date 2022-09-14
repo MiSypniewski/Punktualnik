@@ -1,4 +1,4 @@
-import airDB from "../services/airtableClient";
+import airDB from "./airtableClient";
 
 const saveTime = async (pyload) => {
   const time = await airDB("Times").create([
