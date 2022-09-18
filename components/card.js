@@ -19,13 +19,19 @@ const Card = ({ data }) => {
   const [overTime, setOverTime] = useState(false);
   const [intervalID, setIntervalID] = useState(null);
 
-  let statusClass = classNames("flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl", {
-    "bg-blue-400 hover:bg-blue-500": status === "wait",
-    "bg-red-500 hover:bg-red-600": status === "workInProgress",
-    "bg-yellow-600 hover:bg-yellow-700": status === "overTime",
-    "bg-green-600 hover:bg-green-700": status === "finishWork" && overTime,
-    "bg-red-600 hover:bg-red-700": status === "finishWork" && !overTime,
-  });
+  let statusClass = classNames(
+    "transition-all ease-in-out delay-150 duration-300 flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl",
+    {
+      // "bg-blue-400 hover:bg-blue-500": status === "wait",
+      "bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 hover:transition-all hover:-translate-y-1 hover:bg-gradient-to-tl hover:from-blue-600 hover:via-blue-500 hover:to-red-400":
+        status === "wait",
+      // "bg-gradient-to-br from-blue-100 via-blue-300 to-blue-500": status === "wait",
+      "bg-red-500 hover:bg-red-600": status === "workInProgress",
+      "bg-yellow-600 hover:bg-yellow-700": status === "overTime",
+      "bg-green-600 hover:bg-green-700": status === "finishWork" && overTime,
+      "bg-red-600 hover:bg-red-700": status === "finishWork" && !overTime,
+    }
+  );
 
   const saveToDB = async (startTime, endTime, totalWorkTime, status, overTime) => {
     const payload = {
