@@ -6,25 +6,26 @@ import dayjs from "dayjs";
 dayjs.locale("pl");
 
 export default async (req, res) => {
+  const session = await getSession({ req });
+  if (!session) {
+    return res.status(401).json({ error: "not_authotized" });
+  }
   switch (req.method) {
     case "GET": {
       //tutaj zmienić datę na zmienną
       // const pyload = req.body;
       // console.log(`GET on backend. `);
-      const session = await getSession({ req });
-      if (!session) {
-        return res.status(401).json({ error: "not_authotized" });
-      }
+
       const time = await getTime(req.query.id);
       res.status(200).json(time);
 
       break;
     }
     case "POST": {
-      const session = await getSession({ req });
-      if (!session) {
-        return res.status(401).json({ error: "not_authotized" });
-      }
+      // const session = await getSession({ req });
+      // if (!session) {
+      //   return res.status(401).json({ error: "not_authotized" });
+      // }
       if (session.user.role !== "editor") {
         return res.status(401).json({ error: "permission_denied" });
       }
@@ -36,10 +37,10 @@ export default async (req, res) => {
       break;
     }
     case "PUT": {
-      const session = await getSession({ req });
-      if (!session) {
-        return res.status(401).json({ error: "not_authotized" });
-      }
+      // const session = await getSession({ req });
+      // if (!session) {
+      //   return res.status(401).json({ error: "not_authotized" });
+      // }
       if (session.user.role !== "editor") {
         return res.status(401).json({ error: "permission_denied" });
       }

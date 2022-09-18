@@ -20,7 +20,7 @@ const TopNavigation = ({ section }) => {
   useEffect(() => {
     if (!firtstRun) {
       setInterval(() => {
-        if (dayjs().format("HH:mm:ss") === "08:30:00") router.reload();
+        if (dayjs().format("HH:mm:ss") === "03:30:00") router.reload();
         setCounter((prevState) => {
           const newState = (prevState += 1);
           return newState;
