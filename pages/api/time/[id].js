@@ -7,10 +7,12 @@ dayjs.locale("pl");
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const session = await getSession({ req });
-  if (!session) {
-    return res.status(401).json({ error: "not_authotized" });
-  }
+  // const session = await getSession({ req });
+  console.log(`req :`, req);
+  console.log(`res :`, res);
+  // if (!session) {
+  //   return res.status(401).json({ error: "not_authotized" });
+  // }
   switch (req.method) {
     case "GET": {
       //tutaj zmienić datę na zmienną
@@ -27,9 +29,9 @@ export default async (req, res) => {
       // if (!session) {
       //   return res.status(401).json({ error: "not_authotized" });
       // }
-      if (session.user.role !== "editor") {
-        return res.status(401).json({ error: "permission_denied" });
-      }
+      // if (session.user.role !== "editor") {
+      //   return res.status(401).json({ error: "permission_denied" });
+      // }
       const payload = req.body;
       // console.log("POST payload on backend", payload);
       const time = await saveTimes(payload);
@@ -42,9 +44,9 @@ export default async (req, res) => {
       // if (!session) {
       //   return res.status(401).json({ error: "not_authotized" });
       // }
-      if (session.user.role !== "editor") {
-        return res.status(401).json({ error: "permission_denied" });
-      }
+      // if (session.user.role !== "editor") {
+      //   return res.status(401).json({ error: "permission_denied" });
+      // }
       const payload = req.body;
       // console.log("PUT payload on backend", payload);
       const time = await updateTime(req.query.id, payload);

@@ -9,10 +9,10 @@ export default async (req, res) => {
     case "POST": {
       try {
         // console.log(req);
-        const session = await getSession({ req });
-        if (!session) {
-          return res.status(401).json({ error: "not_authotized" });
-        }
+        // const session = await getSession({ req });
+        // if (!session) {
+        //   return res.status(401).json({ error: "not_authotized" });
+        // }
 
         const payload = req.body;
         const user = await createUser(payload);
@@ -26,10 +26,10 @@ export default async (req, res) => {
       try {
         // console.log(req);
         //to trzeba ostro zmienić
-        const session = await getSession({ req });
-        if (!session) {
-          return res.status(401).json({ error: "not_authotized" });
-        }
+        // const session = await getSession({ req });
+        // if (!session) {
+        //   return res.status(401).json({ error: "not_authotized" });
+        // }
 
         const payload = req.body;
         const user = await updateUserPassword(payload);
