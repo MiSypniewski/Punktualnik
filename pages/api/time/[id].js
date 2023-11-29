@@ -6,10 +6,10 @@ import dayjs from "dayjs";
 dayjs.locale("pl");
 
 export default async (req, res) => {
-  const session = await getSession({ req });
-  if (!session) {
-    return res.status(401).json({ error: "not_authotized" });
-  }
+  // const session = await getSession({ req });
+  // if (!session) {
+  //   return res.status(401).json({ error: "not_authotized" });
+  // }
   switch (req.method) {
     case "GET": {
       //tutaj zmienić datę na zmienną

@@ -9,9 +9,9 @@ export default async (req, res) => {
       try {
         // console.log(req);
         const session = await getSession({ req });
-        if (!session) {
-          return res.status(401).json({ error: "not_authotized" });
-        }
+        // if (!session) {
+        //   return res.status(401).json({ error: "not_authotized" });
+        // }
 
         const payload = req.body;
         const user = await createUser(payload);
