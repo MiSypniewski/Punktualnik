@@ -8,8 +8,8 @@ dayjs.locale("pl");
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
   // const session = await getSession({ req });
-  console.log(`req :`, req);
-  console.log(`res :`, res);
+  // console.log(`req :`, req);
+  // console.log(`res :`, res);
   // if (!session) {
   //   return res.status(401).json({ error: "not_authotized" });
   // }
