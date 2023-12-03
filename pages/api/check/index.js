@@ -16,7 +16,7 @@ export default async (req, res) => {
     return res.status(401).json({ error: "not_authotized" });
   }
 
-  console.log(`token: `, token);
+  // console.log(`token: `, token);
   switch (req.method) {
     case "GET": {
       //tutaj zmienić datę na zmienną
@@ -24,7 +24,7 @@ export default async (req, res) => {
       // console.log(`GET on backend. `);
       // console.log(`funkcja GET wywołana!`)
       //   const time = await getTime(req.query.id);
-      res.status(200).json({ message: "GET wywołana!" });
+      res.status(200).json({ message: "GET wywołana!", ...token });
 
       break;
     }
@@ -39,7 +39,7 @@ export default async (req, res) => {
       const payload = req.body;
       // console.log("POST payload on backend", payload);
       //   const time = await saveTimes(payload);
-      res.status(200).json({ message: "POST wywołana!" });
+      res.status(200).json({ message: "POST wywołana!", ...token });
       //   res.status(200).json({ status: "created", time });
 
       break;
@@ -55,7 +55,7 @@ export default async (req, res) => {
       const payload = req.body;
       // console.log("PUT payload on backend", payload);
       //   const time = await updateTime(req.query.id, payload);
-      res.status(200).json({ message: "UPDATE wywołana!" });
+      res.status(200).json({ message: "UPDATE wywołana!", ...token });
       //   res.status(200).json({ status: "update", time });
 
       break;
