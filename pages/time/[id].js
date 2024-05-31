@@ -88,6 +88,8 @@ export const getServerSideProps = async (context) => {
   };
 };
 
+const jsonFetcher = (url) => fetch(url).then((res) => res.json());
+
 export default function Home({ newCardData, id }) {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -100,8 +102,10 @@ export default function Home({ newCardData, id }) {
       router.push("/");
     }
   }, [session, status]);
-  // const { data } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: cardData });
-  const data = undefined;
+  const { newData } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: cardData });
+
+  console.log(newData);
+  // const data = undefined;
 
   if (status !== "authenticated") {
     // console.log(`loading`);
@@ -116,8 +120,8 @@ export default function Home({ newCardData, id }) {
   return (
     <BaseLayout>
       <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-1 p-2">
-        {data != undefined
-          ? data.map((data) => <Card data={data} key={data.ID} />)
+        {newData != undefined
+          ? newData.map((data) => <Card data={data} key={data.ID} />)
           : newCardData.map((data) => <Card data={data} key={data.ID} />)}
       </div>
     </BaseLayout>
