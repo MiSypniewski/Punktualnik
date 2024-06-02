@@ -102,7 +102,9 @@ export default function Home({ newCardData, id }) {
       router.push("/");
     }
   }, [session, status]);
-  const { newData } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: cardData });
+  const { newData } = useSWR(`/api/section/${id}`, jsonFetcher, {
+    initialData: newCardData,
+  });
 
   console.log(newData);
   // const data = undefined;
