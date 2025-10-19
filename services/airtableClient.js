@@ -14,8 +14,8 @@ Airtable.configure({
   apiKey: process.env.AIRTABLE_API_KEY,
 });
 
-const api1Key = process.env.AIRTABLE_API_KEY;
-const api2Key = process.env.AIRTABLE_API_KEY2;
+const api1Key = process.env.AIRTABLE_BASE;
+const api2Key = process.env.AIRTABLE_BASE2;
 // Pobierz dzisiejszą datę
 const today = new Date();
 // Pobierz numer dnia miesiąca (od 1 do 31)
