@@ -1,4 +1,4 @@
-import airDB from "./airtableClient";
+import db from "./db";
 import crypto from "crypto";
 import Joi from "joi";
 
@@ -8,22 +8,22 @@ const schema = Joi.object({
   newPassword: Joi.string().required(),
 });
 
-const checkUser = async (userID) => {
-  const existingUser = await airDB("Users")
-    .select({ filterByFormula: `ID="${userID}"` })
-    .firstPage();
-  if (existingUser && !existingUser[0]) {
+const findById = db.prepare(`SELECT * FROM Users WHERE id = ?`);
+const updatePassword = db.prepare(
+  `UPDATE Users SET passwordHash = @passwordHash, passwordSalt = @passwordSalt WHERE id = @id`
+);
+
+const checkUser = (userID) => {
+  const existingUser = findById.get(Number(userID));
+  if (!existingUser) {
     throw new Error("user_not_found");
   }
-  return {
-    airtableID: existingUser[0].id,
-    ...existingUser[0].fields,
-  };
+  return existingUser;
 };
 
 const updateUserPassword = async (payload) => {
   const { userID, oldPassword, newPassword } = await schema.validateAsync(payload);
-  const existingUser = await checkUser(userID);
+  const existingUser = checkUser(userID);
   const oldPasswordSalt = existingUser.passwordSalt;
   const oldPasswordHash = crypto.pbkdf2Sync(oldPassword, oldPasswordSalt, 2137, 256, "sha512").toString("hex");
 
@@ -34,17 +34,13 @@ const updateUserPassword = async (payload) => {
   const newPasswordSalt = crypto.randomBytes(256).toString("hex");
   const newPasswordHash = crypto.pbkdf2Sync(newPassword, newPasswordSalt, 2137, 256, "sha512").toString("hex");
 
-  const user = await airDB("Users").update([
-    {
-      id: existingUser.airtableID,
-      fields: {
-        passwordHash: newPasswordHash,
-        passwordSalt: newPasswordSalt,
-      },
-    },
-  ]);
+  updatePassword.run({
+    id: existingUser.id,
+    passwordHash: newPasswordHash,
+    passwordSalt: newPasswordSalt,
+  });
 
-  return user;
+  return { id: existingUser.id };
 };
 
 export default updateUserPassword;

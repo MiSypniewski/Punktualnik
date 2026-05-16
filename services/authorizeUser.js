@@ -1,5 +1,4 @@
-// import airDB from "services/airtableClient";
-import airDB from "./airtableClient";
+import db from "./db";
 import Joi from "joi";
 import crypto from "crypto";
 
@@ -8,39 +7,35 @@ const schema = Joi.object({
   password: Joi.string().required(),
 });
 
+const findByEmail = db.prepare(`SELECT * FROM Users WHERE email = ?`);
+
 const authorizeUser = async (payload) => {
   const { email, password } = await schema.validateAsync(payload);
 
-  const [user] = await airDB("Users")
-    .select({ filterByFormula: `email="${email}"` })
-    .firstPage();
+  const user = findByEmail.get(email);
 
   if (!user) {
-    const passwordSalt = crypto.randomBytes(256).toString("hex");
-    const passwordHash = crypto.pbkdf2Sync(password, passwordSalt, 2137, 256, `sha512`).toString(`hex`);
     return null;
   }
 
-  const passwordHash = crypto.pbkdf2Sync(password, user.fields.passwordSalt, 2137, 256, `sha512`).toString(`hex`);
+  const passwordHash = crypto.pbkdf2Sync(password, user.passwordSalt, 2137, 256, `sha512`).toString(`hex`);
 
-  // console.log(user.fields);
-
-  if (passwordHash !== user.fields.passwordHash) {
+  if (passwordHash !== user.passwordHash) {
     return null;
   }
 
-  if (!user.fields.isActive) {
+  if (!user.isActive) {
     return null;
   }
 
   return {
     id: user.id,
-    userID: user.fields.ID,
-    email: user.fields.email,
-    name: user.fields.name,
-    role: user.fields.role,
-    section: user.fields.section,
-    location: user.fields.location,
+    userID: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    section: user.section,
+    location: user.location,
   };
 };
 

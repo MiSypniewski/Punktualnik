@@ -8,6 +8,12 @@
 # testing
 /coverage
 
+# lokalna baza danych SQLite
+/data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
 # next.js
 /.next/
 /out/

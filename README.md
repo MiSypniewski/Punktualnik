@@ -1,5 +1,49 @@
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## Baza danych
+
+Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
+bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`) tworzony jest
+automatycznie przy pierwszym uruchomieniu.
+
+- Domyślna ścieżka: `./data/punktualnik.sqlite` (katalog `data/` jest w `.gitignore`).
+- Ścieżkę można nadpisać zmienną `SQLITE_PATH` (zob. `.env.local`).
+
+### Wdrożenie na Mikrus 1.0
+
+1. Ustaw `SQLITE_PATH` na trwałą ścieżkę poza katalogiem aplikacji,
+   np. `/home/UŻYTKOWNIK/punktualnik-data/punktualnik.sqlite`,
+   żeby baza przeżyła redeploy/rebuild.
+2. `npm ci && npm run build && npm run start`.
+3. `better-sqlite3` to moduł natywny. Jeśli na serwerze nie ma gotowego prebuildu
+   dla danej wersji Node, potrzebne będą `build-essential` i `python3`
+   (`npm rebuild better-sqlite3`).
+4. Backup = skopiowanie pliku `.sqlite` (najlepiej przy zatrzymanej aplikacji
+   lub `sqlite3 baza.sqlite ".backup kopia.sqlite"`).
+
+## Zarządzanie użytkownikami (panel admina z CLI)
+
+Aktywacja kont i nadawanie roli `editor` (wcześniej robione w UI Airtable)
+odbywa się teraz skryptem CLI. Działa też bez logowania do aplikacji,
+więc nadaje się do utworzenia pierwszego konta (bootstrap).
+
+```bash
+node scripts/admin.js pending                     # nieaktywni (do aktywacji)
+node scripts/admin.js list                        # wszyscy
+node scripts/admin.js activate   jan@example.pl   # aktywuj (po e-mailu lub id)
+node scripts/admin.js deactivate 5                # zablokuj
+node scripts/admin.js role       5 editor         # rola: user | editor
+node scripts/admin.js passwd     jan@example.pl noweHaslo
+
+# alternatywnie przez npm (uwaga na `--`):
+npm run admin -- pending
+```
+
+Na Mikrusie: zaloguj się po SSH, wejdź do katalogu aplikacji i uruchom jak wyżej.
+Skrypt używa tej samej bazy co aplikacja (`SQLITE_PATH` / domyślnie `./data/punktualnik.sqlite`).
+Typowy flow nowego pracownika: rejestracja w aplikacji → `pending` → `activate` →
+(jeśli ma obsługiwać karty) `role <id> editor`.
+
 ## Getting Started
 
 First, run the development server:

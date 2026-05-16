@@ -1,19 +1,19 @@
-import airDB from "./airtableClient";
+import db from "./db";
+
+const stmt = db.prepare(`SELECT * FROM Users WHERE id = ?`);
 
 const getUserData = async (userID) => {
-  const userData = await airDB("Users")
-    .select({ filterByFormula: `ID="${userID}"` })
-    .firstPage();
+  const user = stmt.get(Number(userID));
+  if (!user) return [];
 
-  return userData.map((user) => {
-    user.fields.passwordHash = ";)";
-    user.fields.passwordSalt = ";)";
-    // user.email = ";)";
-    return {
-      // airtableID: user.id,
-      ...user.fields,
-    };
-  });
+  return [
+    {
+      ...user,
+      ID: user.id,
+      passwordHash: ";)",
+      passwordSalt: ";)",
+    },
+  ];
 };
 
 export default getUserData;

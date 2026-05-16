@@ -1,17 +1,19 @@
-import airDB from "./airtableClient";
+import db from "./db";
+
+const stmt = db.prepare(
+  `SELECT * FROM Users WHERE section = ? AND role = 'user' AND isActive = 1`
+);
 
 const getUsers = async (section) => {
-  const users = await airDB("Users")
-    // .select({ filterByFormula: `AND(User="${user}", Data="${data}")` })
-    .select({ filterByFormula: `AND(Section="${section}", role="user", IsActive="1")` })
-    .firstPage();
+  const users = stmt.all(section);
 
-  return users.map((user) => {
-    user.fields.passwordHash = ";)";
-    user.fields.passwordSalt = ";)";
-    user.email = ";)";
-    return user.fields;
-  });
+  return users.map((user) => ({
+    ...user,
+    ID: user.id,
+    passwordHash: ";)",
+    passwordSalt: ";)",
+    email: ";)",
+  }));
 };
 
 export default getUsers;

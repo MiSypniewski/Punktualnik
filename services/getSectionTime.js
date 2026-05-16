@@ -1,17 +1,15 @@
-import airDB from "./airtableClient";
+import db from "./db";
+
+const stmt = db.prepare(`SELECT * FROM Times WHERE section = ? AND data = ?`);
 
 const getSectionTime = async (section, data) => {
-  const times = await airDB("Times")
-    .select({ filterByFormula: `AND(section="${section}", data="${data}")` })
-    // .select({ filterByFormula: `Data="${data}"` })
-    .firstPage();
-  // console.log(times);
-  return times.map((time) => {
-    return {
-      airtableID: time.id,
-      ...time.fields,
-    };
-  });
+  const times = stmt.all(section, data);
+
+  return times.map(({ id, ...fields }) => ({
+    airtableID: id,
+    ...fields,
+    overTime: Boolean(fields.overTime),
+  }));
 };
 
 export default getSectionTime;

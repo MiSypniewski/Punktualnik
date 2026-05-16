@@ -1,4 +1,4 @@
-import airDB from "../services/airtableClient";
+import db from "./db";
 import crypto from "crypto";
 import Joi from "joi";
 
@@ -11,39 +11,36 @@ const schema = Joi.object({
   password: Joi.string().required(),
 });
 
-const checkEmail = async (email) => {
-  const existingUser = await airDB("Users")
-    .select({ filterByFormula: `email="${email}"` })
-    .firstPage();
-  if (existingUser && existingUser[0]) {
+const findByEmail = db.prepare(`SELECT id FROM Users WHERE email = ?`);
+const insertUser = db.prepare(
+  `INSERT INTO Users (name, surname, section, location, email, passwordHash, passwordSalt, role, isActive)
+   VALUES (@name, @surname, @section, @location, @email, @passwordHash, @passwordSalt, 'user', 0)`
+);
+
+const checkEmail = (email) => {
+  if (findByEmail.get(email)) {
     throw new Error("email_taken");
   }
 };
 
 const createUser = async (payload) => {
   const { email, name, surname, section, location, password } = await schema.validateAsync(payload);
-  await checkEmail(email);
+  checkEmail(email);
 
   const passwordSalt = crypto.randomBytes(256).toString("hex");
   const passwordHash = crypto.pbkdf2Sync(password, passwordSalt, 2137, 256, "sha512").toString("hex");
 
-  const user = await airDB("Users").create([
-    {
-      fields: {
-        name,
-        surname,
-        section,
-        location,
-        email,
-        passwordHash,
-        passwordSalt,
-        role: "user",
-        isActive: false,
-      },
-    },
-  ]);
+  const info = insertUser.run({
+    name,
+    surname,
+    section,
+    location,
+    email,
+    passwordHash,
+    passwordSalt,
+  });
 
-  return user;
+  return { id: info.lastInsertRowid, name, surname, section, location, email, role: "user", isActive: 0 };
 };
 
 export default createUser;
