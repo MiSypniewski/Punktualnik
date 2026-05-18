@@ -12,6 +12,7 @@
  *   node scripts/admin.js activate   <email|id>
  *   node scripts/admin.js deactivate <email|id>
  *   node scripts/admin.js role       <email|id> <user|editor>
+ *   node scripts/admin.js section    <email|id> <nazwaSekcji>
  *   node scripts/admin.js passwd     <email|id> <noweHaslo>
  *
  * Skróty npm (pamiętaj o `--`):
@@ -120,6 +121,15 @@ switch (cmd) {
     break;
   }
 
+  case "section": {
+    const u = findUser(selector);
+    if (!extra || !extra.trim()) die("podaj nazwę sekcji.");
+    db.prepare("UPDATE Users SET section = ? WHERE id = ?").run(extra.trim(), u.id);
+    console.log("Zmieniono sekcję:");
+    console.log(fmt(findUser(String(u.id))));
+    break;
+  }
+
   case "passwd": {
     const u = findUser(selector);
     if (!extra) die("podaj nowe hasło.");
@@ -146,6 +156,7 @@ switch (cmd) {
         "  activate   <email|id>      aktywuj konto (isActive=1)",
         "  deactivate <email|id>      zablokuj konto (isActive=0)",
         "  role       <email|id> <user|editor>   zmień rolę",
+        "  section    <email|id> <nazwaSekcji>   zmień sekcję",
         "  passwd     <email|id> <noweHaslo>     ustaw nowe hasło",
         "",
         `Baza: ${dbPath}`,

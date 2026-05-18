@@ -33,6 +33,7 @@ node scripts/admin.js list                        # wszyscy
 node scripts/admin.js activate   jan@example.pl   # aktywuj (po e-mailu lub id)
 node scripts/admin.js deactivate 5                # zablokuj
 node scripts/admin.js role       5 editor         # rola: user | editor
+node scripts/admin.js section    5 biedronka_ch22 # zmień sekcję
 node scripts/admin.js passwd     jan@example.pl noweHaslo
 
 # alternatywnie przez npm (uwaga na `--`):
