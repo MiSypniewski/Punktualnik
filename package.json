@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "admin": "node scripts/admin.js"
+    "admin": "node scripts/admin.js",
+    "migrate:airtable": "node scripts/migrateFromAirtable.js"
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.2",

@@ -44,6 +44,23 @@ Skrypt używa tej samej bazy co aplikacja (`SQLITE_PATH` / domyślnie `./data/pu
 Typowy flow nowego pracownika: rejestracja w aplikacji → `pending` → `activate` →
 (jeśli ma obsługiwać karty) `role <id> editor`.
 
+## Migracja kont z Airtable (jednorazowo)
+
+Skrypt przenosi **tylko tabelę `Users`** z bazy `AIRTABLE_BASE` do SQLite.
+Historia `Times` nie jest migrowana. Czyta przez REST API Airtable
+(nie wymaga pakietu `airtable`), z pełną paginacją.
+
+```bash
+node scripts/migrateFromAirtable.js --dry-run   # podgląd, bez zapisu
+node scripts/migrateFromAirtable.js             # właściwa migracja
+# albo: npm run migrate:airtable -- --dry-run
+```
+
+Wymaga w `.env.local`: `AIRTABLE_API_KEY`, `AIRTABLE_BASE`. Skrypt **przerwie
+się, jeśli tabela `Users` nie jest pusta** (ochrona przed dublowaniem).
+Rekordy bez hasła lub ze zdublowanym e-mailem są pomijane i raportowane.
+Zachowuje numerację kont (`fields.ID` → `Users.id`).
+
 ## Getting Started
 
 First, run the development server:
