@@ -34,6 +34,7 @@ const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), "data", "punk
 const Database = require("better-sqlite3");
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
+db.pragma("busy_timeout = 10000"); // pierwsze — czekaj na lock, nie rzucaj SQLITE_BUSY
 db.pragma("journal_mode = WAL");
 
 // Defensywnie — gdyby aplikacja nie była jeszcze nigdy uruchomiona.

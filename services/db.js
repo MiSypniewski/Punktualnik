@@ -13,6 +13,10 @@ const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   const db = new Database(dbPath);
+  // MUSI być pierwsze: gdy bazę otwiera kilka procesów naraz (workery `next build`,
+  // build obok działającej aplikacji), inne połączenia czekają na zwolnienie locka
+  // zamiast od razu rzucać SQLITE_BUSY na PRAGMA journal_mode/CREATE TABLE.
+  db.pragma("busy_timeout = 10000");
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
