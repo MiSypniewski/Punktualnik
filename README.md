@@ -66,6 +66,25 @@ Zasady:
 - Rodzaje wniosków definiuje `services/overtimeKinds.js` — dodanie nowego rodzaju
   (wraz ze znakiem) wymaga zmiany tylko w tym pliku.
 
+### Powiadomienia na Google Chat
+
+Każdy nowy wniosek jest wysyłany jako wiadomość na webhook przestrzeni Google Chat
+(kto złożył, rodzaj, wymiar, data, powód i link do panelu kierownika).
+
+```bash
+# .env.local — plik jest w .gitignore i NIE trafia do repozytorium
+GCHAT_WEBHOOK_URL=https://chat.googleapis.com/v1/spaces/XXXX/messages?key=...&token=...
+```
+
+- **URL webhooka jest sekretem** — kto go ma, może pisać na czacie. Nigdy nie
+  commituj go ani nie wklejaj do kodu; na serwerze ustaw go w `.env.local`.
+- Brak zmiennej = powiadomienia wyłączone, reszta aplikacji działa bez zmian.
+- Wysyłka nie blokuje odpowiedzi dla pracownika i ma 5-sekundowy limit czasu:
+  awaria albo niedostępność Google Chat **nie może** zablokować złożenia wniosku.
+  Błędy lądują w logu serwera z prefiksem `[gchat]`.
+- Link w powiadomieniu budowany jest z `NEXTAUTH_URL`, więc na produkcji ta
+  zmienna musi wskazywać publiczny adres aplikacji.
+
 Nadanie uprawnień kierownika:
 
 ```bash

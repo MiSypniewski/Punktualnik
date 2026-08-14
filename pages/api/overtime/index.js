@@ -5,6 +5,8 @@ import getOvertimeForUser from "../../../services/getOvertimeForUser";
 import getOvertimeRequests from "../../../services/getOvertimeRequests";
 import { canApproveOvertime } from "../../../services/roles";
 import { STATUS_KEYS } from "../../../services/overtimeKinds";
+import getUserData from "../../../services/getUserData";
+import { notifyNewOvertimeRequest } from "../../../services/notifyGChat";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -66,6 +68,14 @@ export default async (req, res) => {
         minutes: total,
         reason,
       });
+
+      // Powiadomienie na Google Chat bez await — aplikacja chodzi jako stały
+      // proces (next start), więc żądanie dokończy się w tle, a pracownik nie
+      // czeka na Google. Serwis sam łapie swoje błędy, .catch jest na wypadek
+      // wyjątku poza nim, żeby nie zrobić nieobsłużonego odrzucenia.
+      const [author] = await getUserData(token.userID);
+      notifyNewOvertimeRequest(request, author).catch(() => {});
+
       return res.status(201).json({ status: "created", request });
     } catch (error) {
       return res.status(422).json({ status: "not_created", error: error.message });
