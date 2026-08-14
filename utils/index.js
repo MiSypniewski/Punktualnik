@@ -41,3 +41,19 @@ export const DifferenceTime = (start, stop) => {
 };
 
 export const jsonFetcher = (url) => fetch(url).then((res) => res.json());
+
+/**
+ * Minuty → "2h 30min". Używane w module nadgodzin, gdzie saldo bywa ujemne,
+ * więc znak wychodzi przed liczbę, a nie w środku ("-2h 30min", nie "-2h -30min").
+ * @param {number} minutes
+ * @param {{withSign?: boolean}} [opts] withSign wymusza "+" przy wartościach dodatnich
+ */
+export const formatMinutes = (minutes, { withSign = false } = {}) => {
+  const total = Number(minutes) || 0;
+  const abs = Math.abs(total);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+
+  const sign = total < 0 ? "-" : withSign && total > 0 ? "+" : "";
+  return `${sign}${h}h ${m}min`;
+};
