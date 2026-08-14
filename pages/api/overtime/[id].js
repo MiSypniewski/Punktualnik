@@ -1,0 +1,63 @@
+import { getToken } from "next-auth/jwt";
+import decideOvertimeRequest from "../../../services/decideOvertimeRequest";
+import cancelOvertimeRequest from "../../../services/cancelOvertimeRequest";
+import { canApproveOvertime } from "../../../services/roles";
+
+// "cancel" jest osobno, bo to akcja pracownika, nie kierownika.
+const DECISIONS = { approve: "approved", reject: "rejected" };
+const ALLOWED_ACTIONS = ["approve", "reject", "cancel"];
+
+// eslint-disable-next-line import/no-anonymous-default-export
+export default async (req, res) => {
+  const token = await getToken({ req });
+  if (!token) {
+    return res.status(401).json({ error: "not_authorized" });
+  }
+
+  if (req.method !== "PUT") {
+    res.setHeader("Allow", "PUT");
+    return res.status(405).json({ error: "method_not_allowed" });
+  }
+
+  const { id } = req.query;
+  if (!/^\d+$/.test(id ?? "")) {
+    return res.status(400).json({ error: "bad_id" });
+  }
+
+  const { action, note } = req.body ?? {};
+  // Lista, a nie `action in DECISIONS` — `in` przepuściłoby klucze
+  // z prototypu obiektu ("toString", "constructor", ...).
+  if (!ALLOWED_ACTIONS.includes(action)) {
+    return res.status(400).json({ error: "bad_action" });
+  }
+
+  // Anulowanie — tylko własny wniosek i tylko dopóki oczekuje.
+  // Obie te rzeczy sprawdza WHERE w cancelOvertimeRequest.
+  if (action === "cancel") {
+    const { changed, request } = cancelOvertimeRequest({ id, userID: token.userID });
+    if (!changed) {
+      // Nie rozróżniamy "cudzy wniosek" od "już rozpatrzony" — brak potwierdzenia,
+      // czy wniosek o danym id w ogóle istnieje.
+      return res.status(409).json({ error: "cannot_cancel" });
+    }
+    return res.status(200).json({ status: "cancelled", request });
+  }
+
+  if (!canApproveOvertime(token.role)) {
+    return res.status(403).json({ error: "permission_denied" });
+  }
+
+  const { changed, request } = decideOvertimeRequest({
+    id,
+    status: DECISIONS[action],
+    decidedBy: token.userID,
+    fallbackName: token.name,
+    decisionNote: note,
+  });
+
+  if (!changed) {
+    return res.status(409).json({ error: "already_decided" });
+  }
+
+  return res.status(200).json({ status: DECISIONS[action], request });
+};
