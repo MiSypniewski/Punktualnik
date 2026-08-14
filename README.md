@@ -66,6 +66,22 @@ Zasady:
 - Rodzaje wniosków definiuje `services/overtimeKinds.js` — dodanie nowego rodzaju
   (wraz ze znakiem) wymaga zmiany tylko w tym pliku.
 
+### Eksport do CSV
+
+`/api/report/nadgodziny` — plik CSV z BOM-em i średnikiem, otwiera się wprost
+w polskim Excelu. Przyciski są na stronach: kierownik pobiera z panelu,
+pracownik własną historię z `/nadgodziny`.
+
+| Parametr | Znaczenie |
+|---|---|
+| `tryb=wnioski` (domyślnie) | lista wniosków |
+| `tryb=salda` | zestawienie sald wszystkich aktywnych pracowników (tylko `manager`) |
+| `userID`, `status`, `from`, `to` | filtry listy wniosków |
+
+Bez roli `manager` parametr `userID` jest ignorowany — eksport zawsze zawęża się
+do własnych wniosków. Wymiar jest w dwóch kolumnach: godziny dziesiętnie
+z przecinkiem (`1,75` — do liczenia w arkuszu) oraz tekst `+1h 45min`.
+
 ### Powiadomienia na Google Chat
 
 Każdy nowy wniosek jest wysyłany jako wiadomość na webhook przestrzeni Google Chat
