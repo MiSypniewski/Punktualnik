@@ -39,3 +39,6 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# artefakty przeglądarki (snapshoty/logi z testów Playwright MCP)
+/.playwright-mcp/
