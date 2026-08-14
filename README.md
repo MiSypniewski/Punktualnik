@@ -3,8 +3,8 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 ## Baza danych
 
 Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
-bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`) tworzony jest
-automatycznie przy pierwszym uruchomieniu.
+bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`, `Overtime`)
+tworzony jest automatycznie przy pierwszym uruchomieniu.
 
 - Domyślna ścieżka: `./data/punktualnik.sqlite` (katalog `data/` jest w `.gitignore`).
 - Ścieżkę można nadpisać zmienną `SQLITE_PATH` (zob. `.env.local`).
@@ -32,7 +32,7 @@ node scripts/admin.js pending                     # nieaktywni (do aktywacji)
 node scripts/admin.js list                        # wszyscy
 node scripts/admin.js activate   jan@example.pl   # aktywuj (po e-mailu lub id)
 node scripts/admin.js deactivate 5                # zablokuj
-node scripts/admin.js role       5 editor         # rola: user | editor
+node scripts/admin.js role       5 editor         # rola: user | editor | manager
 node scripts/admin.js section    5 biedronka_ch22 # zmień sekcję
 node scripts/admin.js passwd     jan@example.pl noweHaslo
 
@@ -44,6 +44,36 @@ Na Mikrusie: zaloguj się po SSH, wejdź do katalogu aplikacji i uruchom jak wy�
 Skrypt używa tej samej bazy co aplikacja (`SQLITE_PATH` / domyślnie `./data/punktualnik.sqlite`).
 Typowy flow nowego pracownika: rejestracja w aplikacji → `pending` → `activate` →
 (jeśli ma obsługiwać karty) `role <id> editor`.
+
+## Nadgodziny
+
+Osobny moduł rozliczania nadgodzin, niezależny od kart czasu pracy (tabela `Times`).
+
+- `/nadgodziny` — każdy zalogowany: aktualne saldo, formularz zgłoszenia i pełna
+  historia własnych wniosków. Rodzaje: *zostaję dłużej* i *praca poza godzinami*
+  (dodają do salda) oraz *wcześniejsze wyjście* (odejmuje).
+- `/nadgodziny/zarzadzaj` — wyłącznie rola `manager`: wnioski do rozpatrzenia
+  (zatwierdź / odrzuć wraz z notatką), salda wszystkich aktywnych pracowników
+  i historia z filtrami (pracownik, status, zakres dat).
+
+Zasady:
+
+- **Saldo liczy się wyłącznie z wniosków zatwierdzonych.** Oczekujące i odrzucone
+  go nie zmieniają, a `Times.overTime` (flaga „tego dnia ≥ 8h") nie jest tu w ogóle
+  używana — to dwie różne rzeczy.
+- Datę wniosku można podać wstecz (zgłoszenie faktu) i w przód (planowane wyjście).
+- Pracownik może anulować własny wniosek, dopóki ma status *Oczekuje*.
+- Rodzaje wniosków definiuje `services/overtimeKinds.js` — dodanie nowego rodzaju
+  (wraz ze znakiem) wymaga zmiany tylko w tym pliku.
+
+Nadanie uprawnień kierownika:
+
+```bash
+npm run admin -- role michal@example.pl manager
+```
+
+Rola jest zapisana w tokenie JWT, więc **po jej zmianie trzeba się wylogować
+i zalogować ponownie**, żeby zaczęła obowiązywać.
 
 ## Migracja kont z Airtable (jednorazowo)
 

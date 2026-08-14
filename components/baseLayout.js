@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
+import { isStaff, canApproveOvertime } from "../services/roles";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -36,6 +37,19 @@ const TopNavigation = ({ section }) => {
       <Link href={`/`}>
         <a className="capitalize flex-grow font-bold">{dayjs().format(`dddd, DD MMMM YYYY, HH:mm:ss `)}</a>
       </Link>
+      <Link href={`/nadgodziny`}>
+        <a className="font-bold hover:underline">Nadgodziny</a>
+      </Link>
+      {isStaff(session.user.role) && (
+        <Link href={`/utils/eksport`}>
+          <a className="font-bold hover:underline">Eksport</a>
+        </Link>
+      )}
+      {canApproveOvertime(session.user.role) && (
+        <Link href={`/nadgodziny/zarzadzaj`}>
+          <a className="font-bold hover:underline">Panel kierownika</a>
+        </Link>
+      )}
       {session.user.role === "user" ? (
         <Link href={`/users/${session.user.userID}`}>
           <a className="capitalize font-bold">{session.user.name}</a>
