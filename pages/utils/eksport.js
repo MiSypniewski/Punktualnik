@@ -3,6 +3,7 @@ import { getToken } from "next-auth/jwt";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import getAllUsers from "../../services/getAllUsers";
+import { isStaff } from "../../services/roles";
 
 // Dwuwarstwowe zabezpieczenie: tu blokujemy wejście na stronę,
 // a /api/report niezależnie blokuje samo pobranie pliku.
@@ -12,7 +13,7 @@ export async function getServerSideProps(ctx) {
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }
-  if (token.role !== "editor") {
+  if (!isStaff(token.role)) {
     // Brak uprawnień — nie pokazujemy strony.
     return { notFound: true };
   }

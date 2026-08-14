@@ -11,7 +11,7 @@
  *   node scripts/admin.js pending
  *   node scripts/admin.js activate   <email|id>
  *   node scripts/admin.js deactivate <email|id>
- *   node scripts/admin.js role       <email|id> <user|editor>
+ *   node scripts/admin.js role       <email|id> <user|editor|manager>
  *   node scripts/admin.js section    <email|id> <nazwaSekcji>
  *   node scripts/admin.js passwd     <email|id> <noweHaslo>
  *
@@ -53,6 +53,8 @@ db.exec(`
     isActive     INTEGER NOT NULL DEFAULT 0
   );
 `);
+
+const ROLES = ["user", "editor", "manager"];
 
 const die = (msg) => {
   console.error(`Błąd: ${msg}`);
@@ -113,8 +115,10 @@ switch (cmd) {
 
   case "role": {
     const u = findUser(selector);
-    if (extra !== "user" && extra !== "editor") {
-      die("rola musi być 'user' albo 'editor'.");
+    // Lustrzane wobec ROLES w services/roles.js — ten skrypt jest CommonJS,
+    // więc nie zaimportuje tamtego modułu (ESM). Zmiana tu = zmiana tam.
+    if (!ROLES.includes(extra)) {
+      die(`rola musi być jedną z: ${ROLES.join(", ")}.`);
     }
     db.prepare("UPDATE Users SET role = ? WHERE id = ?").run(extra, u.id);
     console.log("Zmieniono rolę:");
@@ -156,7 +160,7 @@ switch (cmd) {
         "  pending                    wypisz tylko nieaktywnych (do aktywacji)",
         "  activate   <email|id>      aktywuj konto (isActive=1)",
         "  deactivate <email|id>      zablokuj konto (isActive=0)",
-        "  role       <email|id> <user|editor>   zmień rolę",
+        "  role       <email|id> <user|editor|manager>   zmień rolę",
         "  section    <email|id> <nazwaSekcji>   zmień sekcję",
         "  passwd     <email|id> <noweHaslo>     ustaw nowe hasło",
         "",

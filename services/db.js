@@ -49,9 +49,32 @@ const createDb = () => {
       overTime      INTEGER DEFAULT 0
     );
 
+    -- Wnioski o nadgodziny. Saldo pracownika = suma zatwierdzonych wierszy,
+    -- gdzie 'early_leave' liczy się na minus (patrz services/overtimeKinds.js).
+    -- Świadomie BEZ denormalizacji imienia/nazwiska (inaczej niż w Times, gdzie
+    -- została po Airtable) — nazwiska bierzemy JOIN-em, więc zmiana danych
+    -- konta propaguje się na całą historię.
+    CREATE TABLE IF NOT EXISTS Overtime (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      userID        INTEGER NOT NULL,
+      kind          TEXT    NOT NULL,
+      data          TEXT    NOT NULL,
+      minutes       INTEGER NOT NULL,
+      reason        TEXT,
+      status        TEXT    NOT NULL DEFAULT 'pending',
+      createdAt     TEXT    NOT NULL,
+      decidedAt     TEXT,
+      decidedBy     INTEGER,
+      decidedByName TEXT,
+      decisionNote  TEXT,
+      FOREIGN KEY (userID) REFERENCES Users(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
     CREATE INDEX IF NOT EXISTS idx_users_section      ON Users(section);
+    CREATE INDEX IF NOT EXISTS idx_overtime_user      ON Overtime(userID, data);
+    CREATE INDEX IF NOT EXISTS idx_overtime_status    ON Overtime(status);
   `);
 
   return db;

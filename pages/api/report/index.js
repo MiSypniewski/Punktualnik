@@ -2,6 +2,7 @@ import { getToken } from "next-auth/jwt";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import getTimesReport from "../../../services/getTimesReport";
+import { isStaff } from "../../../services/roles";
 
 dayjs.locale("pl");
 
@@ -21,8 +22,8 @@ export default async (req, res) => {
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
-  // Eksport czasów wszystkich pracowników — wyłącznie rola editor.
-  if (token.role !== "editor") {
+  // Eksport czasów wszystkich pracowników — tylko personel (editor / manager).
+  if (!isStaff(token.role)) {
     return res.status(403).json({ error: "permission_denied" });
   }
   if (req.method !== "GET") {
