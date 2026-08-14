@@ -3,13 +3,11 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import getTimesReport from "../../../services/getTimesReport";
 import { isStaff } from "../../../services/roles";
+import { buildCsv, sendCsv } from "../../../utils/csv";
 
 dayjs.locale("pl");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-// Cudzysłów wokół każdego pola + podwojenie cudzysłowów w środku (RFC 4180).
-const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 const fmtTime = (v) => {
   const d = dayjs(v);
@@ -58,31 +56,19 @@ export default async (req, res) => {
     "Nadgodziny",
   ];
 
-  const lines = rows.map((r) =>
-    [
-      String(r.data ?? "").slice(0, 10),
-      r.name,
-      r.surname,
-      r.section,
-      r.location,
-      fmtTime(r.startTime),
-      fmtTime(r.endTime),
-      r.totalWorkTime,
-      r.status,
-      r.overTime ? "tak" : "nie",
-    ]
-      .map(csvCell)
-      .join(";")
-  );
-
-  // BOM (﻿) + separator ";" => polski Excel/LibreOffice rozbija na kolumny
-  // i poprawnie pokazuje polskie znaki.
-  const csv = "﻿" + [header.map(csvCell).join(";"), ...lines].join("\r\n") + "\r\n";
+  const lines = rows.map((r) => [
+    String(r.data ?? "").slice(0, 10),
+    r.name,
+    r.surname,
+    r.section,
+    r.location,
+    fmtTime(r.startTime),
+    fmtTime(r.endTime),
+    r.totalWorkTime,
+    r.status,
+    r.overTime ? "tak" : "nie",
+  ]);
 
   const namePart = userID ? `_user${userID}` : "";
-  const filename = `czasy_${from}_${to}${namePart}.csv`;
-
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.status(200).send(csv);
+  return sendCsv(res, `czasy_${from}_${to}${namePart}.csv`, buildCsv(header, lines));
 };

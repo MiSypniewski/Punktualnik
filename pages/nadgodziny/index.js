@@ -181,7 +181,22 @@ export default function Nadgodziny({ balance, requests }) {
           </button>
         </form>
 
-        <h2 className="text-xl font-bold mb-4">Historia</h2>
+        <div className="mb-4 flex flex-wrap gap-3 items-baseline">
+          <h2 className="text-xl font-bold">Historia</h2>
+          {requests.length > 0 && (
+            <button
+              onClick={() => {
+                // Nawigacja, nie fetch — przeglądarka zapisze plik wg
+                // Content-Disposition. API i tak zawęzi eksport do własnych
+                // wniosków, bo rola user nie widzi cudzych.
+                window.location.href = "/api/report/nadgodziny";
+              }}
+              className="text-sm text-indigo-600 hover:underline"
+            >
+              Pobierz CSV
+            </button>
+          )}
+        </div>
         {requests.length === 0 ? (
           <p className="text-gray-500">Brak zgłoszeń.</p>
         ) : (

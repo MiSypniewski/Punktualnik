@@ -91,6 +91,20 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
     }
   };
 
+  // Zwykła nawigacja, nie fetch — przeglądarka sama zapisze plik zgodnie
+  // z Content-Disposition, a ciasteczko sesji leci automatycznie (ten sam origin).
+  // Tak samo działa eksport czasów w utils/eksport.js.
+  const downloadCsv = (tryb) => {
+    const qs = new URLSearchParams({ tryb });
+    if (tryb === "wnioski") {
+      if (userID) qs.set("userID", userID);
+      if (status) qs.set("status", status);
+      if (from) qs.set("from", from);
+      if (to) qs.set("to", to);
+    }
+    window.location.href = `/api/report/nadgodziny?${qs.toString()}`;
+  };
+
   const applyFilters = (e) => {
     e.preventDefault();
     const qs = new URLSearchParams();
@@ -277,7 +291,22 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
           >
             Wyczyść
           </button>
+          <button
+            type="button"
+            onClick={() => downloadCsv("wnioski")}
+            className="text-white bg-green-700 border-0 py-2 px-6 hover:bg-green-800 rounded"
+          >
+            Pobierz CSV
+          </button>
         </form>
+
+        <p className="mb-4 text-xs text-gray-500">
+          „Pobierz CSV” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
+          <button type="button" onClick={() => downloadCsv("salda")} className="text-indigo-600 hover:underline">
+            Pobierz zestawienie sald wszystkich pracowników
+          </button>
+          .
+        </p>
 
         {history.length === 0 ? (
           <p className="text-gray-500">Brak wniosków dla wybranych filtrów.</p>
