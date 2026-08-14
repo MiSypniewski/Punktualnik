@@ -24,10 +24,17 @@ const CONDITIONS = {
 
 const cache = new Map();
 
-const getStatement = (keys) => {
-  const cacheKey = keys.join("|");
+// Lista sekcji ma zmienną długość, więc nie mieści się w słowniku stałych
+// warunków — generujemy @sec0, @sec1... i cache'ujemy osobno per liczba sekcji.
+const sectionsCondition = (count) =>
+  `u.section IN (${Array.from({ length: count }, (_, i) => `@sec${i}`).join(", ")})`;
+
+const getStatement = (keys, sectionCount) => {
+  const cacheKey = `${keys.join("|")}#${sectionCount}`;
   if (!cache.has(cacheKey)) {
-    const where = keys.length ? `\n  WHERE ${keys.map((k) => CONDITIONS[k]).join(" AND ")}` : "";
+    const parts = keys.map((k) => CONDITIONS[k]);
+    if (sectionCount > 0) parts.push(sectionsCondition(sectionCount));
+    const where = parts.length ? `\n  WHERE ${parts.join(" AND ")}` : "";
     cache.set(cacheKey, db.prepare(`${BASE}${where}${ORDER}`));
   }
   return cache.get(cacheKey);
@@ -36,9 +43,15 @@ const getStatement = (keys) => {
 const isSet = (v) => v !== undefined && v !== null && v !== "";
 
 /**
- * @param {{status?: string, userID?: number|string, from?: string, to?: string}} filters
+ * @param {{status?: string, userID?: number|string, from?: string, to?: string,
+ *          sections?: string[]}} filters
+ *   `sections` zawęża wynik do podanych sekcji. Pominięcie pola = bez zawężania
+ *   (wołający odpowiada za uprawnienia); pusta tablica = świadomie nic nie widać.
  */
 const getOvertimeRequests = (filters = {}) => {
+  const { sections } = filters;
+  if (Array.isArray(sections) && sections.length === 0) return [];
+
   const params = {};
   if (isSet(filters.status)) params.status = String(filters.status);
   if (isSet(filters.userID)) params.userID = Number(filters.userID);
@@ -46,7 +59,13 @@ const getOvertimeRequests = (filters = {}) => {
   if (isSet(filters.to)) params.to = String(filters.to);
 
   const keys = Object.keys(CONDITIONS).filter((k) => k in params);
-  return getStatement(keys).all(params);
+
+  const list = Array.isArray(sections) ? sections : [];
+  list.forEach((s, i) => {
+    params[`sec${i}`] = String(s);
+  });
+
+  return getStatement(keys, list.length).all(params);
 };
 
 export default getOvertimeRequests;

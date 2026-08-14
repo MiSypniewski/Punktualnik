@@ -66,6 +66,38 @@ Zasady:
 - Rodzaje wniosków definiuje `services/overtimeKinds.js` — dodanie nowego rodzaju
   (wraz ze znakiem) wymaga zmiany tylko w tym pliku.
 
+### Kto czyje dane widzi
+
+Zasięg jest jawny i trzyma się w jednym miejscu — `services/scope.js`.
+Każda trasa pokazująca cudze dane pyta właśnie tam.
+
+| Rola | Widzi |
+|---|---|
+| `user` | wyłącznie siebie |
+| `editor` | własną sekcję (karty czasu, eksport czasów) |
+| `manager` | **tylko sekcje jawnie mu przypisane** w tabeli `ManagerSections` |
+
+Przypisanie kierownika do sekcji jest niezależne od tego, w której sekcji sam
+figuruje — kierownik z `dyrekcja` może obsługiwać `spedycja` i `cns`, a jedną
+sekcję może obsługiwać kilka osób.
+
+```bash
+npm run admin -- sections michal@example.pl              # podgląd
+npm run admin -- sections michal@example.pl spedycja,cns # ustaw
+npm run admin -- sections michal@example.pl -            # wyczyść
+```
+
+**Kierownik bez przypisanych sekcji nie widzi nikogo** — to celowa wartość
+domyślna, żeby nowe konto nie dostało wglądu w całą firmę przez przeoczenie.
+Panel pokazuje wtedy komunikat z komendą do uruchomienia. Komenda odrzuca
+nazwy sekcji, które nie występują w `Users.section`, bo literówka po cichu
+odcięłaby kierownika od jego ludzi.
+
+Zasięg obejmuje: panel nadgodzin, oba eksporty CSV, `GET /api/time/[id]`
+i stronę kart `/time/[sekcja]`. Eksport czasów filtruje po `Times.section`,
+czyli po sekcji z dnia zapisu — po zmianie zespołu stare dni zostają
+u poprzedniego kierownika.
+
 ### Eksport do CSV
 
 `/api/report/nadgodziny` — plik CSV z BOM-em i średnikiem, otwiera się wprost

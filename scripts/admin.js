@@ -13,6 +13,7 @@
  *   node scripts/admin.js deactivate <email|id>
  *   node scripts/admin.js role       <email|id> <user|editor|manager>
  *   node scripts/admin.js section    <email|id> <nazwaSekcji>
+ *   node scripts/admin.js sections   <email|id> [sekcja1,sekcja2]
  *   node scripts/admin.js passwd     <email|id> <noweHaslo>
  *
  * Skróty npm (pamiętaj o `--`):
@@ -52,6 +53,13 @@ db.exec(`
     role         TEXT    NOT NULL DEFAULT 'user',
     isActive     INTEGER NOT NULL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS ManagerSections (
+    managerID INTEGER NOT NULL,
+    section   TEXT    NOT NULL,
+    PRIMARY KEY (managerID, section),
+    FOREIGN KEY (managerID) REFERENCES Users(id)
+  );
 `);
 
 const ROLES = ["user", "editor", "manager"];
@@ -72,10 +80,19 @@ const findUser = (selector) => {
   return user;
 };
 
-const fmt = (u) =>
-  `#${u.id}  ${u.name} ${u.surname}  <${u.email}>  sekcja=${u.section}  rola=${u.role}  ${
+const sectionsOf = (managerID) =>
+  db
+    .prepare("SELECT section FROM ManagerSections WHERE managerID = ? ORDER BY section")
+    .all(managerID)
+    .map((r) => r.section);
+
+const fmt = (u) => {
+  // Dla kierownika sama rola nic nie mówi — liczy się, które sekcje obsługuje.
+  const scope = u.role === "manager" ? `  obsługuje=[${sectionsOf(u.id).join(", ") || "BRAK"}]` : "";
+  return `#${u.id}  ${u.name} ${u.surname}  <${u.email}>  sekcja=${u.section}  rola=${u.role}${scope}  ${
     u.isActive ? "AKTYWNY" : "nieaktywny"
   }`;
+};
 
 const printList = (rows) => {
   if (rows.length === 0) {
@@ -126,6 +143,43 @@ switch (cmd) {
     break;
   }
 
+  // Które sekcje obsługuje kierownik. Bez drugiego argumentu — podgląd.
+  // Lustrzane wobec services/managerSections.js (ten skrypt jest CommonJS).
+  case "sections": {
+    const u = findUser(selector);
+
+    if (extra === undefined) {
+      console.log(`#${u.id} ${u.name} ${u.surname} obsługuje: ${sectionsOf(u.id).join(", ") || "(brak)"}`);
+      break;
+    }
+
+    if (u.role !== "manager") {
+      die(`przypisania sekcji mają sens tylko dla roli 'manager' (ten użytkownik ma '${u.role}').`);
+    }
+
+    // "-" czyści przypisania; inaczej lista po przecinku.
+    const wanted = extra === "-" ? [] : extra.split(",").map((s) => s.trim()).filter(Boolean);
+
+    const known = db.prepare("SELECT DISTINCT section FROM Users ORDER BY section").all().map((r) => r.section);
+    const unknown = wanted.filter((s) => !known.includes(s));
+    if (unknown.length > 0) {
+      // Sekcje to zwykły tekst w Users.section — literówka po cichu odcięłaby
+      // kierownika od ludzi, więc lepiej się tu zatrzymać.
+      die(`nieznane sekcje: ${unknown.join(", ")}. Istniejące: ${known.join(", ")}`);
+    }
+
+    const tx = db.transaction(() => {
+      db.prepare("DELETE FROM ManagerSections WHERE managerID = ?").run(u.id);
+      const ins = db.prepare("INSERT OR IGNORE INTO ManagerSections (managerID, section) VALUES (?, ?)");
+      wanted.forEach((s) => ins.run(u.id, s));
+    });
+    tx();
+
+    console.log("Zmieniono przypisania:");
+    console.log(fmt(findUser(String(u.id))));
+    break;
+  }
+
   case "section": {
     const u = findUser(selector);
     if (!extra || !extra.trim()) die("podaj nazwę sekcji.");
@@ -161,7 +215,9 @@ switch (cmd) {
         "  activate   <email|id>      aktywuj konto (isActive=1)",
         "  deactivate <email|id>      zablokuj konto (isActive=0)",
         "  role       <email|id> <user|editor|manager>   zmień rolę",
-        "  section    <email|id> <nazwaSekcji>   zmień sekcję",
+        "  section    <email|id> <nazwaSekcji>   zmień sekcję użytkownika",
+        "  sections   <email|id>                 pokaż sekcje obsługiwane przez kierownika",
+        "  sections   <email|id> <a,b,c>         ustaw je ('-' czyści; kierownik bez sekcji nie widzi nikogo)",
         "  passwd     <email|id> <noweHaslo>     ustaw nowe hasło",
         "",
         `Baza: ${dbPath}`,

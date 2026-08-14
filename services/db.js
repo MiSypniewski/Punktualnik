@@ -70,6 +70,17 @@ const createDb = () => {
       FOREIGN KEY (userID) REFERENCES Users(id)
     );
 
+    -- Które sekcje obsługuje dany kierownik. Przypisanie jest JAWNE i niezależne
+    -- od Users.section kierownika: kierownik siedzący w sekcji "dyrekcja" może
+    -- obsługiwać "spedycja" i "cns", a jedną sekcję może obsługiwać kilka osób.
+    -- Brak wierszy = kierownik nie widzi nikogo (bezpieczna wartość domyślna).
+    CREATE TABLE IF NOT EXISTS ManagerSections (
+      managerID INTEGER NOT NULL,
+      section   TEXT    NOT NULL,
+      PRIMARY KEY (managerID, section),
+      FOREIGN KEY (managerID) REFERENCES Users(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
     CREATE INDEX IF NOT EXISTS idx_users_section      ON Users(section);

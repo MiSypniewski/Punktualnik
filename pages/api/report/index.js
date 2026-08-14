@@ -4,6 +4,7 @@ import "dayjs/locale/pl";
 import getTimesReport from "../../../services/getTimesReport";
 import { isStaff } from "../../../services/roles";
 import { buildCsv, sendCsv } from "../../../utils/csv";
+import { visibleSections } from "../../../services/scope";
 
 dayjs.locale("pl");
 
@@ -41,7 +42,8 @@ export default async (req, res) => {
     return res.status(400).json({ error: "bad_user" });
   }
 
-  const rows = getTimesReport({ from, to, userID });
+  // Zasięg sekcyjny: kierownik dostaje swoje sekcje, edytor własną.
+  const rows = getTimesReport({ from, to, userID, sections: visibleSections(token) });
 
   const header = [
     "Data",

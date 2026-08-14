@@ -3,6 +3,9 @@ import saveTimes from "../../../services/saveTime";
 import updateTime from "../../../services/updateTime";
 import { getSession } from "next-auth/react";
 import { getToken } from "next-auth/jwt";
+import getUserData from "../../../services/getUserData";
+import { canSeeUser } from "../../../services/scope";
+import { isStaff } from "../../../services/roles";
 import dayjs from "dayjs";
 dayjs.locale("pl");
 
@@ -20,9 +23,12 @@ export default async (req, res) => {
   }
   switch (req.method) {
     case "GET": {
-      //tutaj zmienić datę na zmienną
-      // const pyload = req.body;
-      // console.log(`GET on backend. `);
+      // req.query.id to userID pracownika. Wcześniej nie było tu żadnej
+      // kontroli — każdy zalogowany mógł odczytać czas dowolnej osoby.
+      const [owner] = await getUserData(req.query.id);
+      if (!canSeeUser(token, owner)) {
+        return res.status(403).json({ error: "permission_denied" });
+      }
 
       const time = await getTime(req.query.id);
       res.status(200).json(time);
@@ -34,7 +40,10 @@ export default async (req, res) => {
       // if (!session) {
       //   return res.status(401).json({ error: "not_authotized" });
       // }
-      if (token.role !== "editor") {
+      // isStaff, nie samo "editor": rola jest jednowartościowa, więc kierownik
+      // (manager) musi zachować obsługę kart, inaczej awans odbierałby mu
+      // możliwość klikania czasu własnemu zespołowi.
+      if (!isStaff(token.role)) {
         return res.status(401).json({ error: "permission_denied" });
       }
       const payload = req.body;
@@ -49,7 +58,10 @@ export default async (req, res) => {
       // if (!session) {
       //   return res.status(401).json({ error: "not_authotized" });
       // }
-      if (token.role !== "editor") {
+      // isStaff, nie samo "editor": rola jest jednowartościowa, więc kierownik
+      // (manager) musi zachować obsługę kart, inaczej awans odbierałby mu
+      // możliwość klikania czasu własnemu zespołowi.
+      if (!isStaff(token.role)) {
         return res.status(401).json({ error: "permission_denied" });
       }
       const payload = req.body;

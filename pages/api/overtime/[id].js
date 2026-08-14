@@ -2,6 +2,9 @@ import { getToken } from "next-auth/jwt";
 import decideOvertimeRequest from "../../../services/decideOvertimeRequest";
 import cancelOvertimeRequest from "../../../services/cancelOvertimeRequest";
 import { canApproveOvertime } from "../../../services/roles";
+import { canSeeUser } from "../../../services/scope";
+import getUserData from "../../../services/getUserData";
+import findOvertimeRequest from "../../../services/getOvertimeRequestById";
 
 // "cancel" jest osobno, bo to akcja pracownika, nie kierownika.
 const DECISIONS = { approve: "approved", reject: "rejected" };
@@ -44,6 +47,18 @@ export default async (req, res) => {
   }
 
   if (!canApproveOvertime(token.role)) {
+    return res.status(403).json({ error: "permission_denied" });
+  }
+
+  // Sama rola nie wystarczy: wniosek musi należeć do pracownika z sekcji, którą
+  // ten kierownik obsługuje. Bez tego wystarczyłoby zgadnąć id, żeby decydować
+  // o cudzym zespole, nawet nie widząc go na liście.
+  const target = findOvertimeRequest(id);
+  if (!target) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  const [author] = await getUserData(target.userID);
+  if (!canSeeUser(token, author)) {
     return res.status(403).json({ error: "permission_denied" });
   }
 

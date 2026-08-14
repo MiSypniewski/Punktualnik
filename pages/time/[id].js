@@ -1,7 +1,9 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
+import { getToken } from "next-auth/jwt";
 import getSectionTime from "../../services/getSectionTime";
+import { canSeeSection } from "../../services/scope";
 import getUsers from "../../services/getUsers";
 import useSWR from "swr";
 import BaseLayout from "../../components/baseLayout";
@@ -12,6 +14,20 @@ import "dayjs/locale/pl";
 dayjs.locale("pl");
 
 export const getServerSideProps = async (context) => {
+  // Kontrola po stronie serwera. Wcześniej strona nie sprawdzała sesji w ogóle
+  // — karty całej sekcji trafiały do propsów każdemu, kto wpisał adres,
+  // a przekierowanie działało dopiero w przeglądarce (czyli po wysłaniu danych).
+  const token = await getToken({ req: context.req });
+  if (!token) {
+    return { redirect: { destination: "/users/signin", permanent: false } };
+  }
+
+  const section = context.params.id;
+  // Własna sekcja zawsze; cudza tylko w zasięgu (kierownik z przypisaniem).
+  if (token.section !== section && !canSeeSection(token, section)) {
+    return { notFound: true };
+  }
+
   //pobieranie dzisiejszej daty i ustawnianie godziny na 3 w nocy aby uniknąć problemów ze zmianą czasu na letni i zimowy
   const toDay = dayjs().hour(3).minute(0).second(0).millisecond(0).format();
   //pobieranie aktywnych użytkowników z danej sekcji (contex.params.id) -- tylko "user", żaden edytor
@@ -96,9 +112,9 @@ export default function Home({ newCardData, id }) {
     if (status === "unauthenticated") {
       router.push("/");
     }
-    if (status === "authenticated" && session.user.section !== id) {
-      router.push("/");
-    }
+    // Dostęp rozstrzyga już getServerSideProps (własna sekcja albo zasięg
+    // kierownika). Porównanie sekcji zostawione tu wyrzucałoby kierownika
+    // z sekcji, którą ma prawo oglądać, a której sam nie jest członkiem.
   }, [session, status]);
   // const { data } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: cardData });
   const data = undefined;

@@ -7,6 +7,7 @@ import { canApproveOvertime } from "../../../services/roles";
 import { STATUS_KEYS } from "../../../services/overtimeKinds";
 import getUserData from "../../../services/getUserData";
 import { notifyNewOvertimeRequest } from "../../../services/notifyGChat";
+import { visibleSections } from "../../../services/scope";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -46,7 +47,11 @@ export default async (req, res) => {
       }
     }
 
-    return res.status(200).json({ requests: getOvertimeRequests({ userID, status, from, to }) });
+    // Kierownik widzi wyłącznie sekcje mu przypisane — nawet gdy jawnie poda
+    // userID kogoś spoza swojego zasięgu.
+    return res.status(200).json({
+      requests: getOvertimeRequests({ userID, status, from, to, sections: visibleSections(token) }),
+    });
   }
 
   if (req.method === "POST") {

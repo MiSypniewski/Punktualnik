@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import getAllUsers from "../../services/getAllUsers";
 import { isStaff } from "../../services/roles";
+import { visibleSections } from "../../services/scope";
 
 // Dwuwarstwowe zabezpieczenie: tu blokujemy wejście na stronę,
 // a /api/report niezależnie blokuje samo pobranie pliku.
@@ -18,7 +19,9 @@ export async function getServerSideProps(ctx) {
     return { notFound: true };
   }
 
-  return { props: { users: getAllUsers() } };
+  // Lista w filtrze zawężona do sekcji, których dane ten użytkownik może
+  // oglądać — inaczej widziałby nazwiska ludzi spoza swojego zasięgu.
+  return { props: { users: getAllUsers(visibleSections(token)) } };
 }
 
 export default function Eksport({ users }) {

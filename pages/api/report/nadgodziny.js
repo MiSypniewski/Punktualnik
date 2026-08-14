@@ -4,6 +4,7 @@ import "dayjs/locale/pl";
 import getOvertimeRequests from "../../../services/getOvertimeRequests";
 import getOvertimeBalances from "../../../services/getOvertimeBalances";
 import { canApproveOvertime } from "../../../services/roles";
+import { visibleSections } from "../../../services/scope";
 import { kindLabel, statusLabel, signedMinutes, STATUS_KEYS } from "../../../services/overtimeKinds";
 import { buildCsv, sendCsv, plNumber } from "../../../utils/csv";
 import { formatMinutes } from "../../../utils";
@@ -50,7 +51,7 @@ export default async (req, res) => {
     }
 
     const header = ["Nazwisko", "Imię", "Sekcja", "Saldo (h)", "Saldo", "Oczekujące wnioski"];
-    const rows = getOvertimeBalances().map((u) => [
+    const rows = getOvertimeBalances(visibleSections(token)).map((u) => [
       u.surname,
       u.name,
       u.section,
@@ -68,7 +69,15 @@ export default async (req, res) => {
   const canSeeAll = canApproveOvertime(token.role);
   const effectiveUserID = canSeeAll ? userID : String(token.userID);
 
-  const rows = getOvertimeRequests({ userID: effectiveUserID, status, from, to });
+  // Pracownik pobiera wyłącznie własną historię (zawężenie po userID powyżej),
+  // więc zasięg sekcyjny stosujemy tylko kierownikowi.
+  const rows = getOvertimeRequests({
+    userID: effectiveUserID,
+    status,
+    from,
+    to,
+    ...(canSeeAll ? { sections: visibleSections(token) } : {}),
+  });
 
   const header = [
     "Data",

@@ -10,6 +10,7 @@ import getOvertimeBalances from "../../services/getOvertimeBalances";
 import getAllUsers from "../../services/getAllUsers";
 import { kindLabel, signedMinutes, OVERTIME_STATUSES, STATUS_KEYS } from "../../services/overtimeKinds";
 import { canApproveOvertime } from "../../services/roles";
+import { visibleSections } from "../../services/scope";
 import { formatMinutes } from "../../utils";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,18 +36,23 @@ export async function getServerSideProps(ctx) {
     to: DATE_RE.test(to) ? to : "",
   };
 
+  // Wszystko, co ta strona pokazuje, jest zawężone do sekcji przypisanych
+  // temu kierownikowi. Brak przypisań = pusty panel (i komunikat niżej).
+  const sections = visibleSections(token);
+
   return {
     props: {
-      pending: getOvertimeRequests({ status: "pending" }),
-      balances: getOvertimeBalances(),
-      history: getOvertimeRequests(filters),
-      users: getAllUsers(),
+      pending: getOvertimeRequests({ status: "pending", sections }),
+      balances: getOvertimeBalances(sections),
+      history: getOvertimeRequests({ ...filters, sections }),
+      users: getAllUsers(sections),
       filters,
+      sections,
     },
   };
 }
 
-export default function ZarzadzajNadgodzinami({ pending, balances, history, users, filters }) {
+export default function ZarzadzajNadgodzinami({ pending, balances, history, users, filters, sections }) {
   const router = useRouter();
 
   const [note, setNote] = useState({}); // id wniosku → notatka do decyzji
@@ -125,7 +131,17 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
   return (
     <BaseLayout>
       <section className="mx-auto p-4 mt-6 mb-8 max-w-5xl">
-        <h1 className="text-2xl font-bold mb-6">Nadgodziny — panel kierownika</h1>
+        <h1 className="text-2xl font-bold mb-1">Nadgodziny — panel kierownika</h1>
+        <p className="mb-6 text-sm text-gray-500">
+          {sections.length > 0 ? `Obsługiwane sekcje: ${sections.join(", ")}` : "Brak przypisanych sekcji"}
+        </p>
+
+        {sections.length === 0 && (
+          <p className="mb-6 p-3 bg-yellow-100 text-yellow-900 text-sm rounded">
+            Nie masz przypisanej żadnej sekcji, więc panel jest pusty. Przypisanie nadaje się z linii poleceń:{" "}
+            <code className="font-mono">npm run admin -- sections &lt;e-mail&gt; nazwaSekcji</code>
+          </p>
+        )}
 
         {err && <p className="mb-4 p-2 bg-red-100 text-red-700 text-sm rounded">{err}</p>}
 

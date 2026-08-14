@@ -1,11 +1,37 @@
 import db from "./db";
 
-// Pełna lista kont do filtra na stronie eksportu (bez maskowania haseł —
-// zwracamy tylko pola potrzebne do dropdowna). Times.userID == Users.id.
-const stmt = db.prepare(
-  `SELECT id, name, surname, section FROM Users ORDER BY surname, name`
-);
+// Lista kont do filtrów (dropdowny na stronach eksportu i panelu kierownika).
+// Bez maskowania haseł — zwracamy tylko pola potrzebne do listy wyboru.
+// Times.userID == Users.id.
+const COLUMNS = `id, name, surname, section`;
+const ORDER = `ORDER BY surname, name`;
 
-const getAllUsers = () => stmt.all();
+const stmtAll = db.prepare(`SELECT ${COLUMNS} FROM Users ${ORDER}`);
+
+// Osobne zapytanie per liczba sekcji; nazwy sekcji zawsze przez binding.
+const cache = new Map();
+const stmtForSections = (count) => {
+  if (!cache.has(count)) {
+    const placeholders = Array.from({ length: count }, (_, i) => `@sec${i}`).join(", ");
+    cache.set(count, db.prepare(`SELECT ${COLUMNS} FROM Users WHERE section IN (${placeholders}) ${ORDER}`));
+  }
+  return cache.get(count);
+};
+
+/**
+ * @param {string[]} [sections] zawężenie do sekcji; pominięcie = wszyscy,
+ *   pusta tablica = nikt. Dzięki temu w filtrze nie widać nazwisk ludzi,
+ *   których danych i tak nie wolno obejrzeć.
+ */
+const getAllUsers = (sections) => {
+  if (!Array.isArray(sections)) return stmtAll.all();
+  if (sections.length === 0) return [];
+
+  const params = {};
+  sections.forEach((s, i) => {
+    params[`sec${i}`] = String(s);
+  });
+  return stmtForSections(sections.length).all(params);
+};
 
 export default getAllUsers;
