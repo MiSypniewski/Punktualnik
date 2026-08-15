@@ -25,9 +25,9 @@ zmiany widać od razu po odświeżeniu strony.
 
 | Komenda | Co robi |
 |---|---|
-| `npm run admin -- role <email\|id> user` | zwykły pracownik: widzi tylko siebie |
-| `npm run admin -- role <email\|id> editor` | obsługa kart czasu własnej sekcji + eksport |
-| `npm run admin -- role <email\|id> manager` | kierownik: zatwierdza nadgodziny, widzi salda |
+| `npm run admin -- role <email\|id> user` | pracownik: własne karty, nadgodziny i zadania |
+| `npm run admin -- role <email\|id> editor` | wspólny kiosk: obsługa kart czasu sekcji (zadań nie raportuje) |
+| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, projekty, raport zadań, eksporty |
 | `npm run admin -- sections <email\|id>` | pokazuje, które sekcje obsługuje kierownik |
 | `npm run admin -- sections <email\|id> <a,b,c>` | ustawia je (podmienia całą listę) |
 | `npm run admin -- sections <email\|id> -` | czyści przypisania |
@@ -60,8 +60,7 @@ Szczegóły: [Sekcje (działy)](#sekcje-działy).
 | `npm run lint` | ESLint |
 | `npm run migrate:airtable -- --dry-run` | jednorazowa migracja kont z Airtable (podgląd) |
 
-Na Mikrusie 1.0 build nie zmieści się w pamięci bez włączonej „amfetaminy" (+512 MB RAM),
-a aplikację prowadzi `pm2`. Pełna sekwencja: [Wdrożenie na Mikrus 1.0](#wdrożenie-na-mikrus-10).
+Aplikację prowadzi `pm2`. Pełna sekwencja: [Wdrożenie na Mikrus](#wdrożenie-na-mikrus).
 
 ### Typowe scenariusze
 
@@ -88,22 +87,34 @@ npm run admin -- section-off stary_dzial       # historia i eksporty zostają ni
 
 Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
 bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`, `Overtime`,
-`Sections`, `ManagerSections`) tworzony jest automatycznie przy pierwszym uruchomieniu.
+`Sections`, `ManagerSections`, `Projects`, `ProjectSections`, `TaskEntries`) tworzony
+jest automatycznie przy pierwszym uruchomieniu.
 
 - Domyślna ścieżka: `./data/punktualnik.sqlite` (katalog `data/` jest w `.gitignore`).
 - Ścieżkę można nadpisać zmienną `SQLITE_PATH` (zob. `.env.local`).
 
-### Wdrożenie na Mikrus 1.0
+### Wdrożenie na Mikrus
+
+Produkcja stoi na **Mikrusie 2.1** (1 GB RAM, 10 GB dysku).
 
 1. Ustaw `SQLITE_PATH` na trwałą ścieżkę poza katalogiem aplikacji,
    np. `/home/UŻYTKOWNIK/punktualnik-data/punktualnik.sqlite`,
    żeby baza przeżyła redeploy/rebuild.
-2. `npm ci && npm run build && npm run start`.
-3. `better-sqlite3` to moduł natywny. Jeśli na serwerze nie ma gotowego prebuildu
+2. `pm2 stop` → `npm run build` → `pm2 restart` → `pm2 save`.
+   `npm ci` tylko wtedy, gdy zmienił się `package.json`/lock.
+3. **Kontener nie ma swapu**, więc OOM ubija proces bez ostrzeżenia. Stąd `pm2 stop`
+   przed buildem — żeby build nie konkurował o pamięć z działającą aplikacją.
+   W 1 GB `next build` mieści się bez „amfetaminy” (ta była konieczna na Mikrusie 1.0
+   z 384 MB). Awaryjnie: `NODE_OPTIONS=--max-old-space-size=768 npm run build`.
+4. `better-sqlite3` to moduł natywny. Jeśli na serwerze nie ma gotowego prebuildu
    dla danej wersji Node, potrzebne będą `build-essential` i `python3`
    (`npm rebuild better-sqlite3`).
-4. Backup = skopiowanie pliku `.sqlite` (najlepiej przy zatrzymanej aplikacji
+5. Backup = skopiowanie pliku `.sqlite` (najlepiej przy zatrzymanej aplikacji
    lub `sqlite3 baza.sqlite ".backup kopia.sqlite"`).
+
+Nowe tabele powstają same przy pierwszym starcie — nie ma osobnego kroku
+migracyjnego. Po zmianie ról pamiętaj, że **rola siedzi w JWT**: użytkownik musi
+się wylogować i zalogować, żeby zobaczyć nowe pozycje w menu.
 
 ## Zarządzanie użytkownikami (panel admina z CLI)
 
@@ -267,6 +278,107 @@ npm run admin -- role michal@example.pl manager
 
 Rola jest zapisana w tokenie JWT, więc **po jej zmianie trzeba się wylogować
 i zalogować ponownie**, żeby zaczęła obowiązywać.
+
+## Zadania i projekty
+
+Druga, **niezależna** oś ewidencji obok kart czasu. Karty (`Times`) mówią, że ktoś
+był w pracy; zadania (`TaskEntries`) mówią, czym się zajmował. Nic się między nimi
+nie waliduje — zapomniana karta nie blokuje raportowania, a brak raportu nie
+podważa obecności.
+
+### Kto co może
+
+| | pracownik (`user`) | kiosk (`editor`) | kierownik (`manager`) |
+|---|---|---|---|
+| raportuje własne zadania | tak | **nie** | tak |
+| zakłada projekty | nie | nie | tak |
+| widzi zadania zespołu | nie | nie | tak (swoje sekcje) |
+| poprawia cudze wpisy | nie | nie | tak, bez limitu daty |
+| eksportuje CSV | nie | nie | tak |
+
+**Kiosk nie raportuje zadań i to jest celowe.** Konto `editor` jest współdzielone
+przez całą sekcję, więc jego wpis nie miałby właściciela. W praktyce znaczy to,
+że każdy pracownik, który ma raportować zadania, potrzebuje **własnego, aktywnego
+konta** — inaczej niż przy odbijaniu kart.
+
+### Projekty — bez CLI
+
+Projektami zarządza kierownik na `/zadania/projekty`, w przeglądarce. Świadomie
+**nie ma** komend `project-*` w `scripts/admin.js`: skrypt trzyma własną, lustrzaną
+kopię schematu, więc każda dopisana tam tabela to kolejne miejsce, gdzie schemat
+może się rozjechać.
+
+- Projektu **nie da się skasować**, tylko zarchiwizować — wpisy trzymają `projectID`
+  historycznie. Archiwalny znika z wyboru, dane zostają.
+- Projekt bez zaznaczonej sekcji jest **ogólnofirmowy** (widzą go wszyscy). To
+  odwrotna wartość domyślna niż przy kierownikach, gdzie brak przypisań = nie widzi
+  nikogo — tam chodzi o cudze dane osobowe, tu tylko o nazwę projektu.
+- Kierownik nie przypisze projektu do sekcji spoza swojego zasięgu.
+
+### Raportowanie — `/zadania`
+
+Timer start/stop z licznikiem na żywo albo wpis ręczny od–do. Opis zadania jest
+dowolnym tekstem; aplikacja podpowiada wcześniejsze opisy z historii (natywny
+`<datalist>`, filtrowany po wybranym projekcie) i pozwala wznowić poprzednie
+zadanie jednym kliknięciem. Podpowiedzi są sortowane po **liczbie użyć**, więc
+codzienna rutyna wypada wyżej niż coś zrobionego raz.
+
+Reguły, których pilnuje sama baza albo SQL — nie da się ich obejść przez API:
+
+| Reguła | Zachowanie |
+|---|---|
+| Jeden biegnący timer na osobę | drugi start → `409 already_running` (UNIQUE INDEX) |
+| Wpisy nie mogą na siebie nachodzić | `409 overlap`; styk godzin (12:00–13:00 po 10:00–12:00) przechodzi |
+| Pracownik edytuje tylko dziś i wczoraj | `409 edit_window_closed` |
+| Godziny równe (10:00–10:00) | `422 bad_range` — to pomyłka, nie „pełna doba" |
+
+Doba robocza zaczyna się o **3:00**, nie o północy (ta sama granica, której używają
+karty czasu). Dzięki temu zmiana kończąca się o 1:00 należy do dnia, w którym się
+zaczęła, a o 1:00 w nocy wciąż edytowalny jest dzień, który kalendarzowo minął.
+Wpis 22:00–01:00 zapisze się jako 3 godziny w dobie rozpoczęcia.
+
+**Zapomniany timer** domyka się sam na koniec doby roboczej, w której wystartował —
+timer zostawiony w piątek zamknie się w sobotę o 3:00, a nie w poniedziałek.
+Wpis dostaje flagę „domknięty automatycznie" i żółty pasek; edycja jest
+potwierdzeniem i flagę zdejmuje. Nie ma tu crona — domykanie dzieje się przy okazji
+wejścia na stronę, więc działa też na Mikrusie.
+
+### Raport kierownika — `/zadania/zarzadzaj`
+
+Filtry (zakres dat, projekt, pracownik, próg długości wpisu) żyją w adresie, więc
+widok da się zalinkować i odświeżyć. Zawartość: kafelki podsumowania, rozbicie wg
+projektów z udziałem procentowym, zestawienie **obecność vs zaraportowano** per
+pracownik oraz lista wpisów.
+
+Kolumna „Różnica” jest **wskazówką, gdzie brakuje raportowania — nie podstawą
+rozliczeń**. Obecność pochodzi z kart czasu, zaraportowany czas z wpisów zadań;
+to dwie osobne ewidencje i aplikacja nigdy nie każe im się zgadzać.
+
+Kierownik może poprawiać i dopisywać wpisy podwładnych **bez ograniczenia daty** —
+inaczej starszy błąd zostałby w bazie na zawsze, bo pracownik go już nie sięgnie.
+Każda taka korekta zostawia podpis („popr. Anna”). Timera za nikogo nie uruchamia
+ani nie zatrzymuje: nie wie, kiedy tamten faktycznie zaczął i skończył.
+
+Tabela na ekranie pokazuje najwyżej **200 wpisów** (przy większej liczbie pojawia
+się komunikat) — każdy wiersz jedzie do przeglądarki jako dane strony i przy 500
+payload przekraczał próg Next.js. **Eksport CSV limitu nie ma.**
+
+### Eksport do CSV
+
+`/api/report/zadania` — jak eksport nadgodzin: BOM, średnik, przecinek dziesiętny,
+więc plik otwiera się wprost w polskim Excelu. Tylko `manager`, zawsze zawężony do
+jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
+
+| Parametr | Znaczenie |
+|---|---|
+| `tryb=wpisy` | pojedyncze wpisy ze wszystkimi szczegółami |
+| `tryb=projekty` | zbiorczo wg projektów: osoby, wpisy, czas, udział % |
+| `tryb=porownanie` | obecność vs zaraportowano per pracownik |
+| `from`, `to` | zakres dat (wymagane, `YYYY-MM-DD`) |
+| `projectID`, `userID`, `minMinutes` | filtry, opcjonalne |
+
+Czas jest w dwóch kolumnach: godziny dziesiętnie z przecinkiem (`2,50` — do
+sumowania w arkuszu) i tekst `2h 30min` dla człowieka.
 
 ## Migracja kont z Airtable (jednorazowo)
 
