@@ -1,5 +1,89 @@
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## Ściąga — wszystkie komendy
+
+Wszystkim zarządza się z linii poleceń, z katalogu aplikacji (na serwerze: po SSH).
+Skrypt admina używa tej samej bazy co aplikacja i **nie wymaga restartu ani builda** —
+zmiany widać od razu po odświeżeniu strony.
+
+> Przy `npm run admin` pamiętaj o `--` przed argumentami, inaczej npm zje je po drodze.
+> Zamiennie działa `node scripts/admin.js <komenda>`.
+> Samo `npm run admin` (bez argumentów) wypisuje tę samą listę komend.
+
+### Konta pracowników
+
+| Komenda | Co robi |
+|---|---|
+| `npm run admin -- list` | wszyscy użytkownicy: sekcja, rola, obsługiwane sekcje, status |
+| `npm run admin -- pending` | tylko konta czekające na aktywację |
+| `npm run admin -- activate <email\|id>` | aktywuje konto (dopiero wtedy można się zalogować) |
+| `npm run admin -- deactivate <email\|id>` | blokuje konto, nie kasując danych |
+| `npm run admin -- passwd <email\|id> <noweHaslo>` | ustawia nowe hasło |
+| `npm run admin -- section <email\|id> <slug>` | przenosi pracownika do innej sekcji |
+
+### Role i dostępy
+
+| Komenda | Co robi |
+|---|---|
+| `npm run admin -- role <email\|id> user` | zwykły pracownik: widzi tylko siebie |
+| `npm run admin -- role <email\|id> editor` | obsługa kart czasu własnej sekcji + eksport |
+| `npm run admin -- role <email\|id> manager` | kierownik: zatwierdza nadgodziny, widzi salda |
+| `npm run admin -- sections <email\|id>` | pokazuje, które sekcje obsługuje kierownik |
+| `npm run admin -- sections <email\|id> <a,b,c>` | ustawia je (podmienia całą listę) |
+| `npm run admin -- sections <email\|id> -` | czyści przypisania |
+
+**Rola siedzi w tokenie JWT — po jej zmianie użytkownik musi się wylogować i zalogować
+ponownie.** Kierownik bez przypisanych sekcji nie widzi nikogo (celowo).
+
+### Działy
+
+| Komenda | Co robi |
+|---|---|
+| `npm run admin -- section-list` | aktywne sekcje wraz z liczbą pracowników |
+| `npm run admin -- section-list --all` | także wyłączone |
+| `npm run admin -- section-add <slug> <Etykieta>` | tworzy nowy dział |
+| `npm run admin -- section-label <slug> <Etykieta>` | zmienia nazwę widoczną w formularzu |
+| `npm run admin -- section-off <slug>` | zdejmuje z rejestracji (dane i dostępy zostają) |
+| `npm run admin -- section-on <slug>` | przywraca do wyboru |
+
+`slug` (`magazyn`) to klucz techniczny i adres strony kart `/time/magazyn` — **niezmienny**.
+`Etykieta` (`Magazyn Centralny`) to nazwa dla ludzi, do zmiany w każdej chwili.
+Szczegóły: [Sekcje (działy)](#sekcje-działy).
+
+### Uruchamianie i wdrożenie
+
+| Komenda | Co robi |
+|---|---|
+| `npm run dev` | serwer deweloperski (localhost:3000), przeładowuje kod na bieżąco |
+| `npm run build` | build produkcyjny — **wymagany po każdej zmianie kodu** |
+| `npm run start` | uruchamia zbudowaną aplikację |
+| `npm run lint` | ESLint |
+| `npm run migrate:airtable -- --dry-run` | jednorazowa migracja kont z Airtable (podgląd) |
+
+Na Mikrusie 1.0 build nie zmieści się w pamięci bez włączonej „amfetaminy" (+512 MB RAM),
+a aplikację prowadzi `pm2`. Pełna sekwencja: [Wdrożenie na Mikrus 1.0](#wdrożenie-na-mikrus-10).
+
+### Typowe scenariusze
+
+```bash
+# Nowy pracownik (sam się zarejestrował)
+npm run admin -- pending
+npm run admin -- activate jan@example.pl
+
+# Nowy dział — bez zmiany kodu, builda i deployu
+npm run admin -- section-add magazyn Magazyn Centralny
+npm run admin -- sections michal@example.pl spedycja,magazyn   # kierownik od razu, choć dział jest pusty
+
+# Nowy kierownik
+npm run admin -- role michal@example.pl manager
+npm run admin -- sections michal@example.pl spedycja,cns
+# ...i powiedz mu, żeby się przelogował
+
+# Likwidacja działu
+npm run admin -- section <email> <inny_slug>   # najpierw przenieś ludzi
+npm run admin -- section-off stary_dzial       # historia i eksporty zostają nietknięte
+```
+
 ## Baza danych
 
 Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
