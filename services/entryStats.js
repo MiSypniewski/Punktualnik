@@ -15,11 +15,36 @@ import { parseHmsToMinutes } from "../utils";
 // który limitu nie ma.
 const DETAIL_LIMIT = 200;
 
-// Filtry są opcjonalne i jest ich pięć, więc SQL składamy dynamicznie
+// Szukanie po nazwie zadania.
+//
+// Ani LIKE, ani lower() w SQLite nie znają liter spoza ASCII — "Śruba" nie
+// odpowiedziałoby na "śruba", a opisy są po polsku, więc filtr byłby zdradliwy:
+// czasem trafia, czasem nie. Porównanie robi więc JS.
+//
+// Ogonki ZDEJMUJEMY po obu stronach: kierownik szukający na szybko wpisze
+// "sruby", a w bazie stoi "Śruby montażowe" — filtr, który tego nie znajduje,
+// jest gorszy niż żaden, bo sugeruje, że wpisu nie ma. NFD rozkłada literę na
+// znak bazowy i znak diakrytyczny, ale "ł" jest osobnym znakiem i nie rozkłada
+// się wcale, stąd osobne podstawienie.
+const fold = (text) =>
+  String(text ?? "")
+    .toLocaleLowerCase("pl")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ł/g, "l");
+
+// Igła przychodzi już złożona (patrz paramsOf) — składanie jej przy każdym
+// wierszu byłoby czystą stratą. Indeksu to nie użyje, ale na description i tak
+// go nie ma, a zapytanie jest wcześniej zawężone zakresem dat i sekcją.
+db.function("plContains", { deterministic: true }, (haystack, needle) =>
+  fold(haystack).includes(needle) ? 1 : 0
+);
+
+// Filtry są opcjonalne i jest ich sześć, więc SQL składamy dynamicznie
 // i cache'ujemy gotowe statementy — ten sam zabieg co w getTimesReport.js.
 const cache = new Map();
 
-const buildWhere = ({ sectionCount, withProject, withUser, withMin }) => {
+const buildWhere = ({ sectionCount, withProject, withUser, withMin, withQuery }) => {
   let where = ` WHERE e.data BETWEEN @from AND @to`;
   if (sectionCount > 0) {
     const ph = Array.from({ length: sectionCount }, (_, i) => `@sec${i}`).join(", ");
@@ -28,13 +53,14 @@ const buildWhere = ({ sectionCount, withProject, withUser, withMin }) => {
   if (withProject) where += ` AND e.projectID = @projectID`;
   if (withUser) where += ` AND e.userID = @userID`;
   if (withMin) where += ` AND e.minutes >= @minMinutes`;
+  if (withQuery) where += ` AND plContains(e.description, @q) = 1`;
   // Wpis wciąż biegnący nie ma jeszcze wymiaru — do raportów nie wchodzi.
   where += ` AND e.endedAt IS NOT NULL`;
   return where;
 };
 
 const prepared = (kind, shape, sql) => {
-  const key = `${kind}#${shape.sectionCount}#${shape.withProject}#${shape.withUser}#${shape.withMin}`;
+  const key = `${kind}#${shape.sectionCount}#${shape.withProject}#${shape.withUser}#${shape.withMin}#${shape.withQuery}`;
   if (!cache.has(key)) cache.set(key, db.prepare(sql(buildWhere(shape))));
   return cache.get(key);
 };
@@ -44,14 +70,18 @@ const prepared = (kind, shape, sql) => {
 // komunikat nad tabelą ("pobierz CSV — eksport obejmuje komplet").
 const LIMIT_CLAUSE = { view: ` LIMIT ${DETAIL_LIMIT}`, all: "" };
 
-const shapeOf = ({ sections, projectID, userID, minMinutes }) => ({
-  sectionCount: Array.isArray(sections) ? sections.length : 0,
-  withProject: Boolean(projectID),
-  withUser: Boolean(userID),
-  withMin: Number(minMinutes) > 0,
+const needleOf = ({ q }) => fold(String(q ?? "").trim());
+
+const shapeOf = (filters) => ({
+  sectionCount: Array.isArray(filters.sections) ? filters.sections.length : 0,
+  withProject: Boolean(filters.projectID),
+  withUser: Boolean(filters.userID),
+  withMin: Number(filters.minMinutes) > 0,
+  withQuery: needleOf(filters).length > 0,
 });
 
-const paramsOf = ({ from, to, sections, projectID, userID, minMinutes }) => {
+const paramsOf = (filters) => {
+  const { from, to, sections, projectID, userID, minMinutes } = filters;
   const params = { from, to };
   (Array.isArray(sections) ? sections : []).forEach((s, i) => {
     params[`sec${i}`] = String(s);
@@ -59,6 +89,9 @@ const paramsOf = ({ from, to, sections, projectID, userID, minMinutes }) => {
   if (projectID) params.projectID = Number(projectID);
   if (userID) params.userID = Number(userID);
   if (Number(minMinutes) > 0) params.minMinutes = Number(minMinutes);
+
+  const needle = needleOf(filters);
+  if (needle) params.q = needle;
   return params;
 };
 
@@ -109,6 +142,11 @@ const stmtAttendanceCache = new Map();
  *
  * Times.data trzyma pełne ISO, stąd substr(...,1,10) — dokładnie tak samo
  * filtruje services/getTimesReport.js.
+ *
+ * Z filtrów bierze tylko te, które mają w kartach czasu odpowiednik: sekcję,
+ * osobę i zakres dat. Projekt, próg minut i szukana fraza opisują POJEDYNCZY
+ * wpis zadania, a nie obecność — obecność zostaje pełna, więc przy takim filtrze
+ * kolumna „Pokrycie” pokazuje udział wybranych zadań w całym czasie w pracy.
  */
 const getAttendanceMinutes = ({ from, to, sections, userID }) => {
   const sectionCount = Array.isArray(sections) ? sections.length : 0;
@@ -195,7 +233,13 @@ export const getEntries = (filters, scope = "view") => {
       SELECT e.id, e.data, e.startedAt, e.endedAt, e.minutes, e.description,
              e.autoClosed, e.editedByName, e.section, e.userID, e.projectID,
              u.name, u.surname,
-             p.name AS projectName, p.client AS projectClient, p.color AS projectColor
+             -- Sekcja KONTA, nie wpisu: przy poprawianiu wpisu o tym, które
+             -- projekty wolno wybrać, decyduje dzisiejsza sekcja pracownika
+             -- (pages/api/entries/[id].js), a ta może być inna niż ta zapisana
+             -- w starym wpisie — ludzie przechodzą między działami.
+             u.section AS userSection,
+             p.name AS projectName, p.client AS projectClient, p.color AS projectColor,
+             p.isActive AS projectIsActive
         FROM TaskEntries e
         JOIN Users u    ON u.id = e.userID
         JOIN Projects p ON p.id = e.projectID${where}
@@ -203,7 +247,11 @@ export const getEntries = (filters, scope = "view") => {
   ).all(paramsOf(filters));
 
   return {
-    rows: rows.map((r) => ({ ...r, autoClosed: Boolean(r.autoClosed) })),
+    rows: rows.map((r) => ({
+      ...r,
+      autoClosed: Boolean(r.autoClosed),
+      projectIsActive: Boolean(r.projectIsActive),
+    })),
     total,
     limit: DETAIL_LIMIT,
   };

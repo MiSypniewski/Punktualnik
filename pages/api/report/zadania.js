@@ -4,7 +4,7 @@ import { getByProject, getByUser, getEntries, getSummary } from "../../../servic
 import { closeStaleEntries } from "../../../services/taskEntries";
 import { canExportTasks } from "../../../services/roles";
 import { buildCsv, sendCsv, plNumber } from "../../../utils/csv";
-import { formatMinutes } from "../../../utils";
+import { formatMinutes, TASK_QUERY_MAX } from "../../../utils";
 import { visibleSections } from "../../../services/scope";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -33,7 +33,7 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { tryb, from, to, projectID, userID, minMinutes } = req.query;
+  const { tryb, from, to, projectID, userID, minMinutes, q } = req.query;
 
   if (!MODES.includes(tryb)) {
     return res.status(400).json({ error: "bad_mode", message: `tryb musi być jednym z: ${MODES.join(", ")}` });
@@ -54,7 +54,18 @@ export default async (req, res) => {
 
   // Zasięg sekcyjny bierzemy z tokenu, nigdy z zapytania: kierownik dostanie
   // swoje sekcje nawet wtedy, gdy jawnie poda userID kogoś spoza zasięgu.
-  const filters = { from, to, projectID, userID, minMinutes, sections: visibleSections(token) };
+  //
+  // Fraza szukana leci przycięta do tej samej długości co w formularzu —
+  // eksport ma dać dokładnie to, co widać w tabeli, a nie inny wycinek.
+  const filters = {
+    from,
+    to,
+    projectID,
+    userID,
+    minMinutes,
+    q: String(q ?? "").slice(0, TASK_QUERY_MAX),
+    sections: visibleSections(token),
+  };
   const stamp = `${from}_${to}`;
 
   if (tryb === "projekty") {

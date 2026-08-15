@@ -43,6 +43,17 @@ export const DifferenceTime = (start, stop) => {
 export const jsonFetcher = (url) => fetch(url).then((res) => res.json());
 
 /**
+ * Górna długość frazy szukanej po nazwie zadania (raport zadań).
+ *
+ * Siedzi TUTAJ, a nie w services/entryStats.js, bo potrzebują jej zarówno
+ * serwer, jak i formularz w przeglądarce — a import z services/ wciągnąłby
+ * do bundla klienta better-sqlite3. Sam opis zadania ma limit 200 znaków;
+ * fraza jest jego FRAGMENTEM, więc krótszy limit niczego nie odcina,
+ * a chroni zapytanie przed kilobajtem tekstu z wklejenia.
+ */
+export const TASK_QUERY_MAX = 100;
+
+/**
  * Minuty → "2h 30min". Używane w module nadgodzin, gdzie saldo bywa ujemne,
  * więc znak wychodzi przed liczbę, a nie w środku ("-2h 30min", nie "-2h -30min").
  * @param {number} minutes

@@ -116,9 +116,17 @@ export const listProjects = ({ sections, includeArchived = false } = {}) => {
 
 export const getProject = (id) => toRow(stmtGet.get(Number(id)));
 
-/** Czy ten użytkownik może raportować czas na ten projekt. */
-export const canUseProject = (token, project) => {
-  if (!project || !project.isActive) return false;
+/**
+ * Czy ten użytkownik może raportować czas na ten projekt.
+ *
+ * @param {{allowArchived?: boolean}} opts allowArchived przepuszcza projekt
+ *   zarchiwizowany. Używane WYŁĄCZNIE przy poprawianiu wpisu, który już na nim
+ *   wisi: inaczej archiwizacja projektu zamrażałaby jego stare wpisy na zawsze
+ *   — nie dałoby się poprawić w nich literówki, mimo że projektu nikt nie zmienia.
+ */
+export const canUseProject = (token, project, { allowArchived = false } = {}) => {
+  if (!project) return false;
+  if (!project.isActive && !allowArchived) return false;
   if (project.sections.length === 0) return true; // ogólnofirmowy
   return project.sections.some((s) => projectScope(token).includes(s));
 };

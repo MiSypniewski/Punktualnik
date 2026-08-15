@@ -103,7 +103,9 @@ export default async (req, res) => {
   if (!project) {
     return res.status(404).json({ error: "project_not_found" });
   }
-  if (!canUseProject(access.scopeToken, project)) {
+  // Projekt archiwalny wolno ZOSTAWIĆ, ale nie wolno na niego przenieść.
+  const keepsProject = Number(projectID) === Number(entry.projectID);
+  if (!canUseProject(access.scopeToken, project, { allowArchived: keepsProject })) {
     return res.status(403).json({ error: "project_out_of_scope" });
   }
 

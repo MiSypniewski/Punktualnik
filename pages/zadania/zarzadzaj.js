@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
@@ -13,7 +13,7 @@ import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
 import { visibleSections } from "../../services/scope";
-import { formatMinutes } from "../../utils";
+import { formatMinutes, TASK_QUERY_MAX } from "../../utils";
 
 dayjs.locale("pl");
 
@@ -34,7 +34,7 @@ export async function getServerSideProps(ctx) {
 
   // Filtry żyją w query stringu, więc widok da się odświeżyć i zalinkować —
   // ten sam wzorzec co w panelu nadgodzin.
-  const { from, to, projectID, userID, minMinutes } = ctx.query;
+  const { from, to, projectID, userID, minMinutes, q } = ctx.query;
   const filters = {
     // appNow(), nie dayjs(): to biegnie na serwerze, który może stać w innej
     // strefie niż firma — inaczej domyślny zakres potrafiłby zaczynać się
@@ -44,6 +44,9 @@ export async function getServerSideProps(ctx) {
     projectID: /^\d+$/.test(projectID || "") ? projectID : "",
     userID: /^\d+$/.test(userID || "") ? userID : "",
     minMinutes: /^\d+$/.test(minMinutes || "") ? minMinutes : "",
+    // Fraza szukana w opisie zadania. Bez wzorca — to ma być zwykły tekst,
+    // z polskimi znakami włącznie; przycięcie pilnuje tylko rozsądnej długości.
+    q: String(q ?? "").trim().slice(0, TASK_QUERY_MAX),
   };
 
   const sections = visibleSections(token);
@@ -59,12 +62,30 @@ export async function getServerSideProps(ctx) {
       byUser: getByUser(query),
       detail: getEntries(query),
       projects: listProjects({ sections: projectScope(token), includeArchived: true }),
+      // Do EDYCJI wpisu potrzebne są projekty widziane oczami PRACOWNIKA, a nie
+      // kierownika: API sprawdza wybór jego zasięgiem (pages/api/entries/[id].js),
+      // więc lista z sekcji kierownika podsuwałaby pozycje kończące się odmową.
+      // Sekcji są jednostki, więc trzymanie osobnej listy dla każdej jest tańsze
+      // niż liczenie tego per wiersz.
+      projectsBySection: Object.fromEntries(
+        sections.map((s) => [s, listProjects({ sections: [s] })])
+      ),
       users: getAllUsers(sections),
     },
   };
 }
 
 const hhmm = (ts) => String(ts ?? "").slice(11, 16);
+
+// Endpoint zwraca same kody; wiadomość z serwera przychodzi tylko dla błędów
+// walidacji z services/taskEntries.js (kolizja, zły zakres). Resztę tłumaczymy tu.
+const ERRORS = {
+  project_out_of_scope: "Ten projekt nie jest dostępny dla sekcji tego pracownika.",
+  project_not_found: "Wybranego projektu już nie ma.",
+  permission_denied: "Ten wpis jest poza twoim zasięgiem.",
+  not_found: "Tego wpisu już nie ma — odśwież raport.",
+  bad_project: "Wybierz projekt.",
+};
 
 export default function ZarzadzajZadaniami({
   filters,
@@ -75,11 +96,15 @@ export default function ZarzadzajZadaniami({
   byUser,
   detail,
   projects,
+  projectsBySection,
   users,
 }) {
   const router = useRouter();
 
   const [form, setForm] = useState(filters);
+  const [editingID, setEditingID] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   // Przy zmianie samego query stringu Next nie montuje komponentu od nowa,
   // więc useState zostałby z poprzednimi wartościami i pola filtrów
@@ -91,6 +116,35 @@ export default function ZarzadzajZadaniami({
     const qs = new URLSearchParams();
     Object.entries(form).forEach(([k, v]) => v && qs.set(k, v));
     router.push(`/zadania/zarzadzaj?${qs.toString()}`);
+  };
+
+  /**
+   * Zapis poprawionego wpisu. Kierownika nie obowiązuje okno "dziś i wczoraj" —
+   * decyduje o tym API (pages/api/entries/[id].js), nie ten formularz.
+   *
+   * Po udanym zapisie przeładowujemy propsy z serwera zamiast łatać wiersz
+   * w stanie: zmiana czasu rusza też sumy, udziały projektów i zestawienie
+   * z obecnością nad tabelą.
+   */
+  const saveEntry = async (id, body) => {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/entries/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", ...body }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        setErr(payload.message || ERRORS[payload.error] || "Nie udało się zapisać zmiany.");
+        return false;
+      }
+      await router.replace(router.asPath, undefined, { scroll: false });
+      return true;
+    } finally {
+      setBusy(false);
+    }
   };
 
   // Nawigacja, nie fetch — przeglądarka sama zapisze plik zgodnie
@@ -168,6 +222,18 @@ export default function ZarzadzajZadaniami({
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field label="Zadanie">
+              {/* Fragment opisu, wielkość liter bez znaczenia (także dla polskich
+                  znaków — porównanie robi plContains w services/entryStats.js). */}
+              <input
+                type="search"
+                value={form.q}
+                maxLength={TASK_QUERY_MAX}
+                placeholder="fragment opisu"
+                onChange={(e) => setForm({ ...form, q: e.target.value })}
+                className="p-2 border border-gray-400 rounded w-48"
+              />
             </Field>
             <Field label="Wpisy dłuższe niż">
               <select
@@ -311,11 +377,21 @@ export default function ZarzadzajZadaniami({
           )}
         </div>
 
+        <p className="text-xs text-gray-600 mb-2">
+          Ołówek otwiera wpis do poprawki — projekt, opis, data i godziny. Okno „dziś i wczoraj”, które
+          obowiązuje pracownika, kierownika nie dotyczy: poprawisz wpis z dowolnego okresu. Twoje nazwisko
+          zostaje przy wpisie jako „popr.”.
+        </p>
+
         {detail.total > detail.limit && (
           <p className="mb-2 p-2 bg-amber-50 border border-amber-300 rounded text-sm">
             Pokazano {detail.limit} z {detail.total} wpisów. Zawęź filtry albo pobierz CSV — eksport obejmuje
             komplet.
           </p>
+        )}
+
+        {err && (
+          <p className="mb-2 p-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded">{err}</p>
         )}
 
         {detail.rows.length === 0 ? (
@@ -330,38 +406,35 @@ export default function ZarzadzajZadaniami({
                 <Th>Zadanie</Th>
                 <Th className="text-right">Godziny</Th>
                 <Th className="text-right">Czas</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
-              {detail.rows.map((r) => (
-                <tr key={r.id} className={classNames("border-b border-gray-100", r.autoClosed && "bg-amber-50")}>
-                  <Td className="whitespace-nowrap">{dayjs(r.data).format("DD.MM")}</Td>
-                  <Td className="whitespace-nowrap">
-                    {r.surname} {r.name}
-                  </Td>
-                  <Td>
-                    <span className="flex items-center">
-                      <span
-                        className={`w-2 h-2 rounded-full mr-2 shrink-0 ${projectColor(r.projectColor).dot}`}
-                      />
-                      {r.projectName}
-                    </span>
-                  </Td>
-                  <Td>
-                    {r.description || <span className="text-gray-400">(bez opisu)</span>}
-                    {r.autoClosed && <span className="ml-2 text-xs text-amber-800">auto</span>}
-                    {r.editedByName && (
-                      <span className="ml-2 text-xs text-gray-500">popr. {r.editedByName}</span>
-                    )}
-                  </Td>
-                  <Td className="text-right tabular-nums whitespace-nowrap text-gray-600">
-                    {hhmm(r.startedAt)}–{hhmm(r.endedAt)}
-                  </Td>
-                  <Td className="text-right tabular-nums font-medium whitespace-nowrap">
-                    {formatMinutes(r.minutes)}
-                  </Td>
-                </tr>
-              ))}
+              {detail.rows.map((r) =>
+                r.id === editingID ? (
+                  <EntryEditor
+                    key={r.id}
+                    entry={r}
+                    projects={projectsBySection[r.userSection] ?? []}
+                    busy={busy}
+                    onCancel={() => {
+                      setEditingID(null);
+                      setErr("");
+                    }}
+                    onSave={(body) => saveEntry(r.id, body).then((ok) => ok && setEditingID(null))}
+                  />
+                ) : (
+                  <EntryRow
+                    key={r.id}
+                    entry={r}
+                    busy={busy}
+                    onEdit={() => {
+                      setEditingID(r.id);
+                      setErr("");
+                    }}
+                  />
+                )
+              )}
             </tbody>
           </table>
         )}
@@ -369,6 +442,162 @@ export default function ZarzadzajZadaniami({
     </BaseLayout>
   );
 }
+
+// --- wiersz wpisu -----------------------------------------------------------
+
+// Rok w dacie jest tu potrzebny, inaczej niż na stronie pracownika: raport
+// filtruje po nazwie zadania „nieważne z jakiego okresu”, więc w jednej tabeli
+// potrafią wylądować wpisy z dwóch lat i samo „14.08” nic nie rozstrzyga.
+const dayLabel = (data) => dayjs(data).format("DD.MM.YY");
+
+const EntryRow = ({ entry, busy, onEdit }) => (
+  <tr className={classNames("border-b border-gray-100", entry.autoClosed && "bg-amber-50")}>
+    <Td className="whitespace-nowrap">{dayLabel(entry.data)}</Td>
+    <Td className="whitespace-nowrap">
+      {entry.surname} {entry.name}
+    </Td>
+    <Td>
+      <span className="flex items-center">
+        <span className={`w-2 h-2 rounded-full mr-2 shrink-0 ${projectColor(entry.projectColor).dot}`} />
+        {entry.projectName}
+      </span>
+    </Td>
+    <Td>
+      {entry.description || <span className="text-gray-400">(bez opisu)</span>}
+      {entry.autoClosed && <span className="ml-2 text-xs text-amber-800">auto</span>}
+      {entry.editedByName && <span className="ml-2 text-xs text-gray-500">popr. {entry.editedByName}</span>}
+    </Td>
+    <Td className="text-right tabular-nums whitespace-nowrap text-gray-600">
+      {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
+    </Td>
+    <Td className="text-right tabular-nums font-medium whitespace-nowrap">{formatMinutes(entry.minutes)}</Td>
+    <Td className="text-right">
+      <button
+        disabled={busy}
+        title="Popraw wpis"
+        onClick={onEdit}
+        className="py-1 px-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30"
+      >
+        ✎
+      </button>
+    </Td>
+  </tr>
+);
+
+/**
+ * Lista projektów do wyboru przy poprawianiu wpisu.
+ *
+ * Do aktywnych projektów sekcji pracownika dokładamy ten, na którym wpis już
+ * wisi — bywa archiwalny albo z sekcji, w której pracownik dziś nie pracuje.
+ * Bez tego <select> nie znalazłby swojej wartości, wskazałby pierwszą pozycję
+ * z brzegu i zapis po cichu przeniósłby cudzą pracę na inny projekt.
+ */
+const projectOptions = (available, entry) =>
+  available.some((p) => p.id === entry.projectID)
+    ? available
+    : [
+        { id: entry.projectID, name: entry.projectName, isActive: entry.projectIsActive },
+        ...available,
+      ];
+
+const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => {
+  const [form, setForm] = useState({
+    projectID: entry.projectID,
+    description: entry.description,
+    data: entry.data,
+    from: hhmm(entry.startedAt),
+    to: hhmm(entry.endedAt),
+  });
+
+  const options = useMemo(() => projectOptions(projects, entry), [projects, entry]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    onSave(form);
+  };
+
+  return (
+    <tr className="border-b border-gray-300 bg-indigo-50">
+      {/* Formularz przez całą szerokość wiersza, a nie pole w każdej komórce:
+          sześć wąskich kolumn nie pomieściłoby ani selecta z nazwą projektu,
+          ani opisu, a na telefonie rozjechałoby tabelę. */}
+      <td colSpan={7} className="py-3">
+        <form onSubmit={submit}>
+          <p className="mb-2 text-xs text-gray-600">
+            {entry.surname} {entry.name} · wpis z {dayjs(entry.data).format("D MMMM YYYY")}
+          </p>
+
+          <div className="flex gap-2 flex-col sm:flex-row mb-2">
+            <select
+              value={form.projectID}
+              onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
+              className="p-2 border border-gray-400 rounded sm:w-56 shrink-0 bg-white"
+            >
+              {options.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.isActive ? "" : " (archiwalny)"}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={form.description}
+              maxLength={200}
+              placeholder="Opis zadania"
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="flex-grow min-w-0 p-2 border border-gray-400 rounded"
+            />
+          </div>
+
+          <div className="flex gap-2 items-end flex-wrap">
+            {/* Bez min/max: kierownik poprawia wpisy z dowolnego okresu. */}
+            <Field label="Data">
+              <input
+                type="date"
+                value={form.data}
+                onChange={(e) => setForm({ ...form, data: e.target.value })}
+                className="p-2 border border-gray-400 rounded"
+                required
+              />
+            </Field>
+            <Field label="Od">
+              <input
+                type="time"
+                value={form.from}
+                onChange={(e) => setForm({ ...form, from: e.target.value })}
+                className="p-2 border border-gray-400 rounded"
+                required
+              />
+            </Field>
+            <Field label="Do">
+              <input
+                type="time"
+                value={form.to}
+                onChange={(e) => setForm({ ...form, to: e.target.value })}
+                className="p-2 border border-gray-400 rounded"
+                required
+              />
+            </Field>
+
+            <span className="flex gap-2 ml-auto">
+              <button
+                type="submit"
+                disabled={busy}
+                className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
+              >
+                Zapisz
+              </button>
+              <button type="button" onClick={onCancel} className="py-2 px-3 text-gray-600">
+                Anuluj
+              </button>
+            </span>
+          </div>
+        </form>
+      </td>
+    </tr>
+  );
+};
 
 const Field = ({ label, children }) => (
   <label className="flex flex-col">

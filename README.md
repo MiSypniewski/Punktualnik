@@ -345,10 +345,17 @@ wejścia na stronę, więc działa też na Mikrusie.
 
 ### Raport kierownika — `/zadania/zarzadzaj`
 
-Filtry (zakres dat, projekt, pracownik, próg długości wpisu) żyją w adresie, więc
-widok da się zalinkować i odświeżyć. Zawartość: kafelki podsumowania, rozbicie wg
-projektów z udziałem procentowym, zestawienie **obecność vs zaraportowano** per
-pracownik oraz lista wpisów.
+Filtry (zakres dat, projekt, pracownik, nazwa zadania, próg długości wpisu) żyją
+w adresie, więc widok da się zalinkować i odświeżyć. Zawartość: kafelki
+podsumowania, rozbicie wg projektów z udziałem procentowym, zestawienie
+**obecność vs zaraportowano** per pracownik oraz lista wpisów.
+
+Szukanie po nazwie zadania ignoruje wielkość liter **i ogonki** — „sruby” znajdzie
+„Śruby montażowe”. SQLite sam tego nie potrafi (jego `LIKE` i `lower()` kończą się
+na ASCII), więc porównanie robi funkcja `plContains` zarejestrowana w
+`services/entryStats.js`. Filtr zawęża też kafelki, rozbicia i eksport CSV; jedyne,
+czego nie rusza, to obecność z kart czasu — ta nie zna pojęcia zadania, więc przy
+takim filtrze „Pokrycie” czytamy jako udział szukanych zadań w czasie w pracy.
 
 Kolumna „Różnica” jest **wskazówką, gdzie brakuje raportowania — nie podstawą
 rozliczeń**. Obecność pochodzi z kart czasu, zaraportowany czas z wpisów zadań;
@@ -358,6 +365,14 @@ Kierownik może poprawiać i dopisywać wpisy podwładnych **bez ograniczenia da
 inaczej starszy błąd zostałby w bazie na zawsze, bo pracownik go już nie sięgnie.
 Każda taka korekta zostawia podpis („popr. Anna”). Timera za nikogo nie uruchamia
 ani nie zatrzymuje: nie wie, kiedy tamten faktycznie zaczął i skończył.
+
+Poprawka idzie wprost z tabeli wpisów — ołówek w wierszu otwiera projekt, opis,
+datę i godziny. Reguły są te same co przy pracowniku (kolizje, `10:00–10:00`), bez
+okna „dziś i wczoraj”. Do wyboru są projekty **sekcji pracownika**, a nie kierownika
+— to jego zasięgiem API sprawdza wybór, więc lista z sekcji kierownika podsuwałaby
+pozycje kończące się odmową. Projekt, na którym wpis już wisi, zostaje na liście
+nawet po archiwizacji: inaczej archiwizacja zamrażałaby stare wpisy i nie dałoby się
+poprawić w nich literówki. Przenieść wpis **na** projekt archiwalny nadal nie można.
 
 Tabela na ekranie pokazuje najwyżej **200 wpisów** (przy większej liczbie pojawia
 się komunikat) — każdy wiersz jedzie do przeglądarki jako dane strony i przy 500
@@ -376,6 +391,7 @@ jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
 | `tryb=porownanie` | obecność vs zaraportowano per pracownik |
 | `from`, `to` | zakres dat (wymagane, `YYYY-MM-DD`) |
 | `projectID`, `userID`, `minMinutes` | filtry, opcjonalne |
+| `q` | fragment nazwy zadania; bez wielkości liter i ogonków, do 100 znaków |
 
 Czas jest w dwóch kolumnach: godziny dziesiętnie z przecinkiem (`2,50` — do
 sumowania w arkuszu) i tekst `2h 30min` dla człowieka.
