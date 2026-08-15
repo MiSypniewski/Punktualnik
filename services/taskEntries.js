@@ -1,7 +1,15 @@
 import Joi from "joi";
 import dayjs from "dayjs";
 import db from "./db";
-import { TS_FORMAT, toStamp, workDay, workDayStart, minEditableDay, WORKDAY_START_HOUR } from "./workday";
+import {
+  TS_FORMAT,
+  toStamp,
+  workDay,
+  workDayStart,
+  minEditableDay,
+  WORKDAY_START_HOUR,
+  now as appNow,
+} from "./workday";
 
 // Wpisy czasu: "ile czasu i na czym zeszło".
 //
@@ -46,7 +54,7 @@ const stmtCloseStale = db.prepare(`
      AND startedAt < @boundary`);
 
 /** @returns {number} ile timerów domknięto (zwykle 0) */
-export const closeStaleEntries = (now = dayjs()) =>
+export const closeStaleEntries = (now = appNow()) =>
   stmtCloseStale.run({ boundary: workDayStart(now).format(TS_FORMAT) }).changes;
 
 // --- odczyt -----------------------------------------------------------------
@@ -122,7 +130,7 @@ const descSchema = Joi.string().trim().max(200).allow("").default("");
  * idx_entries_running — łapiemy SQLITE_CONSTRAINT i tłumaczymy na 409,
  * zamiast sprawdzać wcześniej SELECT-em (ten przegrałby z wyścigiem dwóch zakładek).
  */
-export const startEntry = ({ userID, projectID, description, section }, now = dayjs()) => {
+export const startEntry = ({ userID, projectID, description, section }, now = appNow()) => {
   const desc = Joi.attempt(description ?? "", descSchema);
   const startedAt = toStamp(now);
 
@@ -162,7 +170,7 @@ const stmtStop = db.prepare(`
  * której już nie odtworzy. Kolizja z ręcznym wpisem dodanym w międzyczasie
  * jest widoczna w UI i do poprawienia edycją.
  */
-export const stopEntry = ({ id, userID }, now = dayjs()) => {
+export const stopEntry = ({ id, userID }, now = appNow()) => {
   const entry = getEntry(id);
   if (!entry || Number(entry.userID) !== Number(userID)) return undefined;
 
@@ -210,7 +218,7 @@ const spanFromParts = ({ data, from, to }) => {
   return { startedAt, endedAt, minutes };
 };
 
-export const createManualEntry = (payload, { userID, section, enforceWindow = true, now = dayjs() }) => {
+export const createManualEntry = (payload, { userID, section, enforceWindow = true, now = appNow() }) => {
   const { projectID, description, data, from, to } = Joi.attempt(payload, manualSchema);
   if (enforceWindow) assertInWindow(data, now);
 
@@ -249,7 +257,7 @@ const stmtUpdate = db.prepare(`
  * Zdejmuje flagę autoClosed: edycja jest właśnie tym potwierdzeniem, o które
  * prosi żółty pasek przy wpisie domkniętym automatycznie.
  */
-export const updateEntry = (id, payload, { userID, enforceWindow = true, actor = null, now = dayjs() }) => {
+export const updateEntry = (id, payload, { userID, enforceWindow = true, actor = null, now = appNow() }) => {
   const entry = getEntry(id);
   if (!entry) return undefined;
   if (Number(entry.userID) !== Number(userID)) return undefined;
@@ -289,7 +297,7 @@ export const updateEntry = (id, payload, { userID, enforceWindow = true, actor =
 const stmtDelete = db.prepare(`DELETE FROM TaskEntries WHERE id = @id AND userID = @userID AND data >= @minDay`);
 const stmtDeleteAny = db.prepare(`DELETE FROM TaskEntries WHERE id = @id AND userID = @userID`);
 
-export const deleteEntry = ({ id, userID, enforceWindow = true, now = dayjs() }) => {
+export const deleteEntry = ({ id, userID, enforceWindow = true, now = appNow() }) => {
   const params = { id: Number(id), userID: Number(userID) };
   const info = enforceWindow
     ? stmtDelete.run({ ...params, minDay: minEditableDay(now) })

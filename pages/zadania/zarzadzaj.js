@@ -11,6 +11,7 @@ import { getSummary, getByProject, getByUser, getEntries } from "../../services/
 import { closeStaleEntries } from "../../services/taskEntries";
 import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
+import { now as appNow } from "../../services/workday";
 import { visibleSections } from "../../services/scope";
 import { formatMinutes } from "../../utils";
 
@@ -35,8 +36,11 @@ export async function getServerSideProps(ctx) {
   // ten sam wzorzec co w panelu nadgodzin.
   const { from, to, projectID, userID, minMinutes } = ctx.query;
   const filters = {
-    from: DATE_RE.test(from || "") ? from : dayjs().date(1).format("YYYY-MM-DD"),
-    to: DATE_RE.test(to || "") ? to : dayjs().format("YYYY-MM-DD"),
+    // appNow(), nie dayjs(): to biegnie na serwerze, który może stać w innej
+    // strefie niż firma — inaczej domyślny zakres potrafiłby zaczynać się
+    // od złego dnia (zob. services/workday.js).
+    from: DATE_RE.test(from || "") ? from : appNow().date(1).format("YYYY-MM-DD"),
+    to: DATE_RE.test(to || "") ? to : appNow().format("YYYY-MM-DD"),
     projectID: /^\d+$/.test(projectID || "") ? projectID : "",
     userID: /^\d+$/.test(userID || "") ? userID : "",
     minMinutes: /^\d+$/.test(minMinutes || "") ? minMinutes : "",

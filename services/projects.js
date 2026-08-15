@@ -1,8 +1,7 @@
 import Joi from "joi";
-import dayjs from "dayjs";
 import db from "./db";
 import { visibleSections } from "./scope";
-import { TS_FORMAT } from "./workday";
+import { TS_FORMAT, now as appNow } from "./workday";
 
 // Słownik projektów dla modułu zadań.
 //
@@ -159,7 +158,7 @@ export const createProject = (payload, createdBy) => {
       name,
       client,
       color,
-      createdAt: dayjs().format(TS_FORMAT),
+      createdAt: appNow().format(TS_FORMAT),
       createdBy: createdBy ? Number(createdBy) : null,
     });
     writeSections(info.lastInsertRowid, sections);

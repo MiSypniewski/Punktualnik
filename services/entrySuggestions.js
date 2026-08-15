@@ -1,5 +1,5 @@
-import dayjs from "dayjs";
 import db from "./db";
+import { now as appNow } from "./workday";
 
 // Podpowiedzi zadań budowane z własnej historii pracownika.
 //
@@ -32,7 +32,7 @@ const stmt = db.prepare(`
  * @returns {{projectID: number, description: string, projectName: string,
  *            projectColor: string, uses: number, lastUsed: string}[]}
  */
-export const getSuggestions = (userID, now = dayjs()) =>
+export const getSuggestions = (userID, now = appNow()) =>
   stmt.all({
     userID: Number(userID),
     since: now.subtract(HORIZON_DAYS, "day").format("YYYY-MM-DD"),
