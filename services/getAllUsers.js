@@ -5,15 +5,21 @@ import db from "./db";
 // Times.userID == Users.id.
 const COLUMNS = `id, name, surname, section`;
 const ORDER = `ORDER BY surname, name`;
+// Konta `editor` to kioski z ekranem dotykowym, nie ludzie — w filtrach
+// „wybierz pracownika" nie mają czego szukać.
+const NOT_KIOSK = `role <> 'editor'`;
 
-const stmtAll = db.prepare(`SELECT ${COLUMNS} FROM Users ${ORDER}`);
+const stmtAll = db.prepare(`SELECT ${COLUMNS} FROM Users WHERE ${NOT_KIOSK} ${ORDER}`);
 
 // Osobne zapytanie per liczba sekcji; nazwy sekcji zawsze przez binding.
 const cache = new Map();
 const stmtForSections = (count) => {
   if (!cache.has(count)) {
     const placeholders = Array.from({ length: count }, (_, i) => `@sec${i}`).join(", ");
-    cache.set(count, db.prepare(`SELECT ${COLUMNS} FROM Users WHERE section IN (${placeholders}) ${ORDER}`));
+    cache.set(
+      count,
+      db.prepare(`SELECT ${COLUMNS} FROM Users WHERE ${NOT_KIOSK} AND section IN (${placeholders}) ${ORDER}`)
+    );
   }
   return cache.get(count);
 };

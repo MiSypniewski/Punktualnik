@@ -3,6 +3,10 @@ import { signedMinutesSql } from "./overtimeBalanceSql";
 
 // Zestawienie sald wszystkich aktywnych pracowników.
 //
+// Bez kont `editor`: to wspólne konto kiosku (ekran dotykowy, przy którym
+// pracownicy odbijają wejście), a nie osoba — saldo nadgodzin nie ma dla
+// niego sensu i tylko zaśmieca listę kierownikowi.
+//
 // LEFT JOIN, a nie JOIN — inaczej z listy zniknęliby ci, którzy nigdy nie
 // złożyli wniosku, a kierownik ma widzieć cały zespół (saldo 0 to też
 // informacja). Filtr statusu musi siedzieć w CASE wewnątrz SUM, a nie w WHERE:
@@ -15,7 +19,7 @@ const query = (sectionsWhere) => `
     COALESCE(SUM(CASE WHEN o.status = 'pending' THEN 1 ELSE 0 END), 0) AS pendingCount
   FROM Users u
   LEFT JOIN Overtime o ON o.userID = u.id
-  WHERE u.isActive = 1${sectionsWhere}
+  WHERE u.isActive = 1 AND u.role <> 'editor'${sectionsWhere}
   GROUP BY u.id
   ORDER BY u.surname, u.name`;
 

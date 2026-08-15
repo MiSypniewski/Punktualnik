@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
 
-const TopNavigation = ({ section }) => {
+const TopNavigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { data: session } = useSession();
 
@@ -50,12 +50,15 @@ const TopNavigation = ({ section }) => {
           <a className="font-bold hover:underline">Panel kierownika</a>
         </Link>
       )}
-      {session.user.role === "user" ? (
-        <Link href={`/users/${session.user.userID}`}>
-          <a className="capitalize font-bold">{session.user.name}</a>
-        </Link>
+      {session.user.role === "editor" ? (
+        // Konto edytora to wspólny kiosk z ekranem dotykowym — świadomie BEZ
+        // linku, żeby pracownicy klikający w kafelki nie trafili stąd
+        // na zmianę hasła ani na wylogowanie całego stanowiska.
+        <p className="capitalize font-bold">{session.user.name}</p>
       ) : (
-        <p className="capitalize font-bold">{section}</p>
+        <Link href={`/users/${session.user.userID}`}>
+          <a className="capitalize font-bold hover:underline">{session.user.name}</a>
+        </Link>
       )}
     </div>
   );
@@ -93,7 +96,7 @@ export default function BaseLayout({ children }) {
   // console.log(session.user);
   return (
     <>
-      <TopNavigation section={session.user.name} />
+      <TopNavigation />
       {children}
       {/* <Footer /> */}
     </>
