@@ -3,7 +3,13 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
-import { canExportTimes, canApproveOvertime, canTrackTasks, canManageProjects } from "../services/roles";
+import {
+  canExportTimes,
+  canApproveOvertime,
+  canTrackTasks,
+  canManageProjects,
+  canSeeTeamTasks,
+} from "../services/roles";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -47,6 +53,11 @@ const TopNavigation = () => {
       <Link href={`/nadgodziny`}>
         <a className="font-bold hover:underline">Nadgodziny</a>
       </Link>
+      {canSeeTeamTasks(session.user.role) && (
+        <Link href={`/zadania/zarzadzaj`}>
+          <a className="font-bold hover:underline">Raport zadań</a>
+        </Link>
+      )}
       {canManageProjects(session.user.role) && (
         <Link href={`/zadania/projekty`}>
           <a className="font-bold hover:underline">Projekty</a>
