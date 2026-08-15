@@ -111,7 +111,7 @@ export default function Zadania({
 
   return (
     <BaseLayout>
-      <section className="mx-auto p-4 mb-8 max-w-3xl">
+      <section className="mx-auto p-4 mb-8 max-w-5xl">
         <TimerBar
           running={running}
           projects={projects}
@@ -213,10 +213,13 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
   return (
     <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Stała szerokość, bo nazwy projektów bywają długie ("Nowe i remontowane
+            sklepy") i bez niej select albo rozpycha pasek, albo ucina tekst
+            na krawędzi. */}
         <select
           value={projectID}
           onChange={(e) => setProjectID(Number(e.target.value))}
-          className="p-2 border border-indigo-400 rounded"
+          className="p-2 border border-indigo-400 rounded w-full sm:w-56 shrink-0"
         >
           {projects.length === 0 && <option value="">— brak projektów —</option>}
           {projects.map((p) => (
@@ -327,11 +330,14 @@ const ManualForm = ({ projects, descByProject, busy, call, today }) => {
 
   return (
     <form onSubmit={submit} className="mt-4 p-3 border border-gray-300 rounded bg-gray-50">
-      <div className="flex gap-2 flex-wrap items-end">
+      {/* Dwa wyraźne rzędy zamiast jednego flex-wrap z siedmioma polami: przy
+          wąskim ekranie tamten zawijał godzinę końca i przyciski w przypadkowe
+          miejsca. Tu podział jest stały — "co robiłem" nad "kiedy". */}
+      <div className="flex gap-2 flex-col sm:flex-row mb-2">
         <select
           value={form.projectID}
           onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-          className="p-2 border border-gray-400 rounded"
+          className="p-2 border border-gray-400 rounded sm:w-56 shrink-0"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -346,46 +352,67 @@ const ManualForm = ({ projects, descByProject, busy, call, today }) => {
           maxLength={200}
           placeholder="Opis zadania"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="flex-grow min-w-[10rem] p-2 border border-gray-400 rounded"
+          className="flex-grow min-w-0 p-2 border border-gray-400 rounded"
         />
-        {/* Tylko dziś i wczoraj — wstecz pracownik nie sięga. */}
-        <select
-          value={form.data}
-          onChange={(e) => setForm({ ...form, data: e.target.value })}
-          className="p-2 border border-gray-400 rounded"
-        >
-          <option value={today}>dziś</option>
-          <option value={yesterday}>wczoraj</option>
-        </select>
-        <input
-          type="time"
-          value={form.from}
-          onChange={(e) => setForm({ ...form, from: e.target.value })}
-          className="p-2 border border-gray-400 rounded"
-          required
-        />
-        <input
-          type="time"
-          value={form.to}
-          onChange={(e) => setForm({ ...form, to: e.target.value })}
-          className="p-2 border border-gray-400 rounded"
-          required
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
-        >
-          Dodaj
-        </button>
-        <button type="button" onClick={() => setOpen(false)} className="py-2 px-3 text-gray-600">
-          Zwiń
-        </button>
+      </div>
+
+      <div className="flex gap-2 items-end flex-wrap">
+        {/* Etykiety nad polami czasu są konieczne: dwa gołe <input type="time">
+            obok siebie nie mówią, które jest początkiem, a które końcem. */}
+        <SmallField label="Dzień">
+          {/* Tylko dziś i wczoraj — wstecz pracownik nie sięga. */}
+          <select
+            value={form.data}
+            onChange={(e) => setForm({ ...form, data: e.target.value })}
+            className="p-2 border border-gray-400 rounded"
+          >
+            <option value={today}>dziś</option>
+            <option value={yesterday}>wczoraj</option>
+          </select>
+        </SmallField>
+        <SmallField label="Od">
+          <input
+            type="time"
+            value={form.from}
+            onChange={(e) => setForm({ ...form, from: e.target.value })}
+            className="p-2 border border-gray-400 rounded"
+            required
+          />
+        </SmallField>
+        <SmallField label="Do">
+          <input
+            type="time"
+            value={form.to}
+            onChange={(e) => setForm({ ...form, to: e.target.value })}
+            className="p-2 border border-gray-400 rounded"
+            required
+          />
+        </SmallField>
+
+        <span className="flex gap-2 ml-auto">
+          <button
+            type="submit"
+            disabled={busy}
+            className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
+          >
+            Dodaj
+          </button>
+          <button type="button" onClick={() => setOpen(false)} className="py-2 px-3 text-gray-600">
+            Zwiń
+          </button>
+        </span>
       </div>
       <DescriptionOptions descByProject={descByProject} />
     </form>
   );
 };
+
+const SmallField = ({ label, children }) => (
+  <label className="flex flex-col">
+    <span className="mb-1 text-xs font-medium text-gray-700">{label}</span>
+    {children}
+  </label>
+);
 
 // --- lista dni --------------------------------------------------------------
 
@@ -453,14 +480,21 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             className="flex-grow min-w-[8rem] p-1.5 border border-gray-400 rounded text-sm"
           />
+          {/* W wierszu nie ma miejsca na widoczne etykiety, ale dwa gołe pola
+              czasu muszą się dać rozróżnić — stąd aria-label i title. */}
           <input
             type="time"
+            aria-label="Godzina rozpoczęcia"
+            title="Od"
             value={form.from}
             onChange={(e) => setForm({ ...form, from: e.target.value })}
             className="p-1.5 border border-gray-400 rounded text-sm"
           />
+          <span className="text-gray-400 text-sm">–</span>
           <input
             type="time"
+            aria-label="Godzina zakończenia"
+            title="Do"
             value={form.to}
             onChange={(e) => setForm({ ...form, to: e.target.value })}
             className="p-1.5 border border-gray-400 rounded text-sm"

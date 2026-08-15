@@ -14,8 +14,11 @@ const CONFLICT_CODES = ["overlap", "already_running", "edit_window_closed"];
  * bo inaczej starszy błąd zostałby w bazie na zawsze (pracownik go nie sięgnie).
  */
 const resolveAccess = async (token, entry) => {
+  // Własny wpis: zasięg projektów bierzemy z prawdziwego tokenu, żeby lista
+  // na stronie i to, co da się zapisać, znaczyły to samo (patrz komentarz
+  // w pages/api/entries/index.js).
   if (Number(entry.userID) === Number(token.userID)) {
-    return { allowed: true, enforceWindow: true, actor: null };
+    return { allowed: true, enforceWindow: true, actor: null, scopeToken: token };
   }
   if (!canSeeTeamTasks(token.role)) return { allowed: false };
 
@@ -26,6 +29,8 @@ const resolveAccess = async (token, entry) => {
     allowed: true,
     enforceWindow: false,
     actor: { userID: token.userID, name: token.name },
+    // Cudzy wpis — zasięg właściciela, nie poprawiającego.
+    scopeToken: { section: owner.section, role: "user", userID: owner.id },
   };
 };
 
@@ -98,7 +103,7 @@ export default async (req, res) => {
   if (!project) {
     return res.status(404).json({ error: "project_not_found" });
   }
-  if (!canUseProject({ section: entry.section, role: "user", userID: entry.userID }, project)) {
+  if (!canUseProject(access.scopeToken, project)) {
     return res.status(403).json({ error: "project_out_of_scope" });
   }
 

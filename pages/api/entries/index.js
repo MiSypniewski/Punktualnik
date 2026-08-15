@@ -36,7 +36,12 @@ export default async (req, res) => {
   // Domyślnie wpis powstaje NA SIEBIE — userID bierzemy z tokenu, nigdy z body.
   // Cudzy wpis wolno założyć tylko kierownikowi i tylko w jego zasięgu; służy
   // to uzupełnianiu braków za pracownika, który zapomniał zaraportować.
-  let owner = { id: Number(token.userID), section: token.section, self: true };
+  //
+  // `scopeToken` rozstrzyga, KTÓRE projekty wolno wybrać. Dla wpisu na siebie
+  // musi to być prawdziwy token — inaczej kierownik widziałby na liście projekty
+  // obsługiwanych sekcji, ale nie mógłby ich wystartować (projectScope dla roli
+  // 'user' pomija ManagerSections i zostawia samą Users.section).
+  let owner = { id: Number(token.userID), section: token.section, self: true, scopeToken: token };
 
   if (targetUserID !== undefined && targetUserID !== "" && Number(targetUserID) !== Number(token.userID)) {
     if (!canSeeTeamTasks(token.role)) {
@@ -49,16 +54,21 @@ export default async (req, res) => {
     if (!target || !canSeeUser(token, target)) {
       return res.status(403).json({ error: "permission_denied" });
     }
-    owner = { id: Number(target.id), section: target.section, self: false };
+    // Wpis za kogoś sprawdzamy zasięgiem TAMTEJ osoby: kierownik nie może
+    // przypisać pracownikowi projektu, którego ten sam by nie wybrał.
+    owner = {
+      id: Number(target.id),
+      section: target.section,
+      self: false,
+      scopeToken: { section: target.section, role: "user", userID: target.id },
+    };
   }
 
   const project = getProject(projectID);
   if (!project) {
     return res.status(404).json({ error: "project_not_found" });
   }
-  // Projekt sprawdzamy w zasięgu WŁAŚCICIELA wpisu, nie zlecającego: kierownik
-  // nie może przypisać pracownikowi projektu, którego ten i tak by nie wybrał.
-  if (!canUseProject({ section: owner.section, role: "user", userID: owner.id }, project)) {
+  if (!canUseProject(owner.scopeToken, project)) {
     return res.status(403).json({ error: "project_out_of_scope" });
   }
 

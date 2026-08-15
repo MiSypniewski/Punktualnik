@@ -39,9 +39,16 @@ const TopNavigation = () => {
   }, [firtstRun]);
 
   return (
-    <div className="flex gap-6 w-full px-4 py-1">
+    // flex-wrap jest tu konieczne: pozycji w menu przybyło wraz z modułem zadań
+    // i na telefonie nie mieszczą się już w jednej linii — bez zawijania
+    // wypychały stronę w poziomie i pojawiał się pasek przewijania.
+    // Data ma `w-full sm:w-auto`, żeby na wąskim ekranie zajęła własną linię,
+    // a nie wciskała linki w resztę miejsca.
+    <div className="flex flex-wrap items-baseline gap-x-4 sm:gap-x-6 gap-y-1 w-full px-4 py-1">
       <Link href={`/`}>
-        <a className="capitalize flex-grow font-bold">{dayjs().format(`dddd, DD MMMM YYYY, HH:mm:ss `)}</a>
+        <a className="first-letter:uppercase w-full sm:w-auto sm:flex-grow font-bold">
+          {dayjs().format(`dddd, DD MMMM YYYY, HH:mm:ss `)}
+        </a>
       </Link>
       {/* Kiosk (editor) nie raportuje zadań — konto jest współdzielone, więc
           wpis nie miałby właściciela. Stąd link tylko dla canTrackTasks. */}
