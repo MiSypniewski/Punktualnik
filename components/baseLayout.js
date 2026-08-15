@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
-import { isStaff, canApproveOvertime } from "../services/roles";
+import { canExportTimes, canApproveOvertime } from "../services/roles";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -40,7 +40,7 @@ const TopNavigation = () => {
       <Link href={`/nadgodziny`}>
         <a className="font-bold hover:underline">Nadgodziny</a>
       </Link>
-      {isStaff(session.user.role) && (
+      {canExportTimes(session.user.role) && (
         <Link href={`/utils/eksport`}>
           <a className="font-bold hover:underline">Eksport</a>
         </Link>

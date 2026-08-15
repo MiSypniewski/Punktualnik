@@ -3,7 +3,7 @@ import { getToken } from "next-auth/jwt";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import getAllUsers from "../../services/getAllUsers";
-import { isStaff } from "../../services/roles";
+import { canExportTimes } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
 
 // Dwuwarstwowe zabezpieczenie: tu blokujemy wejście na stronę,
@@ -14,8 +14,9 @@ export async function getServerSideProps(ctx) {
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }
-  if (!isStaff(token.role)) {
-    // Brak uprawnień — nie pokazujemy strony.
+  if (!canExportTimes(token.role)) {
+    // Brak uprawnień — nie pokazujemy strony. Kiosk (editor) też nie:
+    // stoi w miejscu publicznym, więc nie może dawać pobrania listy sekcji.
     return { notFound: true };
   }
 

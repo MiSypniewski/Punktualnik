@@ -13,5 +13,17 @@ export const ROLES = ["user", "editor", "manager"];
 // Zatwierdzanie/odrzucanie wniosków o nadgodziny.
 export const canApproveOvertime = (role) => role === "manager";
 
-// "Personel" — wszystko powyżej zwykłego pracownika (eksport CSV, widoki zbiorcze).
+// Klikanie kafelków z licznikiem czasu (zapis do tabeli Times) — WYŁĄCZNIE
+// `editor`, czyli wspólne stanowisko z ekranem dotykowym, przy którym
+// pracownicy odbijają wejście i wyjście. Kierownik kafelki tylko ogląda:
+// czas pracy ma odbijać ten sam sprzęt co wszystkim, a nie własna przeglądarka.
+export const canPunchCards = (role) => role === "editor";
+
+// Eksport czasów pracy do CSV — wyłącznie kierownik. Kiosk stoi na widoku
+// publicznym, więc nie może dawać nikomu pobrania listy z całej sekcji.
+export const canExportTimes = (role) => role === "manager";
+
+// "Personel" — kto w ogóle ogląda cudze dane w swojej sekcji (kafelki sekcji).
+// Uwaga: to NIE jest uprawnienie do zmiany czegokolwiek ani do eksportu —
+// od tego są canPunchCards i canExportTimes.
 export const isStaff = (role) => role === "editor" || role === "manager";

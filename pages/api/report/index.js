@@ -2,7 +2,7 @@ import { getToken } from "next-auth/jwt";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import getTimesReport from "../../../services/getTimesReport";
-import { isStaff } from "../../../services/roles";
+import { canExportTimes } from "../../../services/roles";
 import { buildCsv, sendCsv } from "../../../utils/csv";
 import { visibleSections } from "../../../services/scope";
 
@@ -21,8 +21,9 @@ export default async (req, res) => {
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
-  // Eksport czasów wszystkich pracowników — tylko personel (editor / manager).
-  if (!isStaff(token.role)) {
+  // Eksport czasów wszystkich pracowników — wyłącznie kierownik.
+  // Kiosk (editor) służy tylko do odbijania kart na wspólnym ekranie.
+  if (!canExportTimes(token.role)) {
     return res.status(403).json({ error: "permission_denied" });
   }
   if (req.method !== "GET") {

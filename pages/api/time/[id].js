@@ -5,7 +5,7 @@ import { getSession } from "next-auth/react";
 import { getToken } from "next-auth/jwt";
 import getUserData from "../../../services/getUserData";
 import { canSeeUser } from "../../../services/scope";
-import { isStaff } from "../../../services/roles";
+import { canPunchCards } from "../../../services/roles";
 import dayjs from "dayjs";
 dayjs.locale("pl");
 
@@ -40,10 +40,10 @@ export default async (req, res) => {
       // if (!session) {
       //   return res.status(401).json({ error: "not_authotized" });
       // }
-      // isStaff, nie samo "editor": rola jest jednowartościowa, więc kierownik
-      // (manager) musi zachować obsługę kart, inaczej awans odbierałby mu
-      // możliwość klikania czasu własnemu zespołowi.
-      if (!isStaff(token.role)) {
+      // Zapis czasu tylko ze stanowiska kiosku (rola editor). Kierownik kart
+      // nie klika — ogląda je, a swój czas odbija tak jak reszta zespołu,
+      // na wspólnym ekranie dotykowym.
+      if (!canPunchCards(token.role)) {
         return res.status(401).json({ error: "permission_denied" });
       }
       const payload = req.body;
@@ -58,10 +58,10 @@ export default async (req, res) => {
       // if (!session) {
       //   return res.status(401).json({ error: "not_authotized" });
       // }
-      // isStaff, nie samo "editor": rola jest jednowartościowa, więc kierownik
-      // (manager) musi zachować obsługę kart, inaczej awans odbierałby mu
-      // możliwość klikania czasu własnemu zespołowi.
-      if (!isStaff(token.role)) {
+      // Zapis czasu tylko ze stanowiska kiosku (rola editor). Kierownik kart
+      // nie klika — ogląda je, a swój czas odbija tak jak reszta zespołu,
+      // na wspólnym ekranie dotykowym.
+      if (!canPunchCards(token.role)) {
         return res.status(401).json({ error: "permission_denied" });
       }
       const payload = req.body;

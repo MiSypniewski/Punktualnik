@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import classNames from "classnames";
 import { useSession } from "next-auth/react";
+import { canPunchCards } from "../services/roles";
 import { DifferenceTime, Timer } from "../utils";
 
 import dayjs from "dayjs";
@@ -19,15 +20,36 @@ const Card = ({ data }) => {
   const [overTime, setOverTime] = useState(false);
   const [intervalID, setIntervalID] = useState(null);
 
-  let statusClass = classNames("flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl", {
-    "bg-blue-400 hover:bg-blue-500": status === "wait",
-    "bg-red-500 hover:bg-red-600": status === "workInProgress",
-    "bg-yellow-600 hover:bg-yellow-700": status === "overTime",
-    "bg-green-600 hover:bg-green-700": status === "finishWork" && overTime,
-    "bg-red-600 hover:bg-red-700": status === "finishWork" && !overTime,
-  });
+  // Kliknąć kartę może wyłącznie stanowisko kiosku. Reszta (kierownik, sam
+  // pracownik) ogląda ją jak tablicę — stąd brak podświetlenia pod kursorem
+  // i kursor strzałki: karta ma nie udawać, że jest przyciskiem.
+  const canPunch = canPunchCards(session?.user?.role);
+
+  let statusClass = classNames(
+    "flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl",
+    canPunch ? "cursor-pointer" : "cursor-default",
+    {
+      "bg-blue-400": status === "wait",
+      "bg-red-500": status === "workInProgress",
+      "bg-yellow-600": status === "overTime",
+      "bg-green-600": status === "finishWork" && overTime,
+      "bg-red-600": status === "finishWork" && !overTime,
+    },
+    canPunch && {
+      "hover:bg-blue-500": status === "wait",
+      "hover:bg-red-600": status === "workInProgress",
+      "hover:bg-yellow-700": status === "overTime",
+      "hover:bg-green-700": status === "finishWork" && overTime,
+      "hover:bg-red-700": status === "finishWork" && !overTime,
+    }
+  );
 
   const saveToDB = async (startTime, endTime, totalWorkTime, status, overTime) => {
+    // Efekt na dole komponentu odpala zapis także przy samym wejściu na stronę
+    // (karta w trakcie pracy). Bez tego warunku przeglądarka kierownika biłaby
+    // w API serią żądań, które i tak wracają z 401.
+    if (!canPunch) return;
+
     const payload = {
       userID: data.userID,
       name: data.name,
@@ -87,7 +109,7 @@ const Card = ({ data }) => {
   };
 
   const changeStatus = () => {
-    if (session.user.role === "user") {
+    if (!canPunch) {
       return;
     }
     if (status === "wait") {
@@ -151,7 +173,7 @@ const Card = ({ data }) => {
   }, [status, overTime]);
 
   return (
-    <div className={statusClass} onClick={() => changeStatus()}>
+    <div className={statusClass} onClick={canPunch ? () => changeStatus() : undefined}>
       <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">{icon()}</div>
       <div className="flex-grow">
         <h2 className="mt-5 text-xl font-bold">
