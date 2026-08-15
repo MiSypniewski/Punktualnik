@@ -121,7 +121,16 @@ export default function LiveBoard({ initial, currentUserID }) {
                     )}
                   </p>
                   <p className="text-sm text-gray-600 truncate">
-                    {r.projectName} · {r.description || "(bez opisu)"} · od {hhmm(r.startedAt)}
+                    {r.projectName} ·{" "}
+                    {/* Opis w kolorze przycisku "Pokaż" (indigo-500) — to jedyna
+                        rzecz w wierszu, której kierownik naprawdę szuka wzrokiem;
+                        projekt i godzina są kontekstem i zostają szare. */}
+                    {r.description ? (
+                      <span className="text-indigo-500">{r.description}</span>
+                    ) : (
+                      "(bez opisu)"
+                    )}{" "}
+                    · od {hhmm(r.startedAt)}
                   </p>
                 </div>
                 <span
