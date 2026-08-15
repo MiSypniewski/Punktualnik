@@ -1,6 +1,7 @@
 import db from "./db";
 import crypto from "crypto";
 import Joi from "joi";
+import { getSection } from "./sections";
 
 const schema = Joi.object({
   email: Joi.string().email().required(),
@@ -27,20 +28,43 @@ const createUser = async (payload) => {
   const { email, name, surname, section, location, password } = await schema.validateAsync(payload);
   checkEmail(email);
 
+  // Sekcja MUSI być ze słownika. Formularz podsuwa wyłącznie istniejące sekcje,
+  // ale POST /api/users jest publiczny (nie wymaga sesji), więc bez tej kontroli
+  // dowolny tekst wjeżdżałby do Users.section — a konto z sekcją spoza słownika
+  // jest niewidoczne dla każdego kierownika i praktycznie nie do znalezienia.
+  // Normalizacja przy okazji zamyka temat "Spedycja" kontra "spedycja".
+  // Do bazy trafia slug w postaci ZAPISANEJ w słowniku, nie w tej wpisanej przez
+  // użytkownika — inaczej sekcja odziedziczona jako 'Spedycja' dostałaby drugi,
+  // rozjechany wariant 'spedycja'.
+  const found = getSection(section);
+  if (!found || !found.isActive) {
+    throw new Error("unknown_section");
+  }
+  const sectionSlug = found.slug;
+
   const passwordSalt = crypto.randomBytes(256).toString("hex");
   const passwordHash = crypto.pbkdf2Sync(password, passwordSalt, 2137, 256, "sha512").toString("hex");
 
   const info = insertUser.run({
     name,
     surname,
-    section,
+    section: sectionSlug,
     location,
     email,
     passwordHash,
     passwordSalt,
   });
 
-  return { id: info.lastInsertRowid, name, surname, section, location, email, role: "user", isActive: 0 };
+  return {
+    id: info.lastInsertRowid,
+    name,
+    surname,
+    section: sectionSlug,
+    location,
+    email,
+    role: "user",
+    isActive: 0,
+  };
 };
 
 export default createUser;

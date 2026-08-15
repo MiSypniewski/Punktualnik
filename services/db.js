@@ -9,6 +9,31 @@ const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), "data", "punk
 // W trybie dev Next.js przeładowuje moduły — trzymamy jedno połączenie na proces.
 const globalForDb = globalThis;
 
+// Jednorazowe przeniesienie sekcji, które przed powstaniem tabeli Sections żyły
+// wyłącznie jako tekst w Users.section i ManagerSections.section (przypisanie
+// kierownika musi przeżyć migrację, inaczej po restarcie przestałby kogokolwiek
+// widzieć). Etykietą zostaje sam slug — do poprawienia komendą `section-label`.
+//
+// Warunek "tabela jest pusta" jest tu istotny: bez niego wyłączona sekcja
+// (isActive = 0) wracałaby jako aktywna przy każdym restarcie aplikacji.
+// Sekcji nigdy nie kasujemy, więc pusta tabela oznacza wyłącznie "jeszcze nie
+// migrowano", a nie "skasowano wszystkie".
+//
+// Lustrzane wobec scripts/admin.js — skrypt jest CommonJS i nie zaimportuje tego
+// modułu, a bywa uruchamiany na bazie, której aplikacja jeszcze nie otwierała.
+const backfillSections = (db) => {
+  if (db.prepare(`SELECT COUNT(*) AS n FROM Sections`).get().n > 0) return;
+
+  db.exec(`
+    INSERT OR IGNORE INTO Sections (slug, label)
+    SELECT slug, slug FROM (
+      SELECT DISTINCT TRIM(section) AS slug FROM Users          WHERE TRIM(section) <> ''
+      UNION
+      SELECT DISTINCT TRIM(section) AS slug FROM ManagerSections WHERE TRIM(section) <> ''
+    );
+  `);
+};
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -32,6 +57,21 @@ const createDb = () => {
       passwordSalt TEXT    NOT NULL,
       role         TEXT    NOT NULL DEFAULT 'user',
       isActive     INTEGER NOT NULL DEFAULT 0
+    );
+
+    -- Słownik sekcji (działów). Do sierpnia 2026 sekcja nie miała własnej tabeli
+    -- — była gołym tekstem w Users.section, więc sekcja "istniała" dopiero wtedy,
+    -- gdy ktoś ją miał, a lista do wyboru przy rejestracji była zaszyta w kodzie.
+    --
+    -- slug jest kluczem technicznym i JEDNOCZEŚNIE segmentem adresu /time/<slug>
+    -- oraz wartością w Users.section, Times.section i ManagerSections.section.
+    -- Dlatego jest niezmienny — do zmiany jest wyłącznie label. Sekcji się nie
+    -- kasuje (Times trzyma sekcję historycznie), tylko wyłącza: isActive = 0
+    -- znika z formularza rejestracji, ale nie rusza danych ani przypisań.
+    CREATE TABLE IF NOT EXISTS Sections (
+      slug     TEXT    PRIMARY KEY,
+      label    TEXT    NOT NULL,
+      isActive INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS Times (
@@ -87,6 +127,8 @@ const createDb = () => {
     CREATE INDEX IF NOT EXISTS idx_overtime_user      ON Overtime(userID, data);
     CREATE INDEX IF NOT EXISTS idx_overtime_status    ON Overtime(status);
   `);
+
+  backfillSections(db);
 
   return db;
 };

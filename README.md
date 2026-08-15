@@ -3,8 +3,8 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 ## Baza danych
 
 Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
-bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`, `Overtime`)
-tworzony jest automatycznie przy pierwszym uruchomieniu.
+bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`, `Overtime`,
+`Sections`, `ManagerSections`) tworzony jest automatycznie przy pierwszym uruchomieniu.
 
 - Domyślna ścieżka: `./data/punktualnik.sqlite` (katalog `data/` jest w `.gitignore`).
 - Ścieżkę można nadpisać zmienną `SQLITE_PATH` (zob. `.env.local`).
@@ -33,7 +33,7 @@ node scripts/admin.js list                        # wszyscy
 node scripts/admin.js activate   jan@example.pl   # aktywuj (po e-mailu lub id)
 node scripts/admin.js deactivate 5                # zablokuj
 node scripts/admin.js role       5 editor         # rola: user | editor | manager
-node scripts/admin.js section    5 biedronka_ch22 # zmień sekcję
+node scripts/admin.js section    5 biedronka_ch22 # zmień sekcję (tylko istniejąca)
 node scripts/admin.js passwd     jan@example.pl noweHaslo
 
 # alternatywnie przez npm (uwaga na `--`):
@@ -44,6 +44,47 @@ Na Mikrusie: zaloguj się po SSH, wejdź do katalogu aplikacji i uruchom jak wy�
 Skrypt używa tej samej bazy co aplikacja (`SQLITE_PATH` / domyślnie `./data/punktualnik.sqlite`).
 Typowy flow nowego pracownika: rejestracja w aplikacji → `pending` → `activate` →
 (jeśli ma obsługiwać karty) `role <id> editor`.
+
+## Sekcje (działy)
+
+Sekcje są słownikiem w tabeli `Sections` i to ona rozstrzyga, jakie działy
+istnieją. **Dodanie sekcji to jedna komenda — bez zmiany kodu, builda i deployu.**
+
+```bash
+npm run admin -- section-list                        # aktywne (--all: także wyłączone)
+npm run admin -- section-add   magazyn Magazyn Centralny
+npm run admin -- section-label magazyn Magazyn Główny
+npm run admin -- section-off   magazyn               # zdejmij z rejestracji
+npm run admin -- section-on    magazyn
+```
+
+Sekcja ma `slug` i `label`:
+
+- **`slug`** (`magazyn`) to klucz techniczny — trafia do adresu strony kart
+  `/time/magazyn` oraz do `Users.section`, `Times.section` i `ManagerSections.section`.
+  Dozwolone są małe litery, cyfry, `-` i `_`. **Slug jest niezmienny**: jego zmiana
+  oznaczałaby przepisanie historii w `Times` i unieważnienie linków.
+- **`label`** (`Magazyn Główny`) to nazwa dla człowieka, widoczna w formularzu
+  rejestracji. Ją można zmieniać dowolnie.
+
+Sekcji się **nie kasuje**, tylko wyłącza (`section-off`): `Times` trzyma sekcję
+historycznie, a przypisania kierowników mają dalej obowiązywać. Wyłączona sekcja
+znika z formularza rejestracji i nie da się do niej przenieść pracownika,
+ale dane i dostępy zostają nietknięte.
+
+Kolejność jest teraz naturalna: najpierw `section-add`, potem można od razu
+przypisać kierownika do jeszcze pustej sekcji, a pracownicy dochodzą później.
+
+Nazwy są normalizowane do małych liter, więc `Spedycja` i `spedycja` to ta sama
+sekcja. Sekcja spoza słownika jest odrzucana także przez `POST /api/users`
+(publiczny endpoint rejestracji), nie tylko przez formularz.
+
+Przy pierwszym uruchomieniu na istniejącej bazie sekcje są przenoszone
+automatycznie z `Users.section` i `ManagerSections.section` — etykietą zostaje
+sam slug, do poprawienia komendą `section-label`.
+
+> Lokalizacje (`Users.location`) mają wciąż starą postać: lista jest zaszyta
+> w `pages/users/register.js` i jej zmiana wymaga builda.
 
 ## Nadgodziny
 
@@ -89,9 +130,10 @@ npm run admin -- sections michal@example.pl -            # wyczyść
 
 **Kierownik bez przypisanych sekcji nie widzi nikogo** — to celowa wartość
 domyślna, żeby nowe konto nie dostało wglądu w całą firmę przez przeoczenie.
-Panel pokazuje wtedy komunikat z komendą do uruchomienia. Komenda odrzuca
-nazwy sekcji, które nie występują w `Users.section`, bo literówka po cichu
-odcięłaby kierownika od jego ludzi.
+Panel pokazuje wtedy komunikat z komendą do uruchomienia. Komenda odrzuca sekcje
+spoza tabeli `Sections`, bo literówka po cichu odcięłaby kierownika od jego ludzi.
+Sekcje wyłączone (`isActive = 0`) są dozwolone — kierownik musi widzieć historię
+działu, który już nie przyjmuje nowych pracowników.
 
 Zasięg obejmuje: panel nadgodzin, oba eksporty CSV, `GET /api/time/[id]`
 i stronę kart `/time/[sekcja]`. Eksport czasów filtruje po `Times.section`,

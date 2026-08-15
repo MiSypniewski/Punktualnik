@@ -3,8 +3,21 @@ import { jsonFetcher } from "../../utils";
 import { useRouter } from "next/router";
 import { fromJSON } from "postcss";
 import BaseLayout from "../../components/baseLayout";
+import { listSections } from "../../services/sections";
 
-export default function CreateUser() {
+// Lista sekcji jedzie z bazy, nie z kodu — dodanie działu to komenda
+// `npm run admin -- section-add <slug> <Etykieta>`, bez builda i bez deployu.
+export const getServerSideProps = async () => ({
+  props: { sections: listSections() },
+});
+
+// Kody błędów z API po ludzku; nieznany kod pokazujemy jak leci.
+const ERROR_MESSAGES = {
+  email_taken: "Konto z tym adresem e-mail już istnieje.",
+  unknown_section: "Wybrany dział nie istnieje. Odśwież stronę i spróbuj ponownie.",
+};
+
+export default function CreateUser({ sections }) {
   const userForm = useRef();
   const [error, setError] = useState();
   const [formProcessing, setFormProcessing] = useState(false);
@@ -49,7 +62,7 @@ export default function CreateUser() {
     } else {
       const payload = await response.json();
       setFormProcessing(false);
-      setError(payload.error);
+      setError(ERROR_MESSAGES[payload.error] || payload.error);
     }
   };
 
@@ -137,13 +150,17 @@ export default function CreateUser() {
                   className="appearance-none w-full h-10 bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-gray-700 leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
                 >
                   <option value=""></option>
-                  <option value="biedronka">Biedronka</option>
-                  <option value="cns">CNS</option>
-                  <option value="pio">PiO</option>
-                  <option value="spedycja">Spedycja</option>
-                  <option value="lidl">Lidl</option>
-                  <option value="dyrekcja">Dyrekcja</option>
+                  {sections.map(({ slug, label }) => (
+                    <option key={slug} value={slug}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
+                {sections.length === 0 && (
+                  <p className="mt-1 text-sm text-red-600">
+                    Brak zdefiniowanych działów — skontaktuj się z administratorem.
+                  </p>
+                )}
               </div>
               <div className="p-2 w-full">
                 <label htmlFor="location" className="leading-7 text-sm text-gray-600">
