@@ -27,3 +27,23 @@ export const canExportTimes = (role) => role === "manager";
 // Uwaga: to NIE jest uprawnienie do zmiany czegokolwiek ani do eksportu —
 // od tego są canPunchCards i canExportTimes.
 export const isStaff = (role) => role === "editor" || role === "manager";
+
+// --- Moduł zadań (projekty + raportowanie czasu) ---------------------------
+
+// Raportowanie własnych zadań: każdy zalogowany CZŁOWIEK, ale nie kiosk.
+// Konto `editor` jest współdzielone przez całą sekcję — nie wiadomo, kto przy
+// nim stoi, więc jego wpis nie miałby właściciela. To odwrotność canPunchCards:
+// kartę czasu odbija się na wspólnym sprzęcie, a zadania raportuje się u siebie.
+export const canTrackTasks = (role) => role === "user" || role === "manager";
+
+// Słownik projektów: zakładanie, zmiana nazwy, archiwizacja. Świadomie w webie,
+// a nie w scripts/admin.js — inaczej dodanie projektu wymagałoby wejścia na
+// serwer, dokładnie tak jak przed powstaniem tabeli Sections.
+export const canManageProjects = (role) => role === "manager";
+
+// Oglądanie i korygowanie cudzych wpisów. Sama rola nie wystarcza — zasięg
+// sekcyjny nakłada dodatkowo services/scope.js.
+export const canSeeTeamTasks = (role) => role === "manager";
+
+// Eksport wpisów do CSV — jak przy czasach pracy, wyłącznie kierownik.
+export const canExportTasks = (role) => role === "manager";

@@ -57,3 +57,25 @@ export const formatMinutes = (minutes, { withSign = false } = {}) => {
   const sign = total < 0 ? "-" : withSign && total > 0 ? "+" : "";
   return `${sign}${h}h ${m}min`;
 };
+
+/**
+ * "07:45:00" → 465. Odwrotność formatMinutes dla zapisu używanego w Times.
+ *
+ * Times.totalWorkTime jest TEKSTEM (spadek po Airtable), więc żeby zestawić
+ * obecność z czasem zaraportowanym w zadaniach, trzeba go najpierw sprowadzić
+ * do minut. Sekundy są odrzucane w dół — przy zestawieniu godzin pracy różnica
+ * poniżej minuty nie ma znaczenia, a zaokrąglanie w górę potrafiłoby sztucznie
+ * podbić sumę miesiąca o kilkanaście minut.
+ *
+ * Zwraca 0 dla pustych i niepoprawnych wartości — brak odbitej karty to zero
+ * obecności, nie błąd.
+ */
+export const parseHmsToMinutes = (hms) => {
+  const parts = String(hms ?? "").trim().split(":");
+  if (parts.length < 2) return 0;
+
+  const [h, m] = parts.map((p) => Number(p));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+
+  return h * 60 + m;
+};
