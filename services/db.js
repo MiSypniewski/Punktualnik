@@ -124,7 +124,7 @@ const createDb = () => {
     -- Słownik projektów dla modułu zadań. Projektu się NIE kasuje, tylko
     -- archiwizuje (isActive = 0): TaskEntries trzymają projectID historycznie,
     -- więc skasowanie osierociłoby wpisy sprzed lat. Ta sama zasada co przy
-    -- sekcjach, ale kluczem jest tu `id`, a nie slug — nazwa projektu bywa
+    -- sekcjach, ale kluczem jest tu id, a nie slug — nazwa projektu bywa
     -- długa i zmienna, a w odróżnieniu od sekcji nie trafia do adresu URL.
     CREATE TABLE IF NOT EXISTS Projects (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,7 +157,7 @@ const createDb = () => {
     -- krzyżowej: zapomniana karta nie może blokować raportowania zadań.
     -- Zestawienie obu wielkości jest wyłącznie informacyjne, w dashboardzie.
     --
-    -- Nazwa jest umyślnie daleko od `Times`, żeby przy czytaniu zapytania nie
+    -- Nazwa jest umyślnie daleko od Times, żeby przy czytaniu zapytania nie
     -- było wątpliwości, o którą oś chodzi.
     --
     -- startedAt/endedAt: 'YYYY-MM-DD HH:mm:ss', czas lokalny BEZ offsetu strefy

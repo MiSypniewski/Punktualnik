@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
-import { canExportTimes, canApproveOvertime } from "../services/roles";
+import { canExportTimes, canApproveOvertime, canTrackTasks, canManageProjects } from "../services/roles";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -37,9 +37,21 @@ const TopNavigation = () => {
       <Link href={`/`}>
         <a className="capitalize flex-grow font-bold">{dayjs().format(`dddd, DD MMMM YYYY, HH:mm:ss `)}</a>
       </Link>
+      {/* Kiosk (editor) nie raportuje zadań — konto jest współdzielone, więc
+          wpis nie miałby właściciela. Stąd link tylko dla canTrackTasks. */}
+      {canTrackTasks(session.user.role) && (
+        <Link href={`/zadania`}>
+          <a className="font-bold hover:underline">Zadania</a>
+        </Link>
+      )}
       <Link href={`/nadgodziny`}>
         <a className="font-bold hover:underline">Nadgodziny</a>
       </Link>
+      {canManageProjects(session.user.role) && (
+        <Link href={`/zadania/projekty`}>
+          <a className="font-bold hover:underline">Projekty</a>
+        </Link>
+      )}
       {canExportTimes(session.user.role) && (
         <Link href={`/utils/eksport`}>
           <a className="font-bold hover:underline">Eksport</a>
