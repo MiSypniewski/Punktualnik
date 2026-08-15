@@ -180,11 +180,20 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
   if (running) {
     const project = projects.find((p) => p.id === running.projectID);
     return (
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-emerald-500 shadow-sm">
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
         <div className="flex items-center gap-3 flex-wrap">
           <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(project?.color).dot}`} />
           <div className="flex-grow min-w-0">
-            <p className="font-medium truncate">{running.description || "(bez opisu)"}</p>
+            {/* Opis wyróżniony kolorem akcentu — to on mówi, co się teraz dzieje;
+                nazwa projektu i godzina startu są kontekstem i zostają szare.
+                "(bez opisu)" zostaje szare celowo: to informacja o braku treści. */}
+            <p className="font-medium truncate">
+              {running.description ? (
+                <span className="text-indigo-500">{running.description}</span>
+              ) : (
+                <span className="text-gray-400">(bez opisu)</span>
+              )}
+            </p>
             <p className="text-sm text-gray-600">
               {project?.name ?? "—"} · od {hhmm(running.startedAt)}
             </p>
@@ -212,7 +221,22 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
 
   return (
     <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
+      {/* Opis z lewej, projekt z prawej: zdanie zaczyna się od tego, CO się robi,
+          a projekt jest doprecyzowaniem. Opis dostaje też całą wolną szerokość,
+          bo bywa dłuższy niż nazwa projektu. */}
       <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="text"
+          value={description}
+          list={`opisy-${projectID}`}
+          maxLength={200}
+          placeholder="Nad czym pracujesz?"
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && start()}
+          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500"
+        />
+        <DescriptionOptions descByProject={descByProject} />
+
         {/* Stała szerokość, bo nazwy projektów bywają długie ("Nowe i remontowane
             sklepy") i bez niej select albo rozpycha pasek, albo ucina tekst
             na krawędzi. */}
@@ -228,18 +252,6 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
             </option>
           ))}
         </select>
-
-        <input
-          type="text"
-          value={description}
-          list={`opisy-${projectID}`}
-          maxLength={200}
-          placeholder="Nad czym pracujesz?"
-          onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && start()}
-          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded"
-        />
-        <DescriptionOptions descByProject={descByProject} />
 
         <button
           disabled={busy || projects.length === 0}
@@ -292,7 +304,7 @@ const Resume = ({ suggestions, busy, call }) => (
           className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-gray-300 rounded-full text-sm hover:bg-gray-50 disabled:opacity-50"
         >
           <span className={`w-2 h-2 rounded-full shrink-0 ${projectColor(s.projectColor).dot}`} />
-          <span className="truncate">{s.description}</span>
+          <span className="truncate text-indigo-500">{s.description}</span>
           <span className="text-gray-500 shrink-0">▶</span>
         </button>
       ))}
@@ -334,6 +346,15 @@ const ManualForm = ({ projects, descByProject, busy, call, today }) => {
           wąskim ekranie tamten zawijał godzinę końca i przyciski w przypadkowe
           miejsca. Tu podział jest stały — "co robiłem" nad "kiedy". */}
       <div className="flex gap-2 flex-col sm:flex-row mb-2">
+        <input
+          type="text"
+          value={form.description}
+          list={`opisy-${form.projectID}`}
+          maxLength={200}
+          placeholder="Opis zadania"
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          className="flex-grow min-w-0 p-2 border border-gray-400 rounded text-indigo-500"
+        />
         <select
           value={form.projectID}
           onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
@@ -345,15 +366,6 @@ const ManualForm = ({ projects, descByProject, busy, call, today }) => {
             </option>
           ))}
         </select>
-        <input
-          type="text"
-          value={form.description}
-          list={`opisy-${form.projectID}`}
-          maxLength={200}
-          placeholder="Opis zadania"
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="flex-grow min-w-0 p-2 border border-gray-400 rounded"
-        />
       </div>
 
       <div className="flex gap-2 items-end flex-wrap">
@@ -461,6 +473,14 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
     return (
       <li className="py-2 border-b border-gray-100">
         <div className="flex gap-2 flex-wrap items-center">
+          <input
+            type="text"
+            value={form.description}
+            list={`opisy-${form.projectID}`}
+            maxLength={200}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="flex-grow min-w-[8rem] p-1.5 border border-gray-400 rounded text-sm text-indigo-500"
+          />
           <select
             value={form.projectID}
             onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
@@ -472,14 +492,6 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
               </option>
             ))}
           </select>
-          <input
-            type="text"
-            value={form.description}
-            list={`opisy-${form.projectID}`}
-            maxLength={200}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="flex-grow min-w-[8rem] p-1.5 border border-gray-400 rounded text-sm"
-          />
           {/* W wierszu nie ma miejsca na widoczne etykiety, ale dwa gołe pola
               czasu muszą się dać rozróżnić — stąd aria-label i title. */}
           <input
@@ -529,7 +541,14 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
     >
       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${projectColor(entry.projectColor).dot}`} />
       <span className="flex-grow min-w-0">
-        <span className="block truncate">{entry.description || "(bez opisu)"}</span>
+        <span
+          className={classNames(
+            "block truncate",
+            entry.description ? "text-indigo-500" : "text-gray-400"
+          )}
+        >
+          {entry.description || "(bez opisu)"}
+        </span>
         <span className="block text-xs text-gray-600">
           {entry.projectName}
           {entry.editedByName && ` · popr. ${entry.editedByName}`}
