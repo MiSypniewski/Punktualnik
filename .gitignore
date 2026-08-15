@@ -42,3 +42,6 @@ yarn-error.log*
 
 # artefakty przeglądarki (snapshoty/logi z testów Playwright MCP)
 /.playwright-mcp/
+
+# ręcznie prowadzone salda nadgodzin — dane kadrowe, nie do repozytorium
+/nadgodziny.md
