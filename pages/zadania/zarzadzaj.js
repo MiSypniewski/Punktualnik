@@ -5,9 +5,11 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../components/baseLayout";
+import LiveBoard from "../../components/liveBoard";
 import { projectColor } from "../../components/projectColors";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
+import { getLiveBoard } from "../../services/liveBoard";
 import { closeStaleEntries } from "../../services/taskEntries";
 import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
@@ -57,6 +59,12 @@ export async function getServerSideProps(ctx) {
       filters,
       sections,
       canExport: canExportTasks(token.role),
+      // Migawka bieżącej pracy. Świadomie liczona z samych `sections`, bez
+      // `filters`: to stan na teraz, a nie wycinek okresu — zakres dat czy
+      // wybrany projekt nie mają tu czego zawężać. Dalej odświeża ją już
+      // /api/entries/running, ten props służy pierwszemu renderowi.
+      live: getLiveBoard(sections),
+      currentUserID: Number(token.userID),
       summary: getSummary(query),
       byProject: getByProject(query),
       byUser: getByUser(query),
@@ -91,6 +99,8 @@ export default function ZarzadzajZadaniami({
   filters,
   sections,
   canExport,
+  live,
+  currentUserID,
   summary,
   byProject,
   byUser,
@@ -175,6 +185,8 @@ export default function ZarzadzajZadaniami({
     <BaseLayout>
       <section className="mx-auto p-4 mt-6 mb-10 max-w-6xl">
         <h1 className="text-2xl font-bold mb-4">Raport zadań</h1>
+
+        <LiveBoard initial={live} currentUserID={currentUserID} />
 
         <form onSubmit={apply} className="mb-6 p-3 border border-gray-300 rounded bg-gray-50">
           <div className="flex gap-3 flex-wrap items-end">

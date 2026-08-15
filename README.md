@@ -345,10 +345,34 @@ wejścia na stronę, więc działa też na Mikrusie.
 
 ### Raport kierownika — `/zadania/zarzadzaj`
 
+Na samej górze **„Teraz w toku”** — migawka bieżącej pracy zespołu: kto ma
+uruchomiony timer (projekt, opis, od której godziny i ile już trwa), a pod spodem
+kto timera nie ma, z godziną ostatniego wpisu i dzisiejszym dorobkiem. Licznik
+tyka na żywo, a sama lista dociąga się z `/api/entries/running` co 45 sekund, bez
+przeładowywania raportu. Karta schowana w tle nie odpytuje serwera; powrót do niej
+odświeża dane od razu.
+
+Ta sekcja **nie podlega filtrom** spod spodu — pokazuje stan na teraz, a nie
+wycinek okresu, więc zakres dat czy wybrany projekt nie mają tu czego zawężać.
+Timer biegnący ponad 8 godzin dostaje żółte tło: to prawie zawsze zapomniany
+licznik, a auto-domknięcie złapie go dopiero o 3:00.
+
+Zawężenie po **sekcji konta**, nie po sekcji wpisu — jedyne takie miejsce w module
+i celowo. `token.section` jest zapiekany w JWT przy logowaniu, więc pracownik
+przeniesiony do innego działu startuje nowe wpisy ze starą sekcją aż do
+przelogowania; przy zawężeniu po sekcji wpisu ta sama osoba wisiałaby jako
+„w toku” u poprzedniego kierownika i jako „bez timera” u obecnego.
+
+Brak timera nie znaczy braku pracy: aplikacja nie prowadzi rejestru urlopów ani
+zwolnień, a zadania wolno dopisać ręcznie po fakcie. Lista jest podpowiedzią,
+z kim warto zamienić słowo — nie listą obecności.
+
 Filtry (zakres dat, projekt, pracownik, nazwa zadania, próg długości wpisu) żyją
-w adresie, więc widok da się zalinkować i odświeżyć. Zawartość: kafelki
+w adresie, więc widok da się zalinkować i odświeżyć. Dalsza zawartość: kafelki
 podsumowania, rozbicie wg projektów z udziałem procentowym, zestawienie
-**obecność vs zaraportowano** per pracownik oraz lista wpisów.
+**obecność vs zaraportowano** per pracownik oraz lista wpisów. Wszystkie te
+zestawienia liczą wyłącznie wpisy **zamknięte** — biegnący timer nie ma jeszcze
+wymiaru i wchodzi do statystyk dopiero po zatrzymaniu.
 
 Szukanie po nazwie zadania ignoruje wielkość liter **i ogonki** — „sruby” znajdzie
 „Śruby montażowe”. SQLite sam tego nie potrafi (jego `LIKE` i `lower()` kończą się
