@@ -1,5 +1,5 @@
 import db from "./db";
-import { parseHmsToMinutes } from "../utils";
+import { parseHmsToSeconds } from "../utils";
 
 // Agregaty do dashboardu kierownika.
 //
@@ -52,7 +52,9 @@ const buildWhere = ({ sectionCount, withProject, withUser, withMin, withQuery })
   }
   if (withProject) where += ` AND e.projectID = @projectID`;
   if (withUser) where += ` AND e.userID = @userID`;
-  if (withMin) where += ` AND e.minutes >= @minMinutes`;
+  // Próg przychodzi z formularza W MINUTACH ("wpisy dłuższe niż 15 min"), bo tak
+  // się o tym myśli; do SQL leci już przeliczony na sekundy (patrz paramsOf).
+  if (withMin) where += ` AND e.seconds >= @minSeconds`;
   if (withQuery) where += ` AND plContains(e.description, @q) = 1`;
   // Wpis wciąż biegnący nie ma jeszcze wymiaru — do raportów nie wchodzi.
   where += ` AND e.endedAt IS NOT NULL`;
@@ -88,7 +90,7 @@ const paramsOf = (filters) => {
   });
   if (projectID) params.projectID = Number(projectID);
   if (userID) params.userID = Number(userID);
-  if (Number(minMinutes) > 0) params.minMinutes = Number(minMinutes);
+  if (Number(minMinutes) > 0) params.minSeconds = Number(minMinutes) * 60;
 
   const needle = needleOf(filters);
   if (needle) params.q = needle;
@@ -99,13 +101,13 @@ const paramsOf = (filters) => {
 const noScope = (filters) => Array.isArray(filters.sections) && filters.sections.length === 0;
 
 export const getSummary = (filters) => {
-  if (noScope(filters)) return { minutes: 0, entries: 0, people: 0, autoClosed: 0 };
+  if (noScope(filters)) return { seconds: 0, entries: 0, people: 0, autoClosed: 0 };
 
   return prepared(
     "sum",
     shapeOf(filters),
     (where) => `
-      SELECT COALESCE(SUM(e.minutes), 0) AS minutes,
+      SELECT COALESCE(SUM(e.seconds), 0) AS seconds,
              COUNT(*)                    AS entries,
              COUNT(DISTINCT e.userID)    AS people,
              COALESCE(SUM(e.autoClosed), 0) AS autoClosed
@@ -121,13 +123,13 @@ export const getByProject = (filters) => {
     shapeOf(filters),
     (where) => `
       SELECT p.id, p.name, p.client, p.color,
-             SUM(e.minutes)           AS minutes,
+             SUM(e.seconds)           AS seconds,
              COUNT(*)                 AS entries,
              COUNT(DISTINCT e.userID) AS people
         FROM TaskEntries e
         JOIN Projects p ON p.id = e.projectID${where}
        GROUP BY p.id
-       ORDER BY minutes DESC`
+       ORDER BY seconds DESC`
   ).all(paramsOf(filters));
 };
 
@@ -138,7 +140,7 @@ const stmtAttendanceCache = new Map();
  *
  * Times.totalWorkTime jest TEKSTEM "HH:mm:ss" (spadek po Airtable), więc sumy
  * nie da się policzyć w SQL bez parsowania — wiersze zliczamy w JS przez
- * parseHmsToMinutes. Przy skali tej firmy to kilkaset wierszy na miesiąc.
+ * parseHmsToSeconds. Przy skali tej firmy to kilkaset wierszy na miesiąc.
  *
  * Times.data trzyma pełne ISO, stąd substr(...,1,10) — dokładnie tak samo
  * filtruje services/getTimesReport.js.
@@ -148,7 +150,7 @@ const stmtAttendanceCache = new Map();
  * wpis zadania, a nie obecność — obecność zostaje pełna, więc przy takim filtrze
  * kolumna „Pokrycie” pokazuje udział wybranych zadań w całym czasie w pracy.
  */
-const getAttendanceMinutes = ({ from, to, sections, userID }) => {
+const getAttendanceSeconds = ({ from, to, sections, userID }) => {
   const sectionCount = Array.isArray(sections) ? sections.length : 0;
   const withUser = Boolean(userID);
   const key = `att#${sectionCount}#${withUser}`;
@@ -173,7 +175,7 @@ const getAttendanceMinutes = ({ from, to, sections, userID }) => {
   if (withUser) params.userID = Number(userID);
 
   return stmtAttendanceCache.get(key).all(params).reduce((acc, row) => {
-    acc[row.userID] = (acc[row.userID] || 0) + parseHmsToMinutes(row.totalWorkTime);
+    acc[row.userID] = (acc[row.userID] || 0) + parseHmsToSeconds(row.totalWorkTime);
     return acc;
   }, {});
 };
@@ -194,7 +196,7 @@ export const getByUser = (filters) => {
     shapeOf(filters),
     (where) => `
       SELECT u.id, u.name, u.surname, u.section,
-             SUM(e.minutes) AS reported,
+             SUM(e.seconds) AS reported,
              COUNT(*)       AS entries
         FROM TaskEntries e
         JOIN Users u ON u.id = e.userID${where}
@@ -202,7 +204,7 @@ export const getByUser = (filters) => {
        ORDER BY u.surname COLLATE NOCASE, u.name COLLATE NOCASE`
   ).all(paramsOf(filters));
 
-  const attendance = getAttendanceMinutes(filters);
+  const attendance = getAttendanceSeconds(filters);
 
   return rows.map((r) => {
     const present = attendance[r.id] || 0;
@@ -230,7 +232,7 @@ export const getEntries = (filters, scope = "view") => {
     `list-${scope}`,
     shapeOf(filters),
     (where) => `
-      SELECT e.id, e.data, e.startedAt, e.endedAt, e.minutes, e.description,
+      SELECT e.id, e.data, e.startedAt, e.endedAt, e.seconds, e.description,
              e.autoClosed, e.editedByName, e.section, e.userID, e.projectID,
              u.name, u.surname,
              -- Sekcja KONTA, nie wpisu: przy poprawianiu wpisu o tym, które

@@ -34,6 +34,34 @@ const backfillSections = (db) => {
   `);
 };
 
+// Przejście TaskEntries.minutes → TaskEntries.seconds.
+//
+// CREATE TABLE IF NOT EXISTS nie rusza tabeli, która już istnieje, więc bazy
+// założone przed tą zmianą (testowe i deweloperskie) potrzebują ALTER-a. Wymiar
+// przeliczamy z samych znaczników, a nie z minut — startedAt/endedAt od początku
+// mają sekundy, więc odtworzenie jest DOKŁADNE i wpisy krótsze niż minuta
+// przestają mieć wymiar 0.
+//
+// Idempotentne: sterowane obecnością kolumn, więc kolejne restarty nie robią nic.
+const migrateEntrySeconds = (db) => {
+  const columns = db.prepare(`PRAGMA table_info(TaskEntries)`).all().map((c) => c.name);
+
+  if (!columns.includes("seconds")) {
+    db.exec(`ALTER TABLE TaskEntries ADD COLUMN seconds INTEGER`);
+    db.exec(`
+      UPDATE TaskEntries
+         SET seconds = CAST(ROUND((julianday(endedAt) - julianday(startedAt)) * 86400) AS INTEGER)
+       WHERE endedAt IS NOT NULL`);
+  }
+
+  // DROP COLUMN, a nie "zostawmy, nikomu nie przeszkadza": kolumna, której nikt
+  // nie przelicza, po tygodniu kłamie i przy czytaniu bazy z konsoli podsuwa
+  // fałszywą odpowiedź. SQLite umie ją usunąć od 3.35 (mamy 3.53).
+  if (columns.includes("minutes")) {
+    db.exec(`ALTER TABLE TaskEntries DROP COLUMN minutes`);
+  }
+};
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -165,9 +193,14 @@ const createDb = () => {
     -- w services/workday.js — bez jednolitego kształtu leksykograficzne
     -- porównanie zakresów w SQL przestaje wykrywać kolizje.
     --
-    -- minutes jest redundantne wobec pary startedAt/endedAt. Trzymamy je, bo
+    -- seconds jest redundantne wobec pary startedAt/endedAt. Trzymamy je, bo
     -- raporty sumują tę kolumnę i liczenie różnicy dat na tekście w SQLite
     -- byłoby wolne i kruche. Warunek: przeliczane WYŁĄCZNIE w services/taskEntries.js.
+    --
+    -- SEKUNDY, nie minuty: zadanie potrafi trwać pół minuty ("odbiłem maila",
+    -- "podpis na dokumencie"), a przy zaokrąglaniu do minut taki wpis miał wymiar
+    -- 0 i nie dawał się nawet poprawić — edycja odsyłała godziny bez sekund,
+    -- więc walidacja "koniec musi się różnić od początku" odrzucała własny wpis.
     CREATE TABLE IF NOT EXISTS TaskEntries (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       userID       INTEGER NOT NULL,
@@ -176,7 +209,7 @@ const createDb = () => {
       data         TEXT    NOT NULL,
       startedAt    TEXT    NOT NULL,
       endedAt      TEXT,
-      minutes      INTEGER,
+      seconds      INTEGER,
       section      TEXT    NOT NULL,
       autoClosed   INTEGER NOT NULL DEFAULT 0,
       createdAt    TEXT    NOT NULL,
@@ -207,6 +240,7 @@ const createDb = () => {
   `);
 
   backfillSections(db);
+  migrateEntrySeconds(db);
 
   return db;
 };

@@ -70,23 +70,55 @@ export const formatMinutes = (minutes, { withSign = false } = {}) => {
 };
 
 /**
- * "07:45:00" → 465. Odwrotność formatMinutes dla zapisu używanego w Times.
+ * Sekundy → "2h 15min 07s". Wymiar wpisu w module zadań.
+ *
+ * Osobna funkcja obok formatMinutes, a nie jej rozszerzenie: nadgodziny są
+ * ewidencjonowane w minutach i doklejanie im "00s" byłoby fałszywą precyzją.
+ * Tutaj sekundy są prawdziwą treścią — zadanie potrafi trwać pół minuty
+ * i "0h 0min" wyglądałoby jak zgubiony wpis.
+ *
+ * Sekundy zawsze dwucyfrowo, żeby kolumna z tabular-nums nie skakała.
+ * @param {number} seconds
+ * @param {{withSign?: boolean}} [opts] withSign wymusza "+" przy wartościach dodatnich
+ */
+export const formatDuration = (seconds, { withSign = false } = {}) => {
+  const total = Math.trunc(Number(seconds) || 0);
+  const abs = Math.abs(total);
+  const h = Math.floor(abs / 3600);
+  const m = Math.floor((abs % 3600) / 60);
+  const s = abs % 60;
+
+  const sign = total < 0 ? "-" : withSign && total > 0 ? "+" : "";
+  return `${sign}${h}h ${m}min ${String(s).padStart(2, "0")}s`;
+};
+
+/**
+ * "07:45:30" → 27930. Odwrotność formatDuration dla zapisu używanego w Times.
  *
  * Times.totalWorkTime jest TEKSTEM (spadek po Airtable), więc żeby zestawić
  * obecność z czasem zaraportowanym w zadaniach, trzeba go najpierw sprowadzić
- * do minut. Sekundy są odrzucane w dół — przy zestawieniu godzin pracy różnica
- * poniżej minuty nie ma znaczenia, a zaokrąglanie w górę potrafiłoby sztucznie
- * podbić sumę miesiąca o kilkanaście minut.
+ * do liczby. Sekundy bierzemy w całości — wpisy zadań też są liczone co do
+ * sekundy, a odrzucanie ich po jednej stronie zestawienia zaniżałoby pokrycie.
  *
  * Zwraca 0 dla pustych i niepoprawnych wartości — brak odbitej karty to zero
  * obecności, nie błąd.
  */
-export const parseHmsToMinutes = (hms) => {
+export const parseHmsToSeconds = (hms) => {
   const parts = String(hms ?? "").trim().split(":");
   if (parts.length < 2) return 0;
 
-  const [h, m] = parts.map((p) => Number(p));
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  const [h, m, s = 0] = parts.map((p) => Number(p));
+  if (!Number.isFinite(h) || !Number.isFinite(m) || !Number.isFinite(s)) return 0;
 
-  return h * 60 + m;
+  return h * 3600 + m * 60 + s;
 };
+
+// Znaczniki TaskEntries mają kształt 'YYYY-MM-DD HH:mm:ss' (services/workday.js),
+// więc godzinę wycinamy pozycyjnie. Obie funkcje siedzą TUTAJ, bo potrzebują ich
+// i strony, i endpoint eksportu — wcześniej hhmm było skopiowane w czterech plikach.
+
+/** Znacznik → 'HH:mm' (do wyświetlania i do <input type="time">). */
+export const hhmm = (ts) => String(ts ?? "").slice(11, 16);
+
+/** Znacznik → 'HH:mm:ss'. */
+export const timePart = (ts) => String(ts ?? "").slice(11, 19);

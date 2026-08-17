@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import classNames from "classnames";
 import { ProjectDot } from "./projectColors";
-import { formatMinutes } from "../utils";
+import { formatDuration, hhmm } from "../utils";
 
 // Sekcja "Teraz w toku" na górze raportu kierownika.
 //
@@ -26,14 +26,6 @@ const fetchBoard = async (url) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
-};
-
-const hhmm = (ts) => String(ts ?? "").slice(11, 16);
-
-const clock = (totalSec) => {
-  const mins = Math.floor(totalSec / 60);
-  const secs = Math.floor(totalSec % 60);
-  return `${formatMinutes(mins)} ${String(secs).padStart(2, "0")}s`;
 };
 
 const fullName = (person) => `${person.surname} ${person.name}`;
@@ -140,7 +132,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                   )}
                   title={tooLong ? "Biegnie ponad 8 godzin — sprawdź, czy to nie zapomniany timer" : null}
                 >
-                  {clock(elapsed)}
+                  {formatDuration(elapsed)}
                 </span>
               </li>
             );
@@ -162,7 +154,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                 {Number(u.id) === Number(currentUserID) && " (Ty)"}
                 <span className="text-gray-400">
                   {u.lastEndedAt
-                    ? ` — ostatni wpis ${hhmm(u.lastEndedAt)}, dziś ${formatMinutes(u.minutes)}`
+                    ? ` — ostatni wpis ${hhmm(u.lastEndedAt)}, dziś ${formatDuration(u.seconds)}`
                     : " — brak wpisów dzisiaj"}
                 </span>
               </span>

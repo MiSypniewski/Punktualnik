@@ -11,7 +11,7 @@ import { getEntriesForUser, getRunningEntry, closeStaleEntries } from "../../ser
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
 import { canTrackTasks } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
-import { formatMinutes } from "../../utils";
+import { formatDuration, hhmm, timePart } from "../../utils";
 
 dayjs.locale("pl");
 
@@ -50,8 +50,6 @@ export async function getServerSideProps(ctx) {
     },
   };
 }
-
-const hhmm = (ts) => String(ts ?? "").slice(11, 16);
 
 /** Etykieta dnia: "dziś", "wczoraj", inaczej data słownie. */
 const dayLabel = (data, today) => {
@@ -166,11 +164,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
   useEffect(() => {
     if (!running) return undefined;
 
-    const tick = () => {
-      const mins = dayjs().diff(dayjs(running.startedAt), "minute");
-      const secs = dayjs().diff(dayjs(running.startedAt), "second") % 60;
-      setElapsed(`${formatMinutes(mins)} ${String(secs).padStart(2, "0")}s`);
-    };
+    const tick = () => setElapsed(formatDuration(dayjs().diff(dayjs(running.startedAt), "second")));
 
     tick();
     const handle = setInterval(tick, 1000);
@@ -429,7 +423,7 @@ const SmallField = ({ label, children }) => (
 // --- lista dni --------------------------------------------------------------
 
 const DaySection = ({ data, list, label, editable, projects, descByProject, busy, call }) => {
-  const total = list.reduce((sum, e) => sum + (e.minutes || 0), 0);
+  const total = list.reduce((sum, e) => sum + (e.seconds || 0), 0);
 
   return (
     <div className="mt-6">
@@ -437,7 +431,7 @@ const DaySection = ({ data, list, label, editable, projects, descByProject, busy
         {/* first-letter, nie `capitalize`: ten drugi podniósłby też nazwę
             miesiąca ("Środa, 12 Sierpnia"), a po polsku miesiąc piszemy małą. */}
         <h2 className="font-bold first-letter:uppercase">{label}</h2>
-        <span className="text-sm text-gray-600">{formatMinutes(total)}</span>
+        <span className="text-sm text-gray-600">{formatDuration(total)}</span>
       </div>
       <ul>
         {list.map((e) => (
@@ -555,10 +549,18 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
         </span>
       </span>
 
-      <span className="text-sm text-gray-600 tabular-nums">
+      {/* Zakres w "HH:mm", bo tak się o godzinach mówi — ale wpis krótszy niż
+          minuta wygląda wtedy jak "9:12–9:12". Sekundy siedzą w podpowiedzi,
+          a wymiar obok i tak podaje je wprost. */}
+      <span
+        className="text-sm text-gray-600 tabular-nums"
+        title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
+      >
         {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
       </span>
-      <span className="text-sm font-medium tabular-nums w-20 text-right">{formatMinutes(entry.minutes)}</span>
+      {/* Szerokość pod pełny wymiar z sekundami ("12h 05min 30s"), żeby kolumna
+          czasu stała w jednej linii pionowej niezależnie od długości wpisu. */}
+      <span className="text-sm font-medium tabular-nums w-28 text-right">{formatDuration(entry.seconds)}</span>
 
       <span className="flex gap-1">
         <button

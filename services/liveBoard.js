@@ -71,10 +71,10 @@ const stmtIdle = (count) => {
       db.prepare(`
         SELECT u.id, u.name, u.surname, u.section,
                t.lastEndedAt,
-               COALESCE(t.minutes, 0) AS minutes
+               COALESCE(t.seconds, 0) AS seconds
           FROM Users u
           LEFT JOIN (
-            SELECT userID, MAX(endedAt) AS lastEndedAt, SUM(minutes) AS minutes
+            SELECT userID, MAX(endedAt) AS lastEndedAt, SUM(seconds) AS seconds
               FROM TaskEntries
              WHERE data = @today AND endedAt IS NOT NULL
              GROUP BY userID
@@ -96,7 +96,7 @@ const stmtIdle = (count) => {
 // Przeglądarka nie może tego policzyć sama ze `startedAt`, bo znacznik jest
 // zapisany bez offsetu strefy (services/workday.js): komputer kierownika
 // ustawiony na inną strefę albo z przestawionym zegarem pokazywałby czas
-// przesunięty o godziny. Odejmowanie robimy tak samo jak minutesBetween
+// przesunięty o godziny. Odejmowanie robimy tak samo jak secondsBetween
 // w services/taskEntries.js — obie strony w tym samym "naiwnym" kształcie,
 // więc różnica jest poprawna niezależnie od strefy, w której stoi proces.
 const elapsedSeconds = (startedAt, nowStamp) =>

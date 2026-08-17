@@ -15,7 +15,7 @@ import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
 import { visibleSections } from "../../services/scope";
-import { formatMinutes, TASK_QUERY_MAX } from "../../utils";
+import { formatDuration, hhmm, timePart, TASK_QUERY_MAX } from "../../utils";
 
 dayjs.locale("pl");
 
@@ -82,8 +82,6 @@ export async function getServerSideProps(ctx) {
     },
   };
 }
-
-const hhmm = (ts) => String(ts ?? "").slice(11, 16);
 
 // Endpoint zwraca same kody; wiadomość z serwera przychodzi tylko dla błędów
 // walidacji z services/taskEntries.js (kolizja, zły zakres). Resztę tłumaczymy tu.
@@ -165,7 +163,7 @@ export default function ZarzadzajZadaniami({
     window.location.href = `/api/report/zadania?${qs.toString()}`;
   };
 
-  const maxMinutes = byProject[0]?.minutes || 1;
+  const maxSeconds = byProject[0]?.seconds || 1;
 
   if (sections.length === 0) {
     return (
@@ -275,7 +273,7 @@ export default function ZarzadzajZadaniami({
         </form>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          <Kpi label="Zaraportowany czas" value={formatMinutes(summary.minutes)} />
+          <Kpi label="Zaraportowany czas" value={formatDuration(summary.seconds)} />
           <Kpi label="Liczba wpisów" value={summary.entries} />
           <Kpi label="Raportujących osób" value={summary.people} />
           <Kpi
@@ -313,7 +311,9 @@ export default function ZarzadzajZadaniami({
                   <Td className="text-gray-600">{p.client || "—"}</Td>
                   <Td className="text-right tabular-nums">{p.people}</Td>
                   <Td className="text-right tabular-nums">{p.entries}</Td>
-                  <Td className="text-right tabular-nums font-medium">{formatMinutes(p.minutes)}</Td>
+                  <Td className="text-right tabular-nums font-medium whitespace-nowrap">
+                    {formatDuration(p.seconds)}
+                  </Td>
                   <Td>
                     {/* Pasek proporcjonalny zamiast biblioteki wykresów —
                         czytelny, a nie dokłada nic do bundla. */}
@@ -321,11 +321,11 @@ export default function ZarzadzajZadaniami({
                       <span className="flex-grow bg-gray-200 rounded h-2 overflow-hidden">
                         <span
                           className={`block h-2 ${projectColor(p.color).bar}`}
-                          style={{ width: `${Math.max(2, (p.minutes / maxMinutes) * 100)}%` }}
+                          style={{ width: `${Math.max(2, (p.seconds / maxSeconds) * 100)}%` }}
                         />
                       </span>
                       <span className="text-xs text-gray-600 tabular-nums w-10 text-right">
-                        {Math.round((p.minutes / summary.minutes) * 100)}%
+                        {Math.round((p.seconds / summary.seconds) * 100)}%
                       </span>
                     </span>
                   </Td>
@@ -361,15 +361,19 @@ export default function ZarzadzajZadaniami({
                     {u.surname} {u.name}
                   </Td>
                   <Td className="text-gray-600">{u.section}</Td>
-                  <Td className="text-right tabular-nums">{u.present ? formatMinutes(u.present) : "—"}</Td>
-                  <Td className="text-right tabular-nums font-medium">{formatMinutes(u.reported)}</Td>
+                  <Td className="text-right tabular-nums whitespace-nowrap">
+                    {u.present ? formatDuration(u.present) : "—"}
+                  </Td>
+                  <Td className="text-right tabular-nums font-medium whitespace-nowrap">
+                    {formatDuration(u.reported)}
+                  </Td>
                   <Td
                     className={classNames(
-                      "text-right tabular-nums",
+                      "text-right tabular-nums whitespace-nowrap",
                       u.present === 0 ? "text-gray-400" : u.diff < 0 ? "text-red-600" : "text-emerald-700"
                     )}
                   >
-                    {u.present === 0 ? "—" : formatMinutes(u.diff, { withSign: true })}
+                    {u.present === 0 ? "—" : formatDuration(u.diff, { withSign: true })}
                   </Td>
                   <Td className="text-right tabular-nums">{u.coverage === null ? "—" : `${u.coverage}%`}</Td>
                 </tr>
@@ -479,10 +483,13 @@ const EntryRow = ({ entry, busy, onEdit }) => (
       {entry.autoClosed && <span className="ml-2 text-xs text-amber-800">auto</span>}
       {entry.editedByName && <span className="ml-2 text-xs text-gray-500">popr. {entry.editedByName}</span>}
     </Td>
-    <Td className="text-right tabular-nums whitespace-nowrap text-gray-600">
+    <Td
+      className="text-right tabular-nums whitespace-nowrap text-gray-600"
+      title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
+    >
       {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
     </Td>
-    <Td className="text-right tabular-nums font-medium whitespace-nowrap">{formatMinutes(entry.minutes)}</Td>
+    <Td className="text-right tabular-nums font-medium whitespace-nowrap">{formatDuration(entry.seconds)}</Td>
     <Td className="text-right">
       <button
         disabled={busy}
@@ -627,7 +634,11 @@ const Kpi = ({ label, value, warn, hint }) => (
 );
 
 const Th = ({ children, className }) => <th className={classNames("py-2 pr-3 font-medium", className)}>{children}</th>;
-const Td = ({ children, className }) => <td className={classNames("py-2 pr-3", className)}>{children}</td>;
+const Td = ({ children, className, title }) => (
+  <td className={classNames("py-2 pr-3", className)} title={title}>
+    {children}
+  </td>
+);
 
 const ExportButton = ({ onClick, children }) => (
   <button onClick={onClick} className="text-sm py-1.5 px-3 border border-gray-400 rounded hover:bg-gray-50">

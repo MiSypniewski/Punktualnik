@@ -13,14 +13,14 @@ import {
 
 // Wpisy czasu: "ile czasu i na czym zeszło".
 //
-// To JEDYNE miejsce, w którym przeliczana jest kolumna minutes. Jest ona
+// To JEDYNE miejsce, w którym przeliczana jest kolumna seconds. Jest ona
 // redundantna wobec pary startedAt/endedAt i trzymamy ją tylko dlatego, że
 // raporty ją sumują — więc każde rozejście się tych trzech wartości byłoby
 // błędem cichym i nie do wykrycia z zewnątrz.
 
 const COLS = `
   e.id, e.userID, e.projectID, e.description, e.data, e.startedAt, e.endedAt,
-  e.minutes, e.section, e.autoClosed, e.createdAt, e.editedAt, e.editedBy, e.editedByName`;
+  e.seconds, e.section, e.autoClosed, e.createdAt, e.editedAt, e.editedBy, e.editedByName`;
 
 const SELECT_ONE = `SELECT ${COLS} FROM TaskEntries e WHERE e.id = ?`;
 
@@ -29,7 +29,7 @@ const stmtRunning = db.prepare(`SELECT ${COLS} FROM TaskEntries e WHERE e.userID
 
 const toRow = (r) => (r ? { ...r, autoClosed: Boolean(r.autoClosed) } : undefined);
 
-const minutesBetween = (start, end) => Math.max(0, dayjs(end).diff(dayjs(start), "minute"));
+const secondsBetween = (start, end) => Math.max(0, dayjs(end).diff(dayjs(start), "second"));
 
 // --- auto-domykanie ---------------------------------------------------------
 
@@ -47,8 +47,8 @@ const minutesBetween = (start, end) => Math.max(0, dayjs(end).diff(dayjs(start),
 const stmtCloseStale = db.prepare(`
   UPDATE TaskEntries
      SET endedAt    = datetime(data || ' ${String(WORKDAY_START_HOUR).padStart(2, "0")}:00:00', '+1 day'),
-         minutes    = CAST((julianday(datetime(data || ' ${String(WORKDAY_START_HOUR).padStart(2, "0")}:00:00', '+1 day'))
-                            - julianday(startedAt)) * 1440 AS INTEGER),
+         seconds    = CAST(ROUND((julianday(datetime(data || ' ${String(WORKDAY_START_HOUR).padStart(2, "0")}:00:00', '+1 day'))
+                                  - julianday(startedAt)) * 86400) AS INTEGER),
          autoClosed = 1
    WHERE endedAt IS NULL
      AND startedAt < @boundary`);
@@ -120,8 +120,8 @@ const assertInWindow = (data, now) => {
 // --- zapis ------------------------------------------------------------------
 
 const stmtInsert = db.prepare(`
-  INSERT INTO TaskEntries (userID, projectID, description, data, startedAt, endedAt, minutes, section, createdAt)
-  VALUES (@userID, @projectID, @description, @data, @startedAt, @endedAt, @minutes, @section, @createdAt)`);
+  INSERT INTO TaskEntries (userID, projectID, description, data, startedAt, endedAt, seconds, section, createdAt)
+  VALUES (@userID, @projectID, @description, @data, @startedAt, @endedAt, @seconds, @section, @createdAt)`);
 
 const descSchema = Joi.string().trim().max(200).allow("").default("");
 
@@ -147,7 +147,7 @@ export const startEntry = ({ userID, projectID, description, section }, now = ap
       data: workDay(now),
       startedAt,
       endedAt: null,
-      minutes: null,
+      seconds: null,
       section: String(section),
       createdAt: startedAt,
     });
@@ -161,7 +161,7 @@ export const startEntry = ({ userID, projectID, description, section }, now = ap
 };
 
 const stmtStop = db.prepare(`
-  UPDATE TaskEntries SET endedAt = @endedAt, minutes = @minutes
+  UPDATE TaskEntries SET endedAt = @endedAt, seconds = @seconds
    WHERE id = @id AND userID = @userID AND endedAt IS NULL`);
 
 /**
@@ -179,7 +179,7 @@ export const stopEntry = ({ id, userID }, now = appNow()) => {
     id: Number(id),
     userID: Number(userID),
     endedAt,
-    minutes: minutesBetween(entry.startedAt, endedAt),
+    seconds: secondsBetween(entry.startedAt, endedAt),
   });
 
   return info.changes > 0 ? getEntry(id) : undefined;
@@ -189,9 +189,15 @@ const manualSchema = Joi.object({
   projectID: Joi.number().integer().positive().required(),
   description: descSchema,
   data: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
-  from: Joi.string().pattern(/^\d{2}:\d{2}$/).required(),
-  to: Joi.string().pattern(/^\d{2}:\d{2}$/).required(),
+  // Sekundy OPCJONALNE: formularz ręczny wysyła "HH:mm" (nikt nie wpisuje sekund
+  // z pamięci), a edycja istniejącego wpisu "HH:mm:ss" — inaczej poprawienie
+  // samego opisu ścinałoby wpis 30-sekundowy do zera.
+  from: Joi.string().pattern(/^\d{2}:\d{2}(:\d{2})?$/).required(),
+  to: Joi.string().pattern(/^\d{2}:\d{2}(:\d{2})?$/).required(),
 });
+
+/** "09:12" → "09:12:00"; "09:12:11" zostaje bez zmian. */
+const withSeconds = (time) => (String(time).length === 5 ? `${time}:00` : String(time));
 
 /**
  * Zamiana "dzień + od + do" na parę znaczników.
@@ -200,29 +206,30 @@ const manualSchema = Joi.object({
  * (zmiana nocna) — koniec ląduje następnego dnia kalendarzowego, ale doba
  * ROBOCZA pozostaje ta, w której wpis się zaczął.
  *
- * Godziny równe to celowo błąd, a nie "pełna doba": 10:00–10:00 jest w praktyce
+ * Momenty równe to celowo błąd, a nie "pełna doba": 10:00–10:00 jest w praktyce
  * zawsze pomyłką przy wpisywaniu, a cicha zamiana na 24 godziny zepsułaby
- * sumę miesiąca w sposób trudny do zauważenia.
+ * sumę miesiąca w sposób trudny do zauważenia. Uwaga: "równe" znaczy tu równe
+ * CO DO SEKUNDY — wpis 10:00:11–10:00:19 jest poprawny i przechodzi.
  */
 const spanFromParts = ({ data, from, to }) => {
-  const startedAt = `${data} ${from}:00`;
-  let end = dayjs(`${data} ${to}:00`);
+  const startedAt = `${data} ${withSeconds(from)}`;
+  let end = dayjs(`${data} ${withSeconds(to)}`);
   if (end.isBefore(dayjs(startedAt))) end = end.add(1, "day");
 
   const endedAt = end.format(TS_FORMAT);
-  const minutes = minutesBetween(startedAt, endedAt);
+  const seconds = secondsBetween(startedAt, endedAt);
 
-  if (minutes <= 0) fail("bad_range", "Godzina zakończenia musi się różnić od godziny rozpoczęcia.");
-  if (minutes > 24 * 60) fail("too_long", "Pojedynczy wpis nie może przekraczać doby.");
+  if (seconds <= 0) fail("bad_range", "Godzina zakończenia musi się różnić od godziny rozpoczęcia.");
+  if (seconds > 24 * 3600) fail("too_long", "Pojedynczy wpis nie może przekraczać doby.");
 
-  return { startedAt, endedAt, minutes };
+  return { startedAt, endedAt, seconds };
 };
 
 export const createManualEntry = (payload, { userID, section, enforceWindow = true, now = appNow() }) => {
   const { projectID, description, data, from, to } = Joi.attempt(payload, manualSchema);
   if (enforceWindow) assertInWindow(data, now);
 
-  const { startedAt, endedAt, minutes } = spanFromParts({ data, from, to });
+  const { startedAt, endedAt, seconds } = spanFromParts({ data, from, to });
 
   return db.transaction(() => {
     assertNoOverlap({ userID, startedAt, endedAt });
@@ -233,7 +240,7 @@ export const createManualEntry = (payload, { userID, section, enforceWindow = tr
       data,
       startedAt,
       endedAt,
-      minutes,
+      seconds,
       section: String(section),
       createdAt: toStamp(now),
     });
@@ -244,7 +251,7 @@ export const createManualEntry = (payload, { userID, section, enforceWindow = tr
 const stmtUpdate = db.prepare(`
   UPDATE TaskEntries
      SET projectID = @projectID, description = @description, data = @data,
-         startedAt = @startedAt, endedAt = @endedAt, minutes = @minutes,
+         startedAt = @startedAt, endedAt = @endedAt, seconds = @seconds,
          autoClosed = 0,
          editedAt = @editedAt, editedBy = @editedBy, editedByName = @editedByName
    WHERE id = @id`);
@@ -271,7 +278,7 @@ export const updateEntry = (id, payload, { userID, enforceWindow = true, actor =
     assertInWindow(data, now);
   }
 
-  const { startedAt, endedAt, minutes } = spanFromParts({ data, from, to });
+  const { startedAt, endedAt, seconds } = spanFromParts({ data, from, to });
 
   return db.transaction(() => {
     assertNoOverlap({ userID: entry.userID, startedAt, endedAt, id: entry.id });
@@ -282,7 +289,7 @@ export const updateEntry = (id, payload, { userID, enforceWindow = true, actor =
       data,
       startedAt,
       endedAt,
-      minutes,
+      seconds,
       editedAt: actor ? toStamp(now) : entry.editedAt,
       editedBy: actor ? Number(actor.userID) : entry.editedBy,
       editedByName: actor ? String(actor.name) : entry.editedByName,

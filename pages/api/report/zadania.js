@@ -4,7 +4,7 @@ import { getByProject, getByUser, getEntries, getSummary } from "../../../servic
 import { closeStaleEntries } from "../../../services/taskEntries";
 import { canExportTasks } from "../../../services/roles";
 import { buildCsv, sendCsv, plNumber } from "../../../utils/csv";
-import { formatMinutes, TASK_QUERY_MAX } from "../../../utils";
+import { formatDuration, timePart, TASK_QUERY_MAX } from "../../../utils";
 import { visibleSections } from "../../../services/scope";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -14,9 +14,10 @@ const MODES = ["wpisy", "projekty", "porownanie"];
 // z przecinkiem (Excel to zsumuje) i raz czytelnie dla człowieka. Bez tego
 // pierwszego arkusz nie policzy sumy kolumny, bez drugiego nikt nie wie,
 // czy 1,75 to godziny czy coś innego.
-const hoursPair = (minutes) => [plNumber(minutes / 60), formatMinutes(minutes)];
+const hoursPair = (seconds) => [plNumber(seconds / 3600), formatDuration(seconds)];
 
-const hhmm = (ts) => String(ts ?? "").slice(11, 16);
+// Start i koniec z sekundami, mimo że na ekranie wystarcza "HH:mm": w arkuszu
+// ktoś odejmie jedną kolumnę od drugiej i wynik musi zgadzać się z kolumną czasu.
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
@@ -70,7 +71,7 @@ export default async (req, res) => {
 
   if (tryb === "projekty") {
     const rows = getByProject(filters);
-    const total = getSummary(filters).minutes || 1;
+    const total = getSummary(filters).seconds || 1;
 
     const csv = buildCsv(
       ["Projekt", "Klient", "Liczba osób", "Liczba wpisów", "Czas [h]", "Czas", "Udział %"],
@@ -79,8 +80,8 @@ export default async (req, res) => {
         p.client || "",
         p.people,
         p.entries,
-        ...hoursPair(p.minutes),
-        plNumber((p.minutes / total) * 100, 1),
+        ...hoursPair(p.seconds),
+        plNumber((p.seconds / total) * 100, 1),
       ])
     );
     return sendCsv(res, `zadania_projekty_${stamp}.csv`, csv);
@@ -110,8 +111,8 @@ export default async (req, res) => {
         ...hoursPair(u.reported),
         // Znak ma zostać widoczny również w wersji liczbowej — inaczej
         // "2,5" nie odróżni nadmiaru od niedoboru.
-        plNumber(u.diff / 60),
-        formatMinutes(u.diff, { withSign: true }),
+        plNumber(u.diff / 3600),
+        formatDuration(u.diff, { withSign: true }),
         u.coverage === null ? "" : u.coverage,
       ])
     );
@@ -145,9 +146,9 @@ export default async (req, res) => {
       r.projectName,
       r.projectClient || "",
       r.description,
-      hhmm(r.startedAt),
-      hhmm(r.endedAt),
-      ...hoursPair(r.minutes),
+      timePart(r.startedAt),
+      timePart(r.endedAt),
+      ...hoursPair(r.seconds),
       r.autoClosed ? "tak" : "nie",
       r.editedByName || "",
     ])
