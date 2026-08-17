@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
@@ -51,6 +51,19 @@ export async function getServerSideProps(ctx) {
   };
 }
 
+// Kody, których serwis nie opisuje własnym komunikatem (te z komunikatem —
+// kolizja, zły zakres, zamknięte okno — przychodzą gotowe w `message`).
+const ERRORS = {
+  not_running: "Ten timer już nie biegnie — odśwież stronę.",
+  already_running: "Masz już uruchomiony timer.",
+  project_out_of_scope: "Ten projekt nie jest dla twojej sekcji.",
+  project_not_found: "Wybranego projektu już nie ma.",
+  bad_project: "Wybierz projekt.",
+  not_found: "Tego wpisu już nie ma — odśwież stronę.",
+};
+
+const errorText = (body, fallback) => body.message || ERRORS[body.error] || fallback;
+
 /** Etykieta dnia: "dziś", "wczoraj", inaczej data słownie. */
 const dayLabel = (data, today) => {
   if (data === today) return "Dziś";
@@ -83,7 +96,7 @@ export default function Zadania({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setErr(body.message || body.error || "Nie udało się zapisać.");
+        setErr(errorText(body, "Nie udało się zapisać."));
         return false;
       }
       await refresh();
@@ -116,6 +129,7 @@ export default function Zadania({
           descByProject={descByProject}
           busy={busy}
           call={call}
+          onError={setErr}
         />
 
         {err && (
@@ -154,54 +168,214 @@ export default function Zadania({
 
 // --- pasek timera -----------------------------------------------------------
 
-const TimerBar = ({ running, projects, descByProject, busy, call }) => {
-  const [projectID, setProjectID] = useState(projects[0]?.id ?? "");
-  const [description, setDescription] = useState("");
+const Bar = ({ children }) => (
+  <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
+    {children}
+  </div>
+);
+
+// Ile czekamy z zapisem opisu po ostatnim znaku. Na tyle długo, żeby nie wysyłać
+// żądania na literę, i na tyle krótko, żeby "zapisano" pojawiło się jeszcze
+// w trakcie myślenia nad następnym zdaniem.
+const AUTOSAVE_MS = 800;
+
+/**
+ * Biegnący timer — z opisem i projektem DO POPRAWIENIA w miejscu.
+ *
+ * Zapis idzie własnym fetchem, a nie wspólnym call(): tamten kończy się
+ * router.replace, czyli przemontowaniem paska i wyrwaniem kursora ze środka
+ * zdania. Propsy zostają więc chwilowo starsze niż ekran i to jest w porządku —
+ * dopiero Stop (albo przełączenie zadania) odświeża stronę, a wtedy przychodzi
+ * już to, co zapisaliśmy.
+ */
+const RunningTimer = ({ running, projects, descByProject, busy, call, onError }) => {
+  const [draft, setDraft] = useState({
+    projectID: running.projectID,
+    description: running.description,
+  });
+  const [saved, setSaved] = useState(false);
   const [elapsed, setElapsed] = useState("");
+
+  const stored = useRef(draft); // ostatnia wartość potwierdzona przez serwer
+  const latest = useRef(draft); // to, co widzi użytkownik — dla flushów spoza Reacta
+  const pending = useRef(null); // uchwyt debounce'u
+  latest.current = draft;
+
+  // Nowy timer (Start albo przełączenie zadania) zaczyna od własnego szkicu.
+  // Zależność po running.id, a NIE po całym obiekcie: props wracający z serwera
+  // nie może nadpisać tekstu, który użytkownik właśnie pisze.
+  useEffect(() => {
+    const fresh = { projectID: running.projectID, description: running.description };
+    setDraft(fresh);
+    stored.current = fresh;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running.id]);
+
+  const save = useCallback(
+    async (next) => {
+      if (
+        next.projectID === stored.current.projectID &&
+        next.description === stored.current.description
+      ) {
+        return;
+      }
+
+      const res = await fetch(`/api/entries/${running.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retag", ...next }),
+        // Żądanie ma dojść nawet wtedy, gdy poszło z zamykanej karty.
+        keepalive: true,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        onError(errorText(body, "Nie udało się zapisać opisu."));
+        return;
+      }
+
+      stored.current = next;
+      onError("");
+      setSaved(true);
+    },
+    [running.id, onError]
+  );
+
+  const edit = (patch, { now = false } = {}) => {
+    const next = { ...latest.current, ...patch };
+    setDraft(next);
+    // Ustawiamy ręcznie, bo flush z pagehide może wypaść przed przerysowaniem.
+    latest.current = next;
+    setSaved(false);
+
+    if (pending.current) clearTimeout(pending.current);
+    pending.current = now ? null : setTimeout(() => save(next), AUTOSAVE_MS);
+    if (now) save(next);
+  };
+
+  /** Zapisuje od razu to, co czeka w kolejce (Enter, wyjście z pola, Stop). */
+  const flush = useCallback(async () => {
+    if (!pending.current) return;
+    clearTimeout(pending.current);
+    pending.current = null;
+    await save(latest.current);
+  }, [save]);
+
+  // "zapisano ✓" to potwierdzenie, nie stan — po chwili ma zniknąć, żeby pasek
+  // nie zostawał na stałe zabudowany komunikatem.
+  useEffect(() => {
+    if (!saved) return undefined;
+    const handle = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(handle);
+  }, [saved]);
 
   // Licznik startuje dopiero po zamontowaniu — inaczej HTML z serwera
   // i pierwszy render klienta różniłyby się o sekundę (hydration mismatch).
   useEffect(() => {
-    if (!running) return undefined;
-
     const tick = () => setElapsed(formatDuration(dayjs().diff(dayjs(running.startedAt), "second")));
 
     tick();
     const handle = setInterval(tick, 1000);
     return () => clearInterval(handle);
-  }, [running]);
+  }, [running.startedAt]);
+
+  // Zamknięcie karty w trakcie debounce'u nie może zjeść opisu. visibilitychange
+  // łapie przy okazji telefon, na którym pagehide bywa pomijany.
+  useEffect(() => {
+    const leave = () => {
+      if (!pending.current) return;
+      clearTimeout(pending.current);
+      pending.current = null;
+      save(latest.current);
+    };
+    const onVisibility = () => document.hidden && leave();
+
+    window.addEventListener("pagehide", leave);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      document.removeEventListener("visibilitychange", onVisibility);
+      // Przy odmontowaniu nic nie wysyłamy: to Stop albo przełączenie zadania,
+      // a te robią flush same, zanim wpis przestanie biec.
+      if (pending.current) clearTimeout(pending.current);
+    };
+  }, [save]);
+
+  const stop = async () => {
+    await flush();
+    call(`/api/entries/${running.id}`, { method: "PUT", body: JSON.stringify({ action: "stop" }) });
+  };
+
+  // Projekt zarchiwizowany w trakcie pracy wypadłby z listy, a <select> wskazałby
+  // wtedy pierwszą pozycję z brzegu i cicho przeniósł czas na cudzy projekt.
+  const options = projects.some((p) => p.id === draft.projectID)
+    ? projects
+    : [{ id: draft.projectID, name: "— projekt poza listą —" }, ...projects];
+
+  const project = options.find((p) => p.id === draft.projectID);
+
+  return (
+    <Bar>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(project?.color).dot}`} />
+        {/* Te same pola co przed startem, w tym samym układzie — pasek nie zmienia
+            kształtu po naciśnięciu Start, zmienia się tylko przycisk po prawej. */}
+        <input
+          type="text"
+          value={draft.description}
+          list={`opisy-${draft.projectID}`}
+          maxLength={200}
+          placeholder="Nad czym pracujesz?"
+          onChange={(e) => edit({ description: e.target.value })}
+          onBlur={flush}
+          onKeyDown={(e) => e.key === "Enter" && flush()}
+          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500"
+        />
+        <DescriptionOptions descByProject={descByProject} />
+
+        <select
+          value={draft.projectID}
+          onChange={(e) => edit({ projectID: Number(e.target.value) }, { now: true })}
+          className="p-2 border border-indigo-400 rounded w-full sm:w-56 shrink-0"
+        >
+          {options.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
+        <span className="font-mono text-xl tabular-nums">{elapsed || "…"}</span>
+        <button
+          disabled={busy}
+          onClick={stop}
+          className="text-white bg-rose-500 hover:bg-rose-600 py-2 px-6 rounded font-bold disabled:opacity-50"
+        >
+          Stop
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-gray-500">
+        od {hhmm(running.startedAt)} · opis i projekt zapisują się same
+        {saved && <span className="ml-2 text-emerald-700 font-medium">zapisano ✓</span>}
+      </p>
+    </Bar>
+  );
+};
+
+const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => {
+  const [projectID, setProjectID] = useState(projects[0]?.id ?? "");
+  const [description, setDescription] = useState("");
 
   if (running) {
-    const project = projects.find((p) => p.id === running.projectID);
     return (
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(project?.color).dot}`} />
-          <div className="flex-grow min-w-0">
-            {/* Opis wyróżniony kolorem akcentu — to on mówi, co się teraz dzieje;
-                nazwa projektu i godzina startu są kontekstem i zostają szare.
-                "(bez opisu)" zostaje szare celowo: to informacja o braku treści. */}
-            <p className="font-medium truncate">
-              {running.description ? (
-                <span className="text-indigo-500">{running.description}</span>
-              ) : (
-                <span className="text-gray-400">(bez opisu)</span>
-              )}
-            </p>
-            <p className="text-sm text-gray-600">
-              {project?.name ?? "—"} · od {hhmm(running.startedAt)}
-            </p>
-          </div>
-          <span className="font-mono text-xl tabular-nums">{elapsed || "…"}</span>
-          <button
-            disabled={busy}
-            onClick={() => call(`/api/entries/${running.id}`, { method: "PUT", body: JSON.stringify({ action: "stop" }) })}
-            className="text-white bg-rose-500 hover:bg-rose-600 py-2 px-6 rounded font-bold disabled:opacity-50"
-          >
-            Stop
-          </button>
-        </div>
-      </div>
+      <RunningTimer
+        running={running}
+        projects={projects}
+        descByProject={descByProject}
+        busy={busy}
+        call={call}
+        onError={onError}
+      />
     );
   }
 
@@ -214,7 +388,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
   };
 
   return (
-    <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
+    <Bar>
       {/* Opis z lewej, projekt z prawej: zdanie zaczyna się od tego, CO się robi,
           a projekt jest doprecyzowaniem. Opis dostaje też całą wolną szerokość,
           bo bywa dłuższy niż nazwa projektu. */}
@@ -260,7 +434,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call }) => {
           Nie masz dostępnych projektów — poproś kierownika o założenie projektu dla twojej sekcji.
         </p>
       )}
-    </div>
+    </Bar>
   );
 };
 

@@ -185,6 +185,36 @@ export const stopEntry = ({ id, userID }, now = appNow()) => {
   return info.changes > 0 ? getEntry(id) : undefined;
 };
 
+const stmtRetag = db.prepare(`
+  UPDATE TaskEntries SET projectID = @projectID, description = @description
+   WHERE id = @id AND userID = @userID AND endedAt IS NULL`);
+
+/**
+ * Opis i projekt BIEGNĄCEGO timera — bez dotykania czasów.
+ *
+ * Ludzie klikają Start, żeby licznik nie uciekał, a co robią, dopisują chwilę
+ * później. Wcześniej trzeba było zatrzymać timer i wejść w edycję wpisu, czyli
+ * zapłacić za porządek w opisach rozcięciem pracy na dwa kawałki.
+ *
+ * Warunki "mój wpis" i "wciąż biegnie" siedzą w SAMYM SQL, jak w deleteEntry:
+ * wynik rozstrzyga `changes`, więc równoczesny Stop z drugiej zakładki nie
+ * przepisze opisu wpisu już zamkniętego (tam czasy są ostateczne i zmiana
+ * projektu wymaga zwykłej edycji, z podpisem poprawiającego).
+ *
+ * `editedBy` zostaje puste — to właściciel poprawia sam siebie, dokładnie jak
+ * przy zatrzymywaniu timera. Podpis jest zastrzeżony dla korekt kierownika.
+ */
+export const retagRunningEntry = ({ id, userID, projectID, description }) => {
+  const info = stmtRetag.run({
+    id: Number(id),
+    userID: Number(userID),
+    projectID: Number(projectID),
+    description: Joi.attempt(description ?? "", descSchema),
+  });
+
+  return info.changes > 0 ? getEntry(id) : undefined;
+};
+
 const manualSchema = Joi.object({
   projectID: Joi.number().integer().positive().required(),
   description: descSchema,

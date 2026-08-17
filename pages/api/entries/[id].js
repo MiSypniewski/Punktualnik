@@ -1,11 +1,21 @@
 import { getToken } from "next-auth/jwt";
-import { getEntry, stopEntry, updateEntry, deleteEntry } from "../../../services/taskEntries";
+import {
+  getEntry,
+  stopEntry,
+  updateEntry,
+  deleteEntry,
+  retagRunningEntry,
+} from "../../../services/taskEntries";
 import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 
-const ALLOWED_ACTIONS = ["stop", "update"];
+// "retag" to opis i projekt biegnącego timera; "update" — cały zamknięty wpis
+// razem z czasami. Rozdzielone, bo obowiązują je inne reguły: retag wolno tylko
+// właścicielowi i tylko dopóki licznik leci, update także kierownikowi i tylko
+// na wpisie zamkniętym.
+const ALLOWED_ACTIONS = ["stop", "update", "retag"];
 const CONFLICT_CODES = ["overlap", "already_running", "edit_window_closed"];
 
 /**
@@ -94,6 +104,9 @@ export default async (req, res) => {
       : res.status(409).json({ error: "not_running" });
   }
 
+  // Wybór projektu sprawdzamy raz, dla obu pozostałych akcji — jedna i druga
+  // potrafi przenieść wpis na inny projekt i obie muszą to zrobić na tych samych
+  // zasadach.
   const { projectID, description, data, from, to } = req.body ?? {};
   if (!/^\d+$/.test(String(projectID ?? ""))) {
     return res.status(400).json({ error: "bad_project" });
@@ -107,6 +120,23 @@ export default async (req, res) => {
   const keepsProject = Number(projectID) === Number(entry.projectID);
   if (!canUseProject(access.scopeToken, project, { allowArchived: keepsProject })) {
     return res.status(403).json({ error: "project_out_of_scope" });
+  }
+
+  if (action === "retag") {
+    // Jak przy "stop": biegnący timer należy wyłącznie do swojego właściciela.
+    // Kierownik poprawia dopiero wpis zamknięty, i wtedy zostaje pod nim podpis.
+    if (Number(entry.userID) !== Number(token.userID)) {
+      return res.status(403).json({ error: "permission_denied" });
+    }
+    const retagged = retagRunningEntry({
+      id,
+      userID: token.userID,
+      projectID,
+      description,
+    });
+    return retagged
+      ? res.status(200).json({ status: "retagged", entry: retagged })
+      : res.status(409).json({ error: "not_running" });
   }
 
   try {
