@@ -64,6 +64,21 @@ const ERRORS = {
 
 const errorText = (body, fallback) => body.message || ERRORS[body.error] || fallback;
 
+/**
+ * Co się właśnie stało z poprzednim timerem. Bez tego zdania przełączenie
+ * wygląda jak zgubiony wpis: licznik skacze na nowe zadanie, a stare przenosi się
+ * na listę dnia poniżej — czyli tam, gdzie w tej chwili nikt nie patrzy.
+ */
+const switchMessage = ({ stopped, discarded }) => {
+  if (stopped) {
+    return `Zamknięto „${stopped.description || "bez opisu"}” — ${formatDuration(stopped.seconds)}.`;
+  }
+  if (discarded) {
+    return "Poprzedni timer trwał krócej niż 10 sekund — odrzucony jako pomyłka.";
+  }
+  return "";
+};
+
 /** Etykieta dnia: "dziś", "wczoraj", inaczej data słownie. */
 const dayLabel = (data, today) => {
   if (data === today) return "Dziś";
@@ -85,26 +100,43 @@ export default function Zadania({
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
 
+  /** @returns {object|false} odpowiedź serwera albo false, gdy żądanie się nie udało */
   const call = async (url, options) => {
     setBusy(true);
     setErr("");
+    setInfo("");
     try {
       const res = await fetch(url, {
         headers: { "Content-Type": "application/json" },
         ...options,
       });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         setErr(errorText(body, "Nie udało się zapisać."));
         return false;
       }
       await refresh();
-      return true;
+      return body;
     } finally {
       setBusy(false);
     }
   };
+
+  /**
+   * Wznowienie zadania. `replaceRunning` mówi API, że biegnący timer wolno
+   * zamknąć — kliknięcie "wznów" znaczy "zajmuję się teraz TYM", a nie
+   * "poinformuj mnie, że mam już inny timer".
+   */
+  const resume = ({ projectID, description }) =>
+    call("/api/entries", {
+      method: "POST",
+      body: JSON.stringify({ action: "start", projectID, description, replaceRunning: true }),
+    }).then((body) => {
+      if (body) setInfo(switchMessage(body));
+      return body;
+    });
 
   // Wpisy pogrupowane po dobie roboczej; kolejność z SQL (malejąco) zachowana.
   // Biegnący wpis odsiewamy, bo pokazuje go pasek timera na górze — inaczej
@@ -136,8 +168,16 @@ export default function Zadania({
           <p className="my-3 p-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded">{err}</p>
         )}
 
-        {suggestions.length > 0 && !running && (
-          <Resume suggestions={suggestions} busy={busy} call={call} />
+        {info && (
+          <p className="my-3 p-2 bg-emerald-50 border border-emerald-300 text-emerald-800 text-sm rounded">
+            {info}
+          </p>
+        )}
+
+        {/* Podpowiedzi zostają na ekranie TAKŻE przy biegnącym timerze — to jedyne
+            miejsce, z którego da się jednym kliknięciem przejść na inne zadanie. */}
+        {suggestions.length > 0 && (
+          <Resume suggestions={suggestions} running={running} busy={busy} onResume={resume} />
         )}
 
         <ManualForm projects={projects} descByProject={descByProject} busy={busy} call={call} today={today} />
@@ -159,6 +199,8 @@ export default function Zadania({
             descByProject={descByProject}
             busy={busy}
             call={call}
+            running={running}
+            onResume={resume}
           />
         ))}
       </section>
@@ -455,20 +497,18 @@ const DescriptionOptions = ({ descByProject }) => (
 
 // --- wznawianie -------------------------------------------------------------
 
-const Resume = ({ suggestions, busy, call }) => (
+const Resume = ({ suggestions, running, busy, onResume }) => (
   <div className="mt-4">
-    <h2 className="text-sm font-bold text-gray-700 mb-2">Wznów</h2>
+    {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
+        bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
+    <h2 className="text-sm font-bold text-gray-700 mb-2">{running ? "Przełącz na" : "Wznów"}</h2>
     <div className="flex gap-2 flex-wrap">
       {suggestions.map((s) => (
         <button
           key={`${s.projectID}-${s.description}`}
           disabled={busy}
-          onClick={() =>
-            call("/api/entries", {
-              method: "POST",
-              body: JSON.stringify({ action: "start", projectID: s.projectID, description: s.description }),
-            })
-          }
+          title={running ? "Zamknij bieżące zadanie i zacznij to" : "Zacznij to zadanie"}
+          onClick={() => onResume(s)}
           className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-gray-300 rounded-full text-sm hover:bg-gray-50 disabled:opacity-50"
         >
           <span className={`w-2 h-2 rounded-full shrink-0 ${projectColor(s.projectColor).dot}`} />
@@ -596,7 +636,18 @@ const SmallField = ({ label, children }) => (
 
 // --- lista dni --------------------------------------------------------------
 
-const DaySection = ({ data, list, label, editable, projects, descByProject, busy, call }) => {
+const DaySection = ({
+  data,
+  list,
+  label,
+  editable,
+  projects,
+  descByProject,
+  busy,
+  call,
+  running,
+  onResume,
+}) => {
   const total = list.reduce((sum, e) => sum + (e.seconds || 0), 0);
 
   return (
@@ -617,6 +668,8 @@ const DaySection = ({ data, list, label, editable, projects, descByProject, busy
             descByProject={descByProject}
             busy={busy}
             call={call}
+            running={running}
+            onResume={onResume}
           />
         ))}
       </ul>
@@ -624,7 +677,7 @@ const DaySection = ({ data, list, label, editable, projects, descByProject, busy
   );
 };
 
-const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
+const EntryRow = ({ entry, editable, projects, descByProject, busy, call, running, onResume }) => {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     projectID: entry.projectID,
@@ -745,17 +798,8 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
       <span className="flex gap-1">
         <button
           disabled={busy}
-          title="Wznów to zadanie"
-          onClick={() =>
-            call("/api/entries", {
-              method: "POST",
-              body: JSON.stringify({
-                action: "start",
-                projectID: entry.projectID,
-                description: entry.description,
-              }),
-            })
-          }
+          title={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
+          onClick={() => onResume(entry)}
           className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
         >
           ▶

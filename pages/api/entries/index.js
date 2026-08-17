@@ -1,5 +1,10 @@
 import { getToken } from "next-auth/jwt";
-import { startEntry, createManualEntry, closeStaleEntries } from "../../../services/taskEntries";
+import {
+  startEntry,
+  switchEntry,
+  createManualEntry,
+  closeStaleEntries,
+} from "../../../services/taskEntries";
 import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
@@ -25,7 +30,8 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { action, projectID, description, data, from, to, targetUserID } = req.body ?? {};
+  const { action, projectID, description, data, from, to, targetUserID, replaceRunning } =
+    req.body ?? {};
   if (!ALLOWED_ACTIONS.includes(action)) {
     return res.status(400).json({ error: "bad_action" });
   }
@@ -81,12 +87,23 @@ export default async (req, res) => {
       if (!owner.self) {
         return res.status(400).json({ error: "start_for_others" });
       }
-      const entry = startEntry({
+      const payload = {
         userID: owner.id,
         projectID,
         description,
         section: owner.section,
-      });
+      };
+
+      // Przełączenie na inne zadanie tylko na JAWNE życzenie ("wznów" / "przełącz
+      // na"), a nie domyślnie. Bez flagi biegnący timer nadal daje 409
+      // already_running, więc dwie otwarte zakładki kończą się konfliktem,
+      // a nie cichym zamknięciem pracy, o której druga zakładka nic nie wie.
+      if (replaceRunning) {
+        const { entry, stopped, discarded } = switchEntry(payload);
+        return res.status(201).json({ status: "created", entry, stopped, discarded });
+      }
+
+      const entry = startEntry(payload);
       return res.status(201).json({ status: "created", entry });
     }
 

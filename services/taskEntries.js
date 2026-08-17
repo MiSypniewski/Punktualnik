@@ -215,6 +215,46 @@ export const retagRunningEntry = ({ id, userID, projectID, description }) => {
   return info.changes > 0 ? getEntry(id) : undefined;
 };
 
+// Przełączenie zadania tuż po starcie to korekta pomyłki ("nie ten projekt"),
+// a nie praca. Taki wpis znika, żeby lista dnia nie zbierała kilkusekundowych
+// śmieci, których nikt potem nie sprząta.
+const MIN_KEEP_SECONDS = 10;
+
+/**
+ * "Wznów zadanie" przy biegnącym timerze: zamknij bieżące i od razu zacznij nowe.
+ *
+ * Jedna transakcja i jeden znacznik czasu dla obu wpisów, więc nowe zadanie
+ * zaczyna się dokładnie tam, gdzie skończyło się poprzednie — bez dziury w dniu
+ * i bez zakładki. Kolejność jest wymuszona przez idx_entries_running: dopóki
+ * poprzedni wpis nie ma końca, INSERT nowego odbiłby się o ten indeks.
+ *
+ * Dotąd wznowienie przy biegnącym liczniku kończyło się komunikatem "masz już
+ * uruchomiony timer" — czyli zrzucało na pracownika robotę, którą aplikacja umie
+ * wykonać sama: zatrzymać jedno, wystartować drugie.
+ *
+ * @returns {{entry: object, stopped: object|null, discarded: boolean}}
+ *   `stopped` to zamknięty wpis (null, gdy nic nie biegło albo wpis odrzucono),
+ *   `discarded` mówi, że poprzedni wpis był krótszy niż MIN_KEEP_SECONDS.
+ */
+export const switchEntry = ({ userID, projectID, description, section }, now = appNow()) =>
+  db.transaction(() => {
+    const current = getRunningEntry(userID);
+    let stopped = current ? stopEntry({ id: current.id, userID }, now) : null;
+    let discarded = false;
+
+    if (stopped && stopped.seconds < MIN_KEEP_SECONDS) {
+      deleteEntry({ id: stopped.id, userID, enforceWindow: false });
+      stopped = null;
+      discarded = true;
+    }
+
+    return {
+      entry: startEntry({ userID, projectID, description, section }, now),
+      stopped,
+      discarded,
+    };
+  })();
+
 const manualSchema = Joi.object({
   projectID: Joi.number().integer().positive().required(),
   description: descSchema,
