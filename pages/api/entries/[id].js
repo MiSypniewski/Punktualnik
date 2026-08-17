@@ -7,7 +7,7 @@ import {
   retagRunningEntry,
 } from "../../../services/taskEntries";
 import { getProject, canUseProject } from "../../../services/projects";
-import { canTrackTasks, canSeeTeamTasks } from "../../../services/roles";
+import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 
@@ -20,15 +20,23 @@ const CONFLICT_CODES = ["overlap", "already_running", "edit_window_closed"];
 
 /**
  * Kto może ruszyć ten wpis i na jakich zasadach.
- * Właściciela obowiązuje okno "dziś i wczoraj"; kierownika w zasięgu — nie,
- * bo inaczej starszy błąd zostałby w bazie na zawsze (pracownik go nie sięgnie).
+ * Okno "dziś i wczoraj" obowiązuje pracownika; kierownika — nigdzie, ani na
+ * cudzym wpisie, ani na własnym (services/roles.js: boundByEditWindow). Inaczej
+ * starszy błąd zostawałby w bazie na zawsze: pracownik go nie sięgnie, a jedyna
+ * osoba, która może go poprawić, nie sięgnęłaby własnego.
  */
 const resolveAccess = async (token, entry) => {
   // Własny wpis: zasięg projektów bierzemy z prawdziwego tokenu, żeby lista
   // na stronie i to, co da się zapisać, znaczyły to samo (patrz komentarz
-  // w pages/api/entries/index.js).
+  // w pages/api/entries/index.js). `actor` zostaje pusty — podpis "popr." jest
+  // zastrzeżony dla korekty CUDZEGO wpisu.
   if (Number(entry.userID) === Number(token.userID)) {
-    return { allowed: true, enforceWindow: true, actor: null, scopeToken: token };
+    return {
+      allowed: true,
+      enforceWindow: boundByEditWindow(token.role),
+      actor: null,
+      scopeToken: token,
+    };
   }
   if (!canSeeTeamTasks(token.role)) return { allowed: false };
 

@@ -9,7 +9,7 @@ import { projectColor } from "../../components/projectColors";
 import { listProjects, projectScope } from "../../services/projects";
 import { getEntriesForUser, getRunningEntry, closeStaleEntries } from "../../services/taskEntries";
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
-import { canTrackTasks } from "../../services/roles";
+import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
 import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
 
@@ -47,6 +47,10 @@ export async function getServerSideProps(ctx) {
       descByProject: suggestionsByProject(suggestions),
       today,
       minEditable: minEditableDay(),
+      // Kierownik poprawia i dopisuje wpisy z dowolnego dnia — także tu, na
+      // swojej własnej stronie. Regułę rozstrzyga API (pages/api/entries/[id].js);
+      // ten props tylko przestaje wyłączać przyciski, które i tak by przeszły.
+      editAnyDay: !boundByEditWindow(token.role),
     },
   };
 }
@@ -94,6 +98,7 @@ export default function Zadania({
   descByProject,
   today,
   minEditable,
+  editAnyDay,
 }) {
   const router = useRouter();
   const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
@@ -180,7 +185,14 @@ export default function Zadania({
           <Resume suggestions={suggestions} running={running} busy={busy} onResume={resume} />
         )}
 
-        <ManualForm projects={projects} descByProject={descByProject} busy={busy} call={call} today={today} />
+        <ManualForm
+          projects={projects}
+          descByProject={descByProject}
+          busy={busy}
+          call={call}
+          today={today}
+          anyDay={editAnyDay}
+        />
 
         {days.length === 0 && (
           <p className="mt-8 text-gray-500 text-sm">
@@ -194,7 +206,7 @@ export default function Zadania({
             data={data}
             list={list}
             label={dayLabel(data, today)}
-            editable={data >= minEditable}
+            editable={editAnyDay || data >= minEditable}
             projects={projects}
             descByProject={descByProject}
             busy={busy}
@@ -522,7 +534,7 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
 
 // --- formularz ręczny -------------------------------------------------------
 
-const ManualForm = ({ projects, descByProject, busy, call, today }) => {
+const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
   const [open, setOpen] = useState(false);
   const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
   const [form, setForm] = useState({
@@ -580,15 +592,28 @@ const ManualForm = ({ projects, descByProject, busy, call, today }) => {
         {/* Etykiety nad polami czasu są konieczne: dwa gołe <input type="time">
             obok siebie nie mówią, które jest początkiem, a które końcem. */}
         <SmallField label="Dzień">
-          {/* Tylko dziś i wczoraj — wstecz pracownik nie sięga. */}
-          <select
-            value={form.data}
-            onChange={(e) => setForm({ ...form, data: e.target.value })}
-            className="p-2 border border-gray-400 rounded"
-          >
-            <option value={today}>dziś</option>
-            <option value={yesterday}>wczoraj</option>
-          </select>
+          {/* Pracownik ma tylko dziś i wczoraj — wstecz nie sięga. Kierownik dostaje
+              pole daty, bo uzupełnia braki z dowolnego okresu; `max` pilnuje jedynie,
+              żeby nie wpisać pracy w przyszłość (serwer tego nie zabrania). */}
+          {anyDay ? (
+            <input
+              type="date"
+              value={form.data}
+              max={today}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+              className="p-2 border border-gray-400 rounded"
+              required
+            />
+          ) : (
+            <select
+              value={form.data}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+              className="p-2 border border-gray-400 rounded"
+            >
+              <option value={today}>dziś</option>
+              <option value={yesterday}>wczoraj</option>
+            </select>
+          )}
         </SmallField>
         <SmallField label="Od">
           <input

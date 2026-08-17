@@ -47,3 +47,10 @@ export const canSeeTeamTasks = (role) => role === "manager";
 
 // Eksport wpisów do CSV — jak przy czasach pracy, wyłącznie kierownik.
 export const canExportTasks = (role) => role === "manager";
+
+// Okno "dziś i wczoraj" (services/workday.js) wiąże PRACOWNIKA — kierownika nie,
+// także na WŁASNYCH wpisach. Wcześniej zdjęcie okna wisiało na warunku "to cudzy
+// wpis", nie na roli, i wychodziła z tego reguła bez sensu: kierownik naprawiał
+// cudzy błąd sprzed tygodnia, ale własnego już nie sięgał. Skoro odpowiada za
+// poprawność ewidencji całej sekcji, to tym bardziej za swoją.
+export const boundByEditWindow = (role) => !canSeeTeamTasks(role);

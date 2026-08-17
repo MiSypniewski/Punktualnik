@@ -395,8 +395,8 @@ export default function ZarzadzajZadaniami({
 
         <p className="text-xs text-gray-600 mb-2">
           Ołówek otwiera wpis do poprawki — projekt, opis, data i godziny. Okno „dziś i wczoraj”, które
-          obowiązuje pracownika, kierownika nie dotyczy: poprawisz wpis z dowolnego okresu. Twoje nazwisko
-          zostaje przy wpisie jako „popr.”.
+          obowiązuje pracownika, kierownika nie dotyczy: poprawisz wpis z dowolnego okresu, także swój
+          własny. Przy cudzym wpisie zostaje twoje nazwisko jako „popr.”.
         </p>
 
         {detail.total > detail.limit && (

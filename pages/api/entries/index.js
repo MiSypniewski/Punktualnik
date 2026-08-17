@@ -6,7 +6,7 @@ import {
   closeStaleEntries,
 } from "../../../services/taskEntries";
 import { getProject, canUseProject } from "../../../services/projects";
-import { canTrackTasks, canSeeTeamTasks } from "../../../services/roles";
+import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 
@@ -107,9 +107,15 @@ export default async (req, res) => {
       return res.status(201).json({ status: "created", entry });
     }
 
+    // Okno "dziś i wczoraj" dotyczy pracownika uzupełniającego SWÓJ dzień.
+    // Kierownik wpisuje wstecz i za siebie, i za kogoś — patrz boundByEditWindow.
     const entry = createManualEntry(
       { projectID, description, data, from, to },
-      { userID: owner.id, section: owner.section, enforceWindow: owner.self }
+      {
+        userID: owner.id,
+        section: owner.section,
+        enforceWindow: owner.self && boundByEditWindow(token.role),
+      }
     );
     return res.status(201).json({ status: "created", entry });
   } catch (error) {
