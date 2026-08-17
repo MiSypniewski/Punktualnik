@@ -1,5 +1,5 @@
 import { getToken } from "next-auth/jwt";
-import { closeStaleEntries } from "../../../services/taskEntries";
+import { sweepStaleEntries } from "../../../services/taskEntries";
 import { getLiveBoard } from "../../../services/liveBoard";
 import { canSeeTeamTasks } from "../../../services/roles";
 import { visibleSections } from "../../../services/scope";
@@ -12,19 +12,8 @@ import { visibleSections } from "../../../services/scope";
 // Trasa statyczna, więc w Next 12 wygrywa z [id].js i nie da się jej pomylić
 // z wpisem o id "running" (tamten walidator i tak przyjmuje wyłącznie cyfry).
 
-// Domykanie zapomnianych timerów to UPDATE, a ten endpoint jest odpytywany
-// cyklicznie przez każdą otwartą kartę kierownika. Granica domykania to 3:00,
-// więc realnie jest co robić raz na dobę — bez dławika braliśmy blokadę zapisu
-// co kilkadziesiąt sekund, konkurując z kioskiem odbijającym karty.
-const SWEEP_EVERY_MS = 60_000;
-let lastSweep = 0;
-
-const sweepStaleEntries = () => {
-  const nowMs = Date.now();
-  if (nowMs - lastSweep < SWEEP_EVERY_MS) return;
-  lastSweep = nowMs;
-  closeStaleEntries();
-};
+// Domykanie zapomnianych timerów jest dławione w serwisie (sweepStaleEntries),
+// wspólnie z /api/entries/timer — oba endpointy są odpytywane cyklicznie.
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {

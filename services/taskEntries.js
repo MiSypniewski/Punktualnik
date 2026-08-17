@@ -57,11 +57,47 @@ const stmtCloseStale = db.prepare(`
 export const closeStaleEntries = (now = appNow()) =>
   stmtCloseStale.run({ boundary: workDayStart(now).format(TS_FORMAT) }).changes;
 
+// Domykanie to UPDATE, a endpointy odpytywane cyklicznie (/api/entries/running
+// z panelu kierownika, /api/entries/timer z KAŻDEJ strony) wołałyby je po kilka
+// razy na minutę na każdą otwartą kartę. Granica domykania to 3:00, więc realnie
+// jest co robić raz na dobę — bez dławika brałyby blokadę zapisu bez powodu,
+// konkurując z kioskiem odbijającym karty.
+//
+// Dławik siedzi TUTAJ, a nie w endpointach, żeby wszyscy wołający dzielili jeden
+// licznik: dwa niezależne dławiki po 60 s to nadal dwa zapisy na minutę.
+const SWEEP_EVERY_MS = 60_000;
+let lastSweep = 0;
+
+export const sweepStaleEntries = () => {
+  const nowMs = Date.now();
+  if (nowMs - lastSweep < SWEEP_EVERY_MS) return;
+  lastSweep = nowMs;
+  closeStaleEntries();
+};
+
 // --- odczyt -----------------------------------------------------------------
 
 export const getEntry = (id) => toRow(stmtById.get(Number(id)));
 
 export const getRunningEntry = (userID) => toRow(stmtRunning.get(Number(userID)));
+
+const stmtRunningDetail = db.prepare(`
+  SELECT ${COLS}, p.name AS projectName, p.color AS projectColor
+    FROM TaskEntries e
+    JOIN Projects p ON p.id = e.projectID
+   WHERE e.userID = ? AND e.endedAt IS NULL`);
+
+/** Własny biegnący wpis razem z nazwą projektu — dla timera w tytule karty. */
+export const getRunningEntryDetail = (userID) => toRow(stmtRunningDetail.get(Number(userID)));
+
+/**
+ * Ile sekund biegnie ten timer. Liczone NA SERWERZE z tego samego powodu co
+ * w services/liveBoard.js:94-101 — znaczniki są zapisane bez offsetu strefy,
+ * więc przeglądarka z przestawionym zegarem albo w innej strefie policzyłaby
+ * czas przesunięty o godziny. Odejmowanie idzie przez secondsBetween, żeby
+ * miało w tym module jedno źródło.
+ */
+export const runningSeconds = (entry, now = appNow()) => secondsBetween(entry.startedAt, toStamp(now));
 
 const stmtForUser = db.prepare(`
   SELECT ${COLS}, p.name AS projectName, p.color AS projectColor, p.client AS projectClient

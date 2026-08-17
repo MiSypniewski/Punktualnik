@@ -93,6 +93,24 @@ export const formatDuration = (seconds, { withSign = false } = {}) => {
 };
 
 /**
+ * Sekundy → "1:21:35". Zapis dla paska karty przeglądarki (components/timerTitle.js).
+ *
+ * Osobny format obok formatDuration, bo tytuł karty jest ucinany po kilkunastu
+ * znakach: "1h 21min 35s · Przyjęcie sklepu" nie zmieściłoby ani zegara, ani opisu.
+ * Godziny bez wiodącego zera (tak wygląda zegar), minuty i sekundy zawsze
+ * dwucyfrowo — inaczej "1:5:7" nie czyta się jako czas.
+ * @param {number} seconds
+ */
+export const formatClock = (seconds) => {
+  const total = Math.max(0, Math.trunc(Number(seconds) || 0));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
+
+/**
  * "07:45:30" → 27930. Odwrotność formatDuration dla zapisu używanego w Times.
  *
  * Times.totalWorkTime jest TEKSTEM (spadek po Airtable), więc żeby zestawić

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
+import TimerTitle from "./timerTitle";
 import {
   canExportTimes,
   canApproveOvertime,
@@ -126,6 +127,10 @@ export default function BaseLayout({ children }) {
   // console.log(session.user);
   return (
     <>
+      {/* Timer w pasku karty na KAŻDEJ stronie — stąd tutaj, a nie na /zadania.
+          Kiosk (`editor`) nie raportuje zadań, więc nie ma własnego timera i nie
+          ma po co odpytywać serwera. */}
+      {canTrackTasks(session.user.role) && <TimerTitle />}
       <TopNavigation />
       {children}
       {/* <Footer /> */}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
+import { mutate } from "swr";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
 import dayjs from "dayjs";
@@ -123,6 +124,12 @@ export default function Zadania({
         return false;
       }
       await refresh();
+      // Timer w pasku karty (components/timerTitle.js) ma zareagować na Start,
+      // Stop i przełączenie zadania od razu, a nie po cyklu pollingu. Świadomie
+      // NIE robimy tego w autosave opisu — poprawka napisu w tytule może poczekać
+      // do najbliższego odświeżenia, a mutate na każdą pauzę w pisaniu mnożyłoby
+      // żądania.
+      mutate("/api/entries/timer");
       return body;
     } finally {
       setBusy(false);
