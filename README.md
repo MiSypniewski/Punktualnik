@@ -338,6 +338,17 @@ Enter, wyjście z pola, Stop, przełączenie zakładki i zamknięcie karty wypyc
 kolejkę od razu, więc nic nie ginie. Zapis idzie akcją `retag` i celowo **nie**
 odświeża strony (inaczej kursor wypadałby ze środka zdania).
 
+**Biegnący timer widać w pasku karty przeglądarki** — tytuł strony to
+„1:21:35 · Opis — Punktualnik”, na każdej podstronie, nie tylko na `/zadania`
+(tak działa Clockify). Licznik na stronie widzi tylko ten, kto na nią patrzy;
+do paska kart sięga się wzrokiem z innej zakładki i właśnie wtedy trzeba wiedzieć,
+że czas wciąż leci. Dane daje `/api/entries/timer` — własny biegnący wpis i nic
+więcej, osobno od managerskiego `/api/entries/running`. Sekundy liczy serwer
+(znaczniki są bez offsetu strefy), przeglądarka dorabia je między odpytaniami
+i odświeża stan raz na minutę; Start i Stop widać w tytule natychmiast. Karta
+schowana w tle nie odpytuje serwera — tytuł tyka lokalnie, a timer zatrzymany
+w innej karcie poprawia się przy powrocie do tej.
+
 **„Wznów zadanie” przy biegnącym timerze przełącza się na nowe zadanie**: zamyka
 bieżący wpis i startuje kolejny jedną transakcją, tym samym znacznikiem czasu —
 bez dziury w dniu i bez zakładki. Przełączenie w ciągu **10 sekund** od startu
@@ -352,7 +363,7 @@ Reguły, których pilnuje sama baza albo SQL — nie da się ich obejść przez 
 |---|---|
 | Jeden biegnący timer na osobę | drugi start → `409 already_running` (UNIQUE INDEX) |
 | Wpisy nie mogą na siebie nachodzić | `409 overlap`; styk godzin (12:00–13:00 po 10:00–12:00) przechodzi |
-| Pracownik edytuje tylko dziś i wczoraj | `409 edit_window_closed` |
+| Pracownik edytuje tylko dziś i wczoraj | `409 edit_window_closed` (kierownika okno nie wiąże — `boundByEditWindow` w `services/roles.js`) |
 | Momenty równe co do sekundy (10:00:00–10:00:00) | `422 bad_range` — to pomyłka, nie „pełna doba" |
 
 Doba robocza zaczyna się o **3:00**, nie o północy (ta sama granica, której używają
@@ -408,10 +419,14 @@ Kolumna „Różnica” jest **wskazówką, gdzie brakuje raportowania — nie p
 rozliczeń**. Obecność pochodzi z kart czasu, zaraportowany czas z wpisów zadań;
 to dwie osobne ewidencje i aplikacja nigdy nie każe im się zgadzać.
 
-Kierownik może poprawiać i dopisywać wpisy podwładnych **bez ograniczenia daty** —
-inaczej starszy błąd zostałby w bazie na zawsze, bo pracownik go już nie sięgnie.
-Każda taka korekta zostawia podpis („popr. Anna”). Timera za nikogo nie uruchamia
-ani nie zatrzymuje: nie wie, kiedy tamten faktycznie zaczął i skończył.
+Kierownik może poprawiać i dopisywać wpisy **bez ograniczenia daty** — cudze
+i **własne** — inaczej starszy błąd zostałby w bazie na zawsze, bo pracownik go już
+nie sięgnie. Korekta CUDZEGO wpisu zostawia podpis („popr. Anna”); własna poprawka
+nie, bo nie ma komu o niej mówić. Regułę trzyma jeden predykat
+(`boundByEditWindow` w `services/roles.js`), czytany zarówno przy edycji i usuwaniu
+wpisu, jak i przy wpisie ręcznym — dlatego kierownik ma na `/zadania` aktywny ołówek
+przy każdym dniu i pole daty zamiast wyboru „dziś/wczoraj”. Timera za nikogo nie
+uruchamia ani nie zatrzymuje: nie wie, kiedy tamten faktycznie zaczął i skończył.
 
 Poprawka idzie wprost z tabeli wpisów — ołówek w wierszu otwiera projekt, opis,
 datę i godziny. Reguły są te same co przy pracowniku (kolizje, `10:00–10:00`), bez
@@ -424,6 +439,12 @@ poprawić w nich literówki. Przenieść wpis **na** projekt archiwalny nadal ni
 Tabela na ekranie pokazuje najwyżej **200 wpisów** (przy większej liczbie pojawia
 się komunikat) — każdy wiersz jedzie do przeglądarki jako dane strony i przy 500
 payload przekraczał próg Next.js. **Eksport CSV limitu nie ma.**
+
+Na telefonie lista wpisów to **karty**, nie tabela: siedmiu kolumn nie da się czytać
+wodząc palcem po każdym wierszu. Formularz poprawki jest ten sam w obu układach
+(`EntryForm`), więc reguły i zachowanie nie rozjeżdżają się między ekranami.
+Podsumowania „wg projektów” i „wg pracowników” zostają tabelami, ale w kontenerze
+przewijanym w poziomie — inaczej rozpychały cały dokument szerzej niż ekran.
 
 ### Eksport do CSV
 
