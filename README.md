@@ -323,6 +323,29 @@ dowolnym tekstem; aplikacja podpowiada wcześniejsze opisy z historii (natywny
 zadanie jednym kliknięciem. Podpowiedzi są sortowane po **liczbie użyć**, więc
 codzienna rutyna wypada wyżej niż coś zrobionego raz.
 
+Czas liczy się **co do sekundy** (`TaskEntries.seconds`) i tak też jest pokazywany
+(„2h 15min 07s”). Wpis potrafi trwać pół minuty — „odbiłem maila”, „podpis na
+dokumencie” — a przy zaokrąglaniu do minut taki wpis miał wymiar 0 i nie dawał się
+nawet poprawić: formularz edycji odsyłał godziny bez sekund, więc walidacja
+„koniec musi się różnić od początku” odrzucała własny wpis. Pola godzin nadal
+pokazują „HH:mm”; nietknięte odsyłają oryginalne sekundy (`keepSeconds`
+w `utils/`), ręczna zmiana godziny zeruje je.
+
+**Opis i projekt biegnącego timera poprawia się w miejscu**, bez zatrzymywania
+licznika — ludzie klikają Start, żeby czas nie uciekał, a co robią, dopisują
+chwilę później. Opis zapisuje się 800 ms po ostatnim znaku, projekt natychmiast;
+Enter, wyjście z pola, Stop, przełączenie zakładki i zamknięcie karty wypychają
+kolejkę od razu, więc nic nie ginie. Zapis idzie akcją `retag` i celowo **nie**
+odświeża strony (inaczej kursor wypadałby ze środka zdania).
+
+**„Wznów zadanie” przy biegnącym timerze przełącza się na nowe zadanie**: zamyka
+bieżący wpis i startuje kolejny jedną transakcją, tym samym znacznikiem czasu —
+bez dziury w dniu i bez zakładki. Przełączenie w ciągu **10 sekund** od startu
+kasuje poprzedni wpis: to korekta pomyłki („nie ten projekt”), a nie praca.
+Dzieje się to tylko na jawne żądanie (`replaceRunning` w żądaniu); zwykły start
+nadal odbija się o `409 already_running`, żeby druga zakładka nie zamykała po
+cichu wpisu, o którym nic nie wie.
+
 Reguły, których pilnuje sama baza albo SQL — nie da się ich obejść przez API:
 
 | Reguła | Zachowanie |
@@ -330,7 +353,7 @@ Reguły, których pilnuje sama baza albo SQL — nie da się ich obejść przez 
 | Jeden biegnący timer na osobę | drugi start → `409 already_running` (UNIQUE INDEX) |
 | Wpisy nie mogą na siebie nachodzić | `409 overlap`; styk godzin (12:00–13:00 po 10:00–12:00) przechodzi |
 | Pracownik edytuje tylko dziś i wczoraj | `409 edit_window_closed` |
-| Godziny równe (10:00–10:00) | `422 bad_range` — to pomyłka, nie „pełna doba" |
+| Momenty równe co do sekundy (10:00:00–10:00:00) | `422 bad_range` — to pomyłka, nie „pełna doba" |
 
 Doba robocza zaczyna się o **3:00**, nie o północy (ta sama granica, której używają
 karty czasu). Dzięki temu zmiana kończąca się o 1:00 należy do dnia, w którym się
