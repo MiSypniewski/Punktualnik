@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../components/baseLayout";
 import LiveBoard from "../../components/liveBoard";
-import { projectColor } from "../../components/projectColors";
+import { projectColor, ProjectDot } from "../../components/projectColors";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
@@ -187,13 +187,17 @@ export default function ZarzadzajZadaniami({
         <LiveBoard initial={live} currentUserID={currentUserID} />
 
         <form onSubmit={apply} className="mb-6 p-3 border border-gray-300 rounded bg-gray-50">
-          <div className="flex gap-3 flex-wrap items-end">
+          {/* Na telefonie każde pole zajmuje całą szerokość i idzie w osobnym
+              rzędzie: przy flex-wrap z siedmioma polami selecty z długimi nazwami
+              projektów ucinały tekst na krawędzi ekranu. Od `sm` układ jest ten
+              sam co dotąd — pola jedno za drugim, zawijane. */}
+          <div className="flex gap-3 flex-col sm:flex-row sm:flex-wrap sm:items-end">
             <Field label="Od">
               <input
                 type="date"
                 value={form.from}
                 onChange={(e) => setForm({ ...form, from: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
+                className="w-full sm:w-auto p-2 border border-gray-400 rounded"
               />
             </Field>
             <Field label="Do">
@@ -201,14 +205,14 @@ export default function ZarzadzajZadaniami({
                 type="date"
                 value={form.to}
                 onChange={(e) => setForm({ ...form, to: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
+                className="w-full sm:w-auto p-2 border border-gray-400 rounded"
               />
             </Field>
             <Field label="Projekt">
               <select
                 value={form.projectID}
                 onChange={(e) => setForm({ ...form, projectID: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
+                className="w-full sm:w-auto p-2 border border-gray-400 rounded"
               >
                 <option value="">— wszystkie —</option>
                 {projects.map((p) => (
@@ -223,7 +227,7 @@ export default function ZarzadzajZadaniami({
               <select
                 value={form.userID}
                 onChange={(e) => setForm({ ...form, userID: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
+                className="w-full sm:w-auto p-2 border border-gray-400 rounded"
               >
                 <option value="">— wszyscy —</option>
                 {users.map((u) => (
@@ -242,14 +246,14 @@ export default function ZarzadzajZadaniami({
                 maxLength={TASK_QUERY_MAX}
                 placeholder="fragment opisu"
                 onChange={(e) => setForm({ ...form, q: e.target.value })}
-                className="p-2 border border-gray-400 rounded w-48"
+                className="p-2 border border-gray-400 rounded w-full sm:w-48"
               />
             </Field>
             <Field label="Wpisy dłuższe niż">
               <select
                 value={form.minMinutes}
                 onChange={(e) => setForm({ ...form, minMinutes: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
+                className="w-full sm:w-auto p-2 border border-gray-400 rounded"
               >
                 <option value="">— bez progu —</option>
                 <option value="15">15 min</option>
@@ -259,16 +263,23 @@ export default function ZarzadzajZadaniami({
               </select>
             </Field>
 
-            <button type="submit" className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-6 rounded">
-              Pokaż
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/zadania/zarzadzaj")}
-              className="py-2 px-4 border border-gray-400 rounded"
-            >
-              Wyczyść
-            </button>
+            {/* Oba przyciski w jednym rzędzie także na telefonie — "Wyczyść" pod
+                "Pokaż" wyglądałoby jak trzecie pole formularza. */}
+            <span className="flex gap-2 w-full sm:w-auto">
+              <button
+                type="submit"
+                className="flex-grow sm:flex-grow-0 text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-6 rounded"
+              >
+                Pokaż
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/zadania/zarzadzaj")}
+                className="py-2 px-4 border border-gray-400 rounded"
+              >
+                Wyczyść
+              </button>
+            </span>
           </div>
         </form>
 
@@ -288,7 +299,13 @@ export default function ZarzadzajZadaniami({
         {byProject.length === 0 ? (
           <p className="text-sm text-gray-500 mb-8">Brak wpisów w tym zakresie.</p>
         ) : (
-          <table className="w-full mb-8 text-sm">
+          // Sześć kolumn z liczbami nie zmieści się na telefonie, a bez tego
+          // kontenera tabela rozpychała cały dokument szerzej niż ekran i strona
+          // przewijała się w poziomie (wzorzec z pages/nadgodziny/zarzadzaj.js).
+          // min-w jest konieczne: w samym overflow-x-auto tabela `w-full` zwęża się
+          // do kontenera i ściska nazwy projektów zamiast pozwolić się przewinąć.
+          <div className="overflow-x-auto mb-8">
+          <table className="w-full min-w-[32rem] text-sm">
             <thead>
               <tr className="text-left border-b border-gray-300">
                 <Th>Projekt</Th>
@@ -333,6 +350,7 @@ export default function ZarzadzajZadaniami({
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         <h2 className="font-bold mb-1">Wg pracowników</h2>
@@ -343,7 +361,8 @@ export default function ZarzadzajZadaniami({
         {byUser.length === 0 ? (
           <p className="text-sm text-gray-500 mb-8">Brak wpisów w tym zakresie.</p>
         ) : (
-          <table className="w-full mb-8 text-sm">
+          <div className="overflow-x-auto mb-8">
+          <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="text-left border-b border-gray-300">
                 <Th>Pracownik</Th>
@@ -380,12 +399,13 @@ export default function ZarzadzajZadaniami({
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
           <h2 className="font-bold">Wpisy</h2>
           {canExport && (
-            <span className="flex gap-2">
+            <span className="flex gap-2 flex-wrap">
               <ExportButton onClick={() => download("wpisy")}>CSV: wpisy</ExportButton>
               <ExportButton onClick={() => download("projekty")}>CSV: wg projektów</ExportButton>
               <ExportButton onClick={() => download("porownanie")}>CSV: porównanie</ExportButton>
@@ -413,46 +433,73 @@ export default function ZarzadzajZadaniami({
         {detail.rows.length === 0 ? (
           <p className="text-sm text-gray-500">Brak wpisów w tym zakresie.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left border-b border-gray-300">
-                <Th>Data</Th>
-                <Th>Pracownik</Th>
-                <Th>Projekt</Th>
-                <Th>Zadanie</Th>
-                <Th className="text-right">Godziny</Th>
-                <Th className="text-right">Czas</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody>
-              {detail.rows.map((r) =>
-                r.id === editingID ? (
-                  <EntryEditor
-                    key={r.id}
-                    entry={r}
-                    projects={projectsBySection[r.userSection] ?? []}
-                    busy={busy}
-                    onCancel={() => {
-                      setEditingID(null);
-                      setErr("");
-                    }}
-                    onSave={(body) => saveEntry(r.id, body).then((ok) => ok && setEditingID(null))}
-                  />
-                ) : (
-                  <EntryRow
-                    key={r.id}
-                    entry={r}
-                    busy={busy}
-                    onEdit={() => {
-                      setEditingID(r.id);
-                      setErr("");
-                    }}
-                  />
-                )
-              )}
-            </tbody>
-          </table>
+          <>
+            {/* Siedem kolumn na telefonie nie ma szans — nawet przewijana w poziomie
+                tabela zmuszałaby do wodzenia palcem przy każdym wierszu. Poniżej `sm`
+                te same dane idą więc kartami, jak lista wpisów na /zadania. Oba układy
+                dzielą stan (editingID, saveEntry) i formularz (EntryForm). */}
+            <table className="hidden sm:table w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-300">
+                  <Th>Data</Th>
+                  <Th>Pracownik</Th>
+                  <Th>Projekt</Th>
+                  <Th>Zadanie</Th>
+                  <Th className="text-right">Godziny</Th>
+                  <Th className="text-right">Czas</Th>
+                  <Th />
+                </tr>
+              </thead>
+              <tbody>
+                {detail.rows.map((r) =>
+                  r.id === editingID ? (
+                    <EntryEditor
+                      key={r.id}
+                      entry={r}
+                      projects={projectsBySection[r.userSection] ?? []}
+                      busy={busy}
+                      onCancel={() => {
+                        setEditingID(null);
+                        setErr("");
+                      }}
+                      onSave={(body) => saveEntry(r.id, body).then((ok) => ok && setEditingID(null))}
+                    />
+                  ) : (
+                    <EntryRow
+                      key={r.id}
+                      entry={r}
+                      busy={busy}
+                      onEdit={() => {
+                        setEditingID(r.id);
+                        setErr("");
+                      }}
+                    />
+                  )
+                )}
+              </tbody>
+            </table>
+
+            <ul className="sm:hidden flex flex-col gap-2">
+              {detail.rows.map((r) => (
+                <EntryCard
+                  key={r.id}
+                  entry={r}
+                  projects={projectsBySection[r.userSection] ?? []}
+                  busy={busy}
+                  editing={r.id === editingID}
+                  onEdit={() => {
+                    setEditingID(r.id);
+                    setErr("");
+                  }}
+                  onCancel={() => {
+                    setEditingID(null);
+                    setErr("");
+                  }}
+                  onSave={(body) => saveEntry(r.id, body).then((ok) => ok && setEditingID(null))}
+                />
+              ))}
+            </ul>
+          </>
         )}
       </section>
     </BaseLayout>
@@ -491,17 +538,76 @@ const EntryRow = ({ entry, busy, onEdit }) => (
     </Td>
     <Td className="text-right tabular-nums font-medium whitespace-nowrap">{formatDuration(entry.seconds)}</Td>
     <Td className="text-right">
-      <button
-        disabled={busy}
-        title="Popraw wpis"
-        onClick={onEdit}
-        className="py-1 px-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30"
-      >
-        ✎
-      </button>
+      <PencilButton busy={busy} onClick={onEdit} />
     </Td>
   </tr>
 );
+
+const PencilButton = ({ busy, onClick }) => (
+  <button
+    disabled={busy}
+    title="Popraw wpis"
+    onClick={onClick}
+    className="py-1 px-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30"
+  >
+    ✎
+  </button>
+);
+
+/**
+ * Ten sam wpis na telefonie: cztery krótkie rzędy zamiast siedmiu kolumn.
+ *
+ * Kolejność jest inna niż w tabeli i to jest celowe. W tabeli oko jedzie po
+ * kolumnach, więc data jest pierwsza; tutaj czyta się kartę z góry na dół i pierwsze
+ * pytanie brzmi "co to za praca", a nie "z którego dnia". Data i wymiar stoją
+ * z prawej, gdzie wzrok wraca po nazwisku.
+ */
+const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave }) => {
+  if (editing) {
+    return (
+      <li className="p-3 border border-gray-300 rounded bg-indigo-50">
+        <EntryForm entry={entry} projects={projects} busy={busy} onCancel={onCancel} onSave={onSave} />
+      </li>
+    );
+  }
+
+  return (
+    <li
+      className={classNames(
+        "p-3 border border-gray-300 rounded",
+        entry.autoClosed && "bg-amber-50 border-amber-300"
+      )}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="flex items-baseline min-w-0">
+          <ProjectDot color={entry.projectColor} />
+          <span className="text-sm text-gray-600 truncate">{entry.projectName}</span>
+        </span>
+        <span className="text-sm text-gray-600 tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
+      </div>
+
+      <p className="mt-1 text-indigo-500 break-words">
+        {entry.description || <span className="text-gray-400">(bez opisu)</span>}
+        {entry.autoClosed && <span className="ml-2 text-xs text-amber-800">auto</span>}
+      </p>
+
+      <p className="text-sm text-gray-700">
+        {entry.surname} {entry.name}
+        {entry.editedByName && <span className="ml-2 text-xs text-gray-500">popr. {entry.editedByName}</span>}
+      </p>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-sm text-gray-600 tabular-nums" title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}>
+          {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-medium tabular-nums">{formatDuration(entry.seconds)}</span>
+          <PencilButton busy={busy} onClick={onEdit} />
+        </span>
+      </div>
+    </li>
+  );
+};
 
 /**
  * Lista projektów do wyboru przy poprawianiu wpisu.
@@ -519,7 +625,22 @@ const projectOptions = (available, entry) =>
         ...available,
       ];
 
-const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => {
+/**
+ * Wpis otwarty do poprawki w tabeli. Sam formularz siedzi w EntryForm, bo ten sam
+ * służy karcie na telefonie — obwoluta różni się wyłącznie tym, w co go opakować.
+ */
+const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => (
+  <tr className="border-b border-gray-300 bg-indigo-50">
+    {/* Formularz przez całą szerokość wiersza, a nie pole w każdej komórce:
+        sześć wąskich kolumn nie pomieściłoby ani selecta z nazwą projektu,
+        ani opisu. */}
+    <td colSpan={7} className="py-3">
+      <EntryForm entry={entry} projects={projects} busy={busy} onCancel={onCancel} onSave={onSave} />
+    </td>
+  </tr>
+);
+
+const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
   const [form, setForm] = useState({
     projectID: entry.projectID,
     description: entry.description,
@@ -541,90 +662,88 @@ const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => {
   };
 
   return (
-    <tr className="border-b border-gray-300 bg-indigo-50">
-      {/* Formularz przez całą szerokość wiersza, a nie pole w każdej komórce:
-          sześć wąskich kolumn nie pomieściłoby ani selecta z nazwą projektu,
-          ani opisu, a na telefonie rozjechałoby tabelę. */}
-      <td colSpan={7} className="py-3">
-        <form onSubmit={submit}>
-          <p className="mb-2 text-xs text-gray-600">
-            {entry.surname} {entry.name} · wpis z {dayjs(entry.data).format("D MMMM YYYY")}
-          </p>
+    <form onSubmit={submit}>
+      <p className="mb-2 text-xs text-gray-600">
+        {entry.surname} {entry.name} · wpis z {dayjs(entry.data).format("D MMMM YYYY")}
+      </p>
 
-          <div className="flex gap-2 flex-col sm:flex-row mb-2">
-            <select
-              value={form.projectID}
-              onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-              className="p-2 border border-gray-400 rounded sm:w-56 shrink-0 bg-white"
-            >
-              {options.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.isActive ? "" : " (archiwalny)"}
-                </option>
-              ))}
-            </select>
+      <div className="flex gap-2 flex-col sm:flex-row mb-2">
+        <select
+          value={form.projectID}
+          onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
+          className="p-2 border border-gray-400 rounded sm:w-56 shrink-0 bg-white"
+        >
+          {options.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+              {p.isActive ? "" : " (archiwalny)"}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={form.description}
+          maxLength={200}
+          placeholder="Opis zadania"
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          className="flex-grow min-w-0 p-2 border border-gray-400 rounded"
+        />
+      </div>
+
+      <div className="flex gap-2 items-end flex-wrap">
+        {/* Bez min/max: kierownik poprawia wpisy z dowolnego okresu. */}
+        <Field label="Data">
+          <input
+            type="date"
+            value={form.data}
+            onChange={(e) => setForm({ ...form, data: e.target.value })}
+            className="w-full sm:w-auto p-2 border border-gray-400 rounded"
+            required
+          />
+        </Field>
+        {/* Od i Do obok siebie także na telefonie — to jedna informacja, zakres. */}
+        <span className="flex gap-2 w-full sm:w-auto">
+          <Field label="Od">
             <input
-              type="text"
-              value={form.description}
-              maxLength={200}
-              placeholder="Opis zadania"
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="flex-grow min-w-0 p-2 border border-gray-400 rounded"
+              type="time"
+              value={form.from}
+              onChange={(e) => setForm({ ...form, from: e.target.value })}
+              className="w-full sm:w-auto p-2 border border-gray-400 rounded"
+              required
             />
-          </div>
+          </Field>
+          <Field label="Do">
+            <input
+              type="time"
+              value={form.to}
+              onChange={(e) => setForm({ ...form, to: e.target.value })}
+              className="w-full sm:w-auto p-2 border border-gray-400 rounded"
+              required
+            />
+          </Field>
+        </span>
 
-          <div className="flex gap-2 items-end flex-wrap">
-            {/* Bez min/max: kierownik poprawia wpisy z dowolnego okresu. */}
-            <Field label="Data">
-              <input
-                type="date"
-                value={form.data}
-                onChange={(e) => setForm({ ...form, data: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
-                required
-              />
-            </Field>
-            <Field label="Od">
-              <input
-                type="time"
-                value={form.from}
-                onChange={(e) => setForm({ ...form, from: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
-                required
-              />
-            </Field>
-            <Field label="Do">
-              <input
-                type="time"
-                value={form.to}
-                onChange={(e) => setForm({ ...form, to: e.target.value })}
-                className="p-2 border border-gray-400 rounded"
-                required
-              />
-            </Field>
-
-            <span className="flex gap-2 ml-auto">
-              <button
-                type="submit"
-                disabled={busy}
-                className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
-              >
-                Zapisz
-              </button>
-              <button type="button" onClick={onCancel} className="py-2 px-3 text-gray-600">
-                Anuluj
-              </button>
-            </span>
-          </div>
-        </form>
-      </td>
-    </tr>
+        <span className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex-grow sm:flex-grow-0 text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
+          >
+            Zapisz
+          </button>
+          <button type="button" onClick={onCancel} className="py-2 px-3 text-gray-600">
+            Anuluj
+          </button>
+        </span>
+      </div>
+    </form>
   );
 };
 
+// w-full na telefonie, bo pola stoją tam jedno pod drugim (patrz komentarz
+// w formularzu filtrów); od `sm` etykieta zwęża się do swojej zawartości.
 const Field = ({ label, children }) => (
-  <label className="flex flex-col">
+  <label className="flex flex-col w-full sm:w-auto">
     <span className="mb-1 text-xs font-medium text-gray-700">{label}</span>
     {children}
   </label>
