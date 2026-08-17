@@ -14,7 +14,17 @@ const MODES = ["wpisy", "projekty", "porownanie"];
 // z przecinkiem (Excel to zsumuje) i raz czytelnie dla człowieka. Bez tego
 // pierwszego arkusz nie policzy sumy kolumny, bez drugiego nikt nie wie,
 // czy 1,75 to godziny czy coś innego.
-const hoursPair = (seconds) => [plNumber(seconds / 3600), formatDuration(seconds)];
+//
+// CZTERY miejsca po przecinku, nie domyślne dwa: przy dwóch najmniejszą
+// rozróżnialną wartością jest 0,01 h, czyli 36 sekund — każdy krótki wpis
+// zaokrąglałby się do niej i suma kolumny w arkuszu rozjeżdżałaby się
+// z kolumną czytelną tym bardziej, im więcej takich wpisów.
+const HOURS_DECIMALS = 4;
+
+const hoursPair = (seconds) => [
+  plNumber(seconds / 3600, HOURS_DECIMALS),
+  formatDuration(seconds),
+];
 
 // Start i koniec z sekundami, mimo że na ekranie wystarcza "HH:mm": w arkuszu
 // ktoś odejmie jedną kolumnę od drugiej i wynik musi zgadzać się z kolumną czasu.
@@ -111,7 +121,7 @@ export default async (req, res) => {
         ...hoursPair(u.reported),
         // Znak ma zostać widoczny również w wersji liczbowej — inaczej
         // "2,5" nie odróżni nadmiaru od niedoboru.
-        plNumber(u.diff / 3600),
+        plNumber(u.diff / 3600, HOURS_DECIMALS),
         formatDuration(u.diff, { withSign: true }),
         u.coverage === null ? "" : u.coverage,
       ])
