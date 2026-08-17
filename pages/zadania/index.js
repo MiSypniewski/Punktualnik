@@ -11,7 +11,7 @@ import { getEntriesForUser, getRunningEntry, closeStaleEntries } from "../../ser
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
 import { canTrackTasks } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
-import { formatDuration, hhmm, timePart } from "../../utils";
+import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
 
 dayjs.locale("pl");
 
@@ -510,7 +510,13 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call }) => {
             onClick={() =>
               call(`/api/entries/${entry.id}`, {
                 method: "PUT",
-                body: JSON.stringify({ action: "update", ...form }),
+                body: JSON.stringify({
+                  action: "update",
+                  ...form,
+                  // Nietknięte godziny lecą z oryginalnymi sekundami — patrz keepSeconds.
+                  from: keepSeconds(form.from, entry.startedAt),
+                  to: keepSeconds(form.to, entry.endedAt),
+                }),
               }).then((ok) => ok && setEditing(false))
             }
             className="text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-4 rounded text-sm disabled:opacity-50"

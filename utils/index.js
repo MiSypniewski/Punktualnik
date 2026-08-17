@@ -122,3 +122,19 @@ export const hhmm = (ts) => String(ts ?? "").slice(11, 16);
 
 /** Znacznik → 'HH:mm:ss'. */
 export const timePart = (ts) => String(ts ?? "").slice(11, 19);
+
+/**
+ * Godzina do wysłania z formularza edycji wpisu.
+ *
+ * Pola <input type="time"> pokazują "HH:mm", bo tak się o godzinach mówi i nikt
+ * nie chce klikać sekund przy poprawianiu literówki w opisie. Ale wpis potrafi
+ * zaczynać się o 13:12:11 — gdyby nietknięte pole odesłało samo "13:12",
+ * poprawienie opisu skróciłoby 30-sekundowy wpis do zera i odbiło się o walidację
+ * "koniec musi się różnić od początku". Dlatego pole nietknięte oddaje ORYGINALNY
+ * znacznik z sekundami, a dopiero ręczna zmiana godziny zeruje sekundy — co jest
+ * dokładnie tym, czego oczekuje ktoś, kto wpisuje "9:15".
+ *
+ * @param {string} value wartość z pola ("HH:mm")
+ * @param {string} stamp znacznik z bazy ('YYYY-MM-DD HH:mm:ss')
+ */
+export const keepSeconds = (value, stamp) => (value === hhmm(stamp) ? timePart(stamp) : value);

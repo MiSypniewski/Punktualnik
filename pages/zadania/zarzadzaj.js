@@ -15,7 +15,7 @@ import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
 import { visibleSections } from "../../services/scope";
-import { formatDuration, hhmm, timePart, TASK_QUERY_MAX } from "../../utils";
+import { formatDuration, hhmm, keepSeconds, timePart, TASK_QUERY_MAX } from "../../utils";
 
 dayjs.locale("pl");
 
@@ -532,7 +532,12 @@ const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => {
 
   const submit = (e) => {
     e.preventDefault();
-    onSave(form);
+    // Nietknięte godziny lecą z oryginalnymi sekundami — patrz keepSeconds.
+    onSave({
+      ...form,
+      from: keepSeconds(form.from, entry.startedAt),
+      to: keepSeconds(form.to, entry.endedAt),
+    });
   };
 
   return (
