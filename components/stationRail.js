@@ -111,7 +111,11 @@ export default function StationRail({ user }) {
           <Logo />
           <StationClock />
 
-          <nav className="hidden lg:flex items-center gap-5 flex-grow" aria-label="Sekcje aplikacji">
+          {/* Próg 1280 px, nie 1024: przy siedmiu pozycjach kierownika, zegarze,
+              znaku, koncie i przełączniku motywu pasek nie mieścił się na
+              tablecie i wypychał stronę w poziomie. Poniżej — menu pod
+              przyciskiem. */}
+          <nav className="hidden xl:flex items-center gap-5 flex-grow min-w-0" aria-label="Sekcje aplikacji">
             {items.map((item) => (
               <RailLink key={item.href} item={item} active={router.pathname === item.match} />
             ))}
@@ -127,7 +131,7 @@ export default function StationRail({ user }) {
                     {user.name}
                   </a>
                 </Link>
-                <SignOutButton className="hidden lg:block text-sm" />
+                <SignOutButton className="hidden xl:block text-sm" />
               </>
             )}
             {/* Poniżej 640 px przełącznik przenosi się do menu: znak, zegar,
@@ -143,7 +147,7 @@ export default function StationRail({ user }) {
               aria-expanded={open}
               aria-controls="menu-paska"
               aria-label={open ? "Zamknij menu" : "Otwórz menu"}
-              className="lg:hidden flex items-center justify-center w-9 h-9 rounded border border-line text-muted hover:text-body hover:bg-raised"
+              className="xl:hidden flex items-center justify-center w-9 h-9 rounded border border-line text-muted hover:text-body hover:bg-raised"
             >
               <MenuIcon open={open} />
             </button>
@@ -154,7 +158,7 @@ export default function StationRail({ user }) {
       {open && (
         <nav
           id="menu-paska"
-          className="lg:hidden border-t border-line-subtle bg-surface"
+          className="xl:hidden border-t border-line-subtle bg-surface"
           aria-label="Sekcje aplikacji"
         >
           <div className="mx-auto max-w-wide px-4 py-2">
