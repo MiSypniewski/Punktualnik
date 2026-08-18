@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
+import ThemeToggle from "./themeToggle";
 import TimerTitle from "./timerTitle";
 import {
   canExportTimes,
@@ -91,6 +92,10 @@ const TopNavigation = () => {
           <a className="capitalize font-bold hover:underline">{session.user.name}</a>
         </Link>
       )}
+      {/* Także dla kiosku: stoi w konkretnym pomieszczeniu i bywa, że trzeba mu
+          po prostu przygasić ekran. To ustawienie wyglądu, nie konta — nie ma
+          czego przestawić na cudzą szkodę. */}
+      <ThemeToggle />
     </div>
   );
 };
