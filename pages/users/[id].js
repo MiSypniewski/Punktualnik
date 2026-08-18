@@ -1,3 +1,4 @@
+import { getToken } from "next-auth/jwt";
 import getUserData from "../../services/getUserData";
 import BaseLayout from "../../components/baseLayout";
 import Spinner from "../../components/spinner";
@@ -12,8 +13,27 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
 
+// Kontrola po stronie serwera. Wcześniej `getUserData` szło do bazy PRZED
+// jakimkolwiek sprawdzeniem sesji, więc dane konta (imię, nazwisko, e-mail,
+// dział, rola) trafiały do propsów każdemu, kto wpisał adres — także osobie
+// niezalogowanej. Sprawdzenie w `useEffect` przekierowywało dopiero
+// w przeglądarce, czyli PO wysłaniu danych.
 export const getServerSideProps = async (context) => {
+  const token = await getToken({ req: context.req });
+  if (!token) {
+    return { redirect: { destination: "/users/signin", permanent: false } };
+  }
+
+  // Cudzy profil to 404, a nie 403: odpowiedź „brak uprawnień” potwierdzałaby,
+  // że konto o tym identyfikatorze istnieje.
+  if (String(token.userID) !== String(context.params.id)) {
+    return { notFound: true };
+  }
+
   const userData = await getUserData(context.params.id);
+  if (userData.length === 0) {
+    return { notFound: true };
+  }
 
   return {
     props: {
@@ -21,6 +41,12 @@ export const getServerSideProps = async (context) => {
       id: context.params.id,
     },
   };
+};
+
+// Kody błędów z API po ludzku; nieznany kod pokazujemy jak leci.
+const ERROR_MESSAGES = {
+  wrong_old_password: "Stare hasło się nie zgadza.",
+  user_not_found: "Nie znaleziono konta. Zaloguj się ponownie.",
 };
 
 export default function UserData({ userData, id }) {
@@ -32,13 +58,11 @@ export default function UserData({ userData, id }) {
   const [error, setError] = useState();
   const [formProcessing, setFormProcessing] = useState(false);
 
-  //wywalenie użytkownika o innym ID
+  // Cudzy profil odcina już getServerSideProps. Tutaj zostaje wyłącznie
+  // przypadek sesji, która wygasła, kiedy strona była otwarta.
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/");
-    }
-    if (status === "authenticated" && session.user.userID.toString() !== id) {
-      router.push("/");
+      router.push("/users/signin");
     }
   }, [session, status]);
 
@@ -78,9 +102,9 @@ export default function UserData({ userData, id }) {
     if (response.ok) {
       router.push("/users/password");
     } else {
-      const payload = await response.json();
+      const body = await response.json();
       setFormProcessing(false);
-      setError(payload.error);
+      setError(ERROR_MESSAGES[body.error] || body.error);
     }
   };
 

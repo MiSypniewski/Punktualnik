@@ -1,46 +1,64 @@
+import { getToken } from "next-auth/jwt";
 import createUser from "../../../services/createUser";
 import updateUserPassword from "../../../services/updateUserPassowrd";
-import { getSession } from "next-auth/react";
-// import authorizeUser from "../../../services/authorize";
 
+// Obie metody wymagają zalogowania. Wcześniej sprawdzenie sesji było
+// zakomentowane, czyli endpoint stał otworem dla całego internetu:
+//
+// - POST pozwalał dowolnej osobie wsypywać wiersze do tabeli Users. Konta
+//   powstają wyłączone (`isActive = 0`), więc nie dawało to dostępu do
+//   aplikacji, ale dawało nieograniczone zaśmiecanie bazy na maszynie z 10 GB
+//   dysku i listy „do aktywacji”, w której nie sposób znaleźć prawdziwego
+//   pracownika.
+// - PUT był otwartą wyrocznią do zgadywania haseł: brał `userID` z CIAŁA
+//   ŻĄDANIA i sprawdzał stare hasło, więc bez żadnej sesji dało się strzelać
+//   hasłami do konta o dowolnym identyfikatorze (a te są małymi liczbami).
+//
+// Identyfikator do zmiany hasła bierzemy TERAZ Z TOKENU i nigdy z ciała
+// żądania: hasło zmienia się wyłącznie własne. Kierownik od cudzych haseł ma
+// `npm run admin -- passwd <email> <hasło>`.
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
+  const token = await getToken({ req });
+  if (!token) {
+    return res.status(401).json({ error: "not_authorized" });
+  }
+
   switch (req.method) {
     case "POST": {
-      try {
-        // console.log(req);
-        // const session = await getSession({ req });
-        // if (!session) {
-        //   return res.status(401).json({ error: "not_authotized" });
-        // }
-
-        const payload = req.body;
-        const user = await createUser(payload);
-        res.status(200).json({ status: "created", user });
-      } catch (error) {
-        res.status(422).json({ status: "not_created", error: error.message });
+      // Kiosk to konto WSPÓŁDZIELONE przy ekranie dotykowym w miejscu
+      // publicznym — nie zakłada kont, tak samo jak nie raportuje zadań
+      // i nie pobiera eksportów.
+      if (token.role === "editor") {
+        return res.status(403).json({ error: "permission_denied" });
       }
-      break;
+
+      try {
+        const user = await createUser(req.body);
+        return res.status(200).json({ status: "created", user });
+      } catch (error) {
+        return res.status(422).json({ status: "not_created", error: error.message });
+      }
     }
     case "PUT": {
-      try {
-        // console.log(req);
-        //to trzeba ostro zmienić
-        // const session = await getSession({ req });
-        // if (!session) {
-        //   return res.status(401).json({ error: "not_authotized" });
-        // }
+      const { oldPassword, newPassword } = req.body ?? {};
 
-        const payload = req.body;
-        const user = await updateUserPassword(payload);
-        res.status(200).json({ status: "update", user });
+      try {
+        const user = await updateUserPassword({
+          userID: token.userID,
+          oldPassword,
+          newPassword,
+        });
+        return res.status(200).json({ status: "update", user });
       } catch (error) {
-        res.status(422).json({ status: "not_update", error: error.message });
+        return res.status(422).json({ status: "not_update", error: error.message });
       }
-      break;
     }
     default: {
-      res.status(400);
+      // Wcześniej ta gałąź ustawiała status i nie kończyła odpowiedzi —
+      // żądanie wisiało do timeoutu.
+      res.setHeader("Allow", "POST, PUT");
+      return res.status(405).json({ error: "method_not_allowed" });
     }
   }
 };

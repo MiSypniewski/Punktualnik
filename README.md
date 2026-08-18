@@ -70,7 +70,7 @@ Aplikację prowadzi `pm2`. Pełna sekwencja: [Wdrożenie na Mikrus](#wdrożenie-
 ### Typowe scenariusze
 
 ```bash
-# Nowy pracownik (sam się zarejestrował)
+# Nowy pracownik (formularz /users/register wypełnił ktoś zalogowany)
 npm run admin -- pending
 npm run admin -- activate jan@example.pl
 
@@ -142,8 +142,14 @@ npm run admin -- pending
 
 Na Mikrusie: zaloguj się po SSH, wejdź do katalogu aplikacji i uruchom jak wyżej.
 Skrypt używa tej samej bazy co aplikacja (`SQLITE_PATH` / domyślnie `./data/punktualnik.sqlite`).
-Typowy flow nowego pracownika: rejestracja w aplikacji → `pending` → `activate` →
-(jeśli ma obsługiwać karty) `role <id> editor`.
+Typowy flow nowego pracownika: formularz `/users/register` → `pending` →
+`activate` → (jeśli ma obsługiwać karty) `role <id> editor`.
+
+**Formularz rejestracji wymaga zalogowania** — konto zakłada ktoś, kto już je ma
+(kiosk nie, to konto współdzielone). Nie jest to samoobsługa z ulicy: `POST
+/api/users` bez sesji odpowiada 401, bo inaczej dowolna osoba z internetu
+wsypywałaby wiersze do tabeli `Users` i listy „do aktywacji”. Konto pierwsze
+oraz konta zakładane hurtem robi się i tak z linii poleceń.
 
 ## Sekcje (działy)
 
