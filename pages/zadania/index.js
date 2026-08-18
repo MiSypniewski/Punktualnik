@@ -229,9 +229,26 @@ export default function Zadania({
 
 // --- pasek timera -----------------------------------------------------------
 
-const Bar = ({ children }) => (
-  <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white border-b-2 border-indigo-500 shadow-sm">
-    {children}
+// `tone` rozróżnia stan: "idle" (czekamy na Start) od "running" (czas leci).
+// Kolor ma nieść tę informację z drugiego końca pokoju — sam licznik jest na to
+// za mały, a to jedyne miejsce na stronie, gdzie coś się DZIEJE.
+//
+// Nagłówek zamiast samego placeholdera: placeholder znika po pierwszej literze,
+// więc po wpisaniu opisu pasek przestawał się przedstawiać.
+const Bar = ({ tone = "idle", title, children }) => (
+  // Zewnętrzna warstwa jest pełnoszerokościowa i NIEPRZEZROCZYSTA, bo karta ma
+  // zaokrąglone rogi — bez niej przy `sticky` przez rogi prześwitywałaby
+  // przewijana pod spodem lista wpisów.
+  <div className="sticky top-0 z-10 -mx-4 px-4 pt-2 pb-4 bg-white">
+    <div
+      className={classNames(
+        "rounded-lg border-2 p-3 shadow-sm",
+        tone === "running" ? "border-rose-400 bg-rose-50" : "border-indigo-400 bg-indigo-50"
+      )}
+    >
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-600">{title}</h2>
+      {children}
+    </div>
   </div>
 );
 
@@ -376,7 +393,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
   const project = options.find((p) => p.id === draft.projectID);
 
   return (
-    <Bar>
+    <Bar tone="running" title="Pracujesz nad">
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(project?.color).dot}`} />
         {/* Te same pola co przed startem, w tym samym układzie — pasek nie zmienia
@@ -386,7 +403,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
           value={draft.description}
           list={`opisy-${draft.projectID}`}
           maxLength={200}
-          placeholder="Nad czym pracujesz?"
+          placeholder="np. Weryfikacja raportów z instalacji"
           onChange={(e) => edit({ description: e.target.value })}
           onBlur={flush}
           onKeyDown={(e) => e.key === "Enter" && flush()}
@@ -449,7 +466,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
   };
 
   return (
-    <Bar>
+    <Bar title="Nad czym pracujesz?">
       {/* Opis z lewej, projekt z prawej: zdanie zaczyna się od tego, CO się robi,
           a projekt jest doprecyzowaniem. Opis dostaje też całą wolną szerokość,
           bo bywa dłuższy niż nazwa projektu. */}
@@ -459,7 +476,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
           value={description}
           list={`opisy-${projectID}`}
           maxLength={200}
-          placeholder="Nad czym pracujesz?"
+          placeholder="np. Weryfikacja raportów z instalacji"
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && start()}
           className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500"
