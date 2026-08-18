@@ -5,10 +5,13 @@ import { getToken } from "next-auth/jwt";
 import getSectionTime from "../../services/getSectionTime";
 import { canSeeSection } from "../../services/scope";
 import getUsers from "../../services/getUsers";
+import { getSection } from "../../services/sections";
 import useSWR from "swr";
 import BaseLayout from "../../components/baseLayout";
 import Card from "../../components/card";
 import Spinner from "../../components/spinner";
+import PageHeader from "../../components/ui/pageHeader";
+import EmptyState from "../../components/ui/emptyState";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -96,15 +99,23 @@ export const getServerSideProps = async (context) => {
     });
   }
 
+  // Etykieta działu do nagłówka tablicy — slug (`spedycja`) jest kluczem
+  // technicznym, a na ścianie ma stać nazwa dla ludzi.
+  const sectionRow = getSection(context.params.id);
+
   return {
     props: {
       newCardData,
       id: context.params.id,
+      sectionLabel: sectionRow?.label ?? context.params.id,
+      // Doba robocza zaczyna się o 3:00, więc „dzisiaj” na tablicy to nie
+      // zawsze dzisiaj w kalendarzu — stąd data prosto z serwera.
+      workdayLabel: dayjs(toDay).format("dddd, D MMMM YYYY"),
     },
   };
 };
 
-export default function Home({ newCardData, id }) {
+export default function Home({ newCardData, id, sectionLabel, workdayLabel }) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -121,21 +132,32 @@ export default function Home({ newCardData, id }) {
 
   if (status !== "authenticated") {
     // console.log(`loading`);
-    return (
-      <div>
-        <p className="text-center mt-20"> Ładowanie ...</p>
-        <Spinner />
-      </div>
-    );
+    return <Spinner />;
   }
 
+  const cards = data != undefined ? data : newCardData;
+
   return (
-    <BaseLayout>
-      <div className="lg:container mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-1 p-2">
-        {data != undefined
-          ? data.map((data) => <Card data={data} key={data.ID} />)
-          : newCardData.map((data) => <Card data={data} key={data.ID} />)}
-      </div>
+    <BaseLayout width="full">
+      <PageHeader
+        title={sectionLabel}
+        description={<span className="first-letter:uppercase">{workdayLabel}</span>}
+      />
+
+      {cards.length === 0 ? (
+        <EmptyState
+          title="Nikogo tu nie ma"
+          description="W tym dziale nie ma aktywnych pracowników. Konta zakłada się przez rejestrację, a aktywuje poleceniem `npm run admin -- activate`."
+        />
+      ) : (
+        // Cztery kolumny od 1280 px: tablet kiosku stoi zwykle w poziomie,
+        // a przy kilkunastu osobach trzy kolumny zeszły poniżej krawędzi ekranu.
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {cards.map((card) => (
+            <Card data={card} key={card.ID} />
+          ))}
+        </div>
+      )}
     </BaseLayout>
   );
 }
