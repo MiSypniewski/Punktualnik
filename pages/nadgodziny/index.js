@@ -91,8 +91,8 @@ export default function Nadgodziny({ balance, requests }) {
   };
 
   const balanceClass = classNames("text-4xl font-bold", {
-    "text-green-600": balance > 0,
-    "text-red-600": balance < 0,
+    "text-green-600 dark:text-green-300": balance > 0,
+    "text-red-600 dark:text-red-300": balance < 0,
     "text-muted": balance === 0,
   });
 
@@ -103,7 +103,7 @@ export default function Nadgodziny({ balance, requests }) {
       <section className="mx-auto p-4 mt-6 mb-8 max-w-3xl">
         <h1 className="text-2xl font-bold mb-6">Moje nadgodziny</h1>
 
-        <div className="mb-8 p-4 border border-indigo-200 rounded shadow-sm">
+        <div className="mb-8 p-4 border border-indigo-200 dark:border-indigo-500/40 rounded shadow-sm">
           <p className="text-sm text-muted mb-1">Aktualne saldo</p>
           <p className={balanceClass}>{formatMinutes(balance, { withSign: true })}</p>
           <p className="text-xs text-muted mt-2">
@@ -170,7 +170,7 @@ export default function Nadgodziny({ balance, requests }) {
             className="mb-6 p-2 border border-indigo-400 rounded"
           />
 
-          {err && <p className="mb-4 text-red-600 text-sm">{err}</p>}
+          {err && <p className="mb-4 text-red-600 dark:text-red-300 text-sm">{err}</p>}
 
           <button
             type="submit"
@@ -191,7 +191,7 @@ export default function Nadgodziny({ balance, requests }) {
                 // wniosków, bo rola user nie widzi cudzych.
                 window.location.href = "/api/report/nadgodziny";
               }}
-              className="text-sm text-indigo-600 hover:underline"
+              className="text-sm text-indigo-600 dark:text-indigo-300 hover:underline"
             >
               Pobierz CSV
             </button>
@@ -219,8 +219,8 @@ export default function Nadgodziny({ balance, requests }) {
                     <td className="py-2 pr-3">{kindLabel(r.kind)}</td>
                     <td
                       className={classNames("py-2 pr-3 text-right whitespace-nowrap font-medium", {
-                        "text-green-600": signedMinutes(r) > 0,
-                        "text-red-600": signedMinutes(r) < 0,
+                        "text-green-600 dark:text-green-300": signedMinutes(r) > 0,
+                        "text-red-600 dark:text-red-300": signedMinutes(r) < 0,
                       })}
                     >
                       {formatMinutes(signedMinutes(r), { withSign: true })}
@@ -243,7 +243,7 @@ export default function Nadgodziny({ balance, requests }) {
                         <button
                           onClick={() => cancel(r.id)}
                           disabled={busy}
-                          className="text-xs text-red-600 hover:underline disabled:text-faint"
+                          className="text-xs text-red-600 dark:text-red-300 hover:underline disabled:text-faint"
                         >
                           Anuluj
                         </button>

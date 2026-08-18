@@ -157,7 +157,7 @@ export default function CreateUser({ sections }) {
                   ))}
                 </select>
                 {sections.length === 0 && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-300">
                     Brak zdefiniowanych działów — skontaktuj się z administratorem.
                   </p>
                 )}
@@ -188,7 +188,7 @@ export default function CreateUser({ sections }) {
                   id="K15"
                   name="numerKasy"
                   value="K15"
-                  className="appearance-none indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="appearance-none indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
                 <label htmlFor="K15" className="inline-block leading-7 text-sm text-muted">
                   K15
@@ -201,7 +201,7 @@ export default function CreateUser({ sections }) {
                   id="K16"
                   name="numerKasy"
                   value="K16"
-                  className="indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
                 <label htmlFor="K16" className="leading-7 text-sm text-muted">
                   K16
@@ -213,7 +213,7 @@ export default function CreateUser({ sections }) {
                   id="K17"
                   name="numerKasy"
                   value="K17"
-                  className=" indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className=" indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
                 <label htmlFor="K17" className="leading-7 text-sm text-muted">
                   K17
@@ -247,7 +247,7 @@ export default function CreateUser({ sections }) {
                   id="tak"
                   name="glosowanie"
                   value="tak"
-                  className="appearance-none indeterminate:bg-line h-4 w-4 rounded-full border border-line  bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="appearance-none indeterminate:bg-line h-4 w-4 rounded-full border border-line  bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
                 <label htmlFor="tak" className="inline-block leading-3 text-sm text-muted cursor-pointer">
                   Tak, jestem pedałem
@@ -260,7 +260,7 @@ export default function CreateUser({ sections }) {
                   id="nie"
                   name="glosowanie"
                   value="nie"
-                  className="indeterminate:bg-line h-4 w-4 rounded-full border border-line bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="indeterminate:bg-line h-4 w-4 rounded-full border border-line bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
                 <label htmlFor="nie" className="leading-3 text-sm text-muted">
                   Nie, jebać PiS!
@@ -272,7 +272,7 @@ export default function CreateUser({ sections }) {
                   id="nieumiem"
                   name="glosowanie"
                   value="nieumiem"
-                  className=" indeterminate:bg-line h-4 w-4 border rounded-full border-line bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className=" indeterminate:bg-line h-4 w-4 border rounded-full border-line bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
                 <label htmlFor="nieumiem" className="leading-3 text-sm text-muted">
                   Nie umiem

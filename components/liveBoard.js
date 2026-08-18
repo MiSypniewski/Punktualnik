@@ -82,7 +82,7 @@ export default function LiveBoard({ initial, currentUserID }) {
         <p className="text-xs text-muted">
           Stan bieżący, <span className="font-medium">niezależny od filtrów poniżej</span>
           {board?.generatedAt && ` · ${hhmm(board.generatedAt)}`}
-          {error && <span className="text-amber-800"> · brak łączności, dane mogą być nieaktualne</span>}
+          {error && <span className="text-amber-800 dark:text-amber-300"> · brak łączności, dane mogą być nieaktualne</span>}
         </p>
       </header>
 
@@ -101,7 +101,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                 key={r.id}
                 className={classNames(
                   "flex items-center gap-3 px-3 py-2 border-b border-line-subtle",
-                  tooLong && "bg-amber-50"
+                  tooLong && "bg-amber-50 dark:bg-amber-500/10"
                 )}
               >
                 <ProjectDot color={r.projectColor} />
@@ -118,7 +118,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                         rzecz w wierszu, której kierownik naprawdę szuka wzrokiem;
                         projekt i godzina są kontekstem i zostają szare. */}
                     {r.description ? (
-                      <span className="text-indigo-500">{r.description}</span>
+                      <span className="text-indigo-500 dark:text-indigo-300">{r.description}</span>
                     ) : (
                       "(bez opisu)"
                     )}{" "}
@@ -128,7 +128,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                 <span
                   className={classNames(
                     "font-mono tabular-nums whitespace-nowrap",
-                    tooLong ? "text-amber-800" : "text-body"
+                    tooLong ? "text-amber-800 dark:text-amber-300" : "text-body"
                   )}
                   title={tooLong ? "Biegnie ponad 8 godzin — sprawdź, czy to nie zapomniany timer" : null}
                 >

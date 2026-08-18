@@ -202,7 +202,7 @@ export default function Projekty({ projects, sections, colorKeys }) {
             </div>
           </div>
 
-          {err && <p className="mb-4 text-red-600 text-sm">{err}</p>}
+          {err && <p className="mb-4 text-red-600 dark:text-red-300 text-sm">{err}</p>}
 
           <div className="flex gap-3">
             <button

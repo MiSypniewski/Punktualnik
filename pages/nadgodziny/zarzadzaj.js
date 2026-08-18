@@ -123,8 +123,8 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
 
   const balanceClass = (v) =>
     classNames("text-right font-medium whitespace-nowrap", {
-      "text-green-600": v > 0,
-      "text-red-600": v < 0,
+      "text-green-600 dark:text-green-300": v > 0,
+      "text-red-600 dark:text-red-300": v < 0,
       "text-muted": v === 0,
     });
 
@@ -137,16 +137,16 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
         </p>
 
         {sections.length === 0 && (
-          <p className="mb-6 p-3 bg-yellow-100 text-yellow-900 text-sm rounded">
+          <p className="mb-6 p-3 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-900 dark:text-yellow-300 text-sm rounded">
             Nie masz przypisanej żadnej sekcji, więc panel jest pusty. Przypisanie nadaje się z linii poleceń:{" "}
             <code className="font-mono">npm run admin -- sections &lt;e-mail&gt; nazwaSekcji</code>
           </p>
         )}
 
-        {err && <p className="mb-4 p-2 bg-red-100 text-red-700 text-sm rounded">{err}</p>}
+        {err && <p className="mb-4 p-2 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>}
 
         <h2 className="text-xl font-bold mb-4">
-          Do rozpatrzenia {pending.length > 0 && <span className="text-indigo-600">({pending.length})</span>}
+          Do rozpatrzenia {pending.length > 0 && <span className="text-indigo-600 dark:text-indigo-300">({pending.length})</span>}
         </h2>
 
         {pending.length === 0 ? (
@@ -154,7 +154,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
         ) : (
           <div className="mb-10 flex flex-col gap-3">
             {pending.map((r) => (
-              <div key={r.id} className="p-3 border border-indigo-200 rounded shadow-sm">
+              <div key={r.id} className="p-3 border border-indigo-200 dark:border-indigo-500/40 rounded shadow-sm">
                 <div className="flex flex-wrap gap-x-4 gap-y-1 items-baseline">
                   <span className="font-bold">
                     {r.surname} {r.name}
@@ -164,8 +164,8 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                   <span className="text-sm">{kindLabel(r.kind)}</span>
                   <span
                     className={classNames("font-medium", {
-                      "text-green-600": signedMinutes(r) > 0,
-                      "text-red-600": signedMinutes(r) < 0,
+                      "text-green-600 dark:text-green-300": signedMinutes(r) > 0,
+                      "text-red-600 dark:text-red-300": signedMinutes(r) < 0,
                     })}
                   >
                     {formatMinutes(signedMinutes(r), { withSign: true })}
@@ -228,7 +228,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                   <td className="py-2 text-right">
                     <button
                       onClick={() => router.push(`/nadgodziny/zarzadzaj?userID=${u.id}`)}
-                      className="text-xs text-indigo-600 hover:underline"
+                      className="text-xs text-indigo-600 dark:text-indigo-300 hover:underline"
                     >
                       Historia
                     </button>
@@ -318,7 +318,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
 
         <p className="mb-4 text-xs text-muted">
           „Pobierz CSV” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
-          <button type="button" onClick={() => downloadCsv("salda")} className="text-indigo-600 hover:underline">
+          <button type="button" onClick={() => downloadCsv("salda")} className="text-indigo-600 dark:text-indigo-300 hover:underline">
             Pobierz zestawienie sald wszystkich pracowników
           </button>
           .

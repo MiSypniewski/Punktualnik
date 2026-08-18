@@ -177,11 +177,11 @@ export default function Zadania({
         />
 
         {err && (
-          <p className="my-3 p-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded">{err}</p>
+          <p className="my-3 p-2 bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/40 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>
         )}
 
         {info && (
-          <p className="my-3 p-2 bg-emerald-50 border border-emerald-300 text-emerald-800 text-sm rounded">
+          <p className="my-3 p-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-sm rounded">
             {info}
           </p>
         )}
@@ -243,7 +243,7 @@ const Bar = ({ tone = "idle", title, children }) => (
     <div
       className={classNames(
         "rounded-lg border-2 p-3 shadow-sm",
-        tone === "running" ? "border-rose-400 bg-rose-50" : "border-indigo-400 bg-indigo-50"
+        tone === "running" ? "border-rose-400 bg-rose-50 dark:bg-rose-500/10" : "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/10"
       )}
     >
       <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">{title}</h2>
@@ -407,7 +407,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
           onChange={(e) => edit({ description: e.target.value })}
           onBlur={flush}
           onKeyDown={(e) => e.key === "Enter" && flush()}
-          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500"
+          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500 dark:text-indigo-300"
         />
         <DescriptionOptions descByProject={descByProject} />
 
@@ -434,7 +434,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
       </div>
       <p className="mt-1 text-xs text-muted">
         od {hhmm(running.startedAt)} · opis i projekt zapisują się same
-        {saved && <span className="ml-2 text-emerald-700 font-medium">zapisano ✓</span>}
+        {saved && <span className="ml-2 text-emerald-700 dark:text-emerald-300 font-medium">zapisano ✓</span>}
       </p>
     </Bar>
   );
@@ -479,7 +479,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
           placeholder="np. Weryfikacja raportów z instalacji"
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && start()}
-          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500"
+          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500 dark:text-indigo-300"
         />
         <DescriptionOptions descByProject={descByProject} />
 
@@ -548,7 +548,7 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
           className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-line rounded-full text-sm hover:bg-raised disabled:opacity-50"
         >
           <span className={`w-2 h-2 rounded-full shrink-0 ${projectColor(s.projectColor).dot}`} />
-          <span className="truncate text-indigo-500">{s.description}</span>
+          <span className="truncate text-indigo-500 dark:text-indigo-300">{s.description}</span>
           <span className="text-muted shrink-0">▶</span>
         </button>
       ))}
@@ -571,7 +571,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="mt-6 text-sm text-indigo-600 hover:underline">
+      <button onClick={() => setOpen(true)} className="mt-6 text-sm text-indigo-600 dark:text-indigo-300 hover:underline">
         + Dodaj wpis ręcznie
       </button>
     );
@@ -597,7 +597,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
           maxLength={200}
           placeholder="Opis zadania"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="flex-grow min-w-0 p-2 border border-line-strong rounded text-indigo-500"
+          className="flex-grow min-w-0 p-2 border border-line-strong rounded text-indigo-500 dark:text-indigo-300"
         />
         <select
           value={form.projectID}
@@ -751,7 +751,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             list={`opisy-${form.projectID}`}
             maxLength={200}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="flex-grow min-w-[8rem] p-1.5 border border-line-strong rounded text-sm text-indigo-500"
+            className="flex-grow min-w-[8rem] p-1.5 border border-line-strong rounded text-sm text-indigo-500 dark:text-indigo-300"
           />
           <select
             value={form.projectID}
@@ -812,7 +812,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
   return (
     <li
-      className={classNames("py-2.5 border-b border-line-subtle", entry.autoClosed && "bg-amber-50")}
+      className={classNames("py-2.5 border-b border-line-subtle", entry.autoClosed && "bg-amber-50 dark:bg-amber-500/10")}
     >
       {/* Rząd BEZ flex-wrap. Wcześniej wiersz był jednym `flex flex-wrap` i długi
           opis wypychał godziny oraz przyciski do drugiej linii — bo `truncate`
@@ -834,7 +834,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             <span
               className={classNames(
                 "block break-words",
-                entry.description ? "text-indigo-500" : "text-faint"
+                entry.description ? "text-indigo-500 dark:text-indigo-300" : "text-faint"
               )}
             >
               {entry.description || "(bez opisu)"}
@@ -899,7 +899,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
       {/* Poza rzędem flexowym: bez `flex-wrap` sztuczka z `w-full` przestałaby
           działać, a komunikat ma iść pełną szerokością pod całym wpisem. */}
       {entry.autoClosed && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
           Timer domknął się automatycznie na koniec doby — sprawdź czas i popraw wpis.
         </p>
       )}

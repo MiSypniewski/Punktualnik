@@ -170,7 +170,7 @@ export default function ZarzadzajZadaniami({
       <BaseLayout>
         <section className="mx-auto p-4 mt-6 max-w-2xl">
           <h1 className="text-2xl font-bold mb-4">Raport zadań</h1>
-          <p className="p-3 bg-amber-50 border border-amber-300 rounded text-sm">
+          <p className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/40 rounded text-sm">
             Nie masz przypisanej żadnej sekcji, więc nie widzisz niczyich danych. Przypisanie nadaje się
             komendą <code className="font-mono">npm run admin -- sections &lt;e-mail&gt; &lt;sekcje&gt;</code>.
           </p>
@@ -389,7 +389,7 @@ export default function ZarzadzajZadaniami({
                   <Td
                     className={classNames(
                       "text-right tabular-nums whitespace-nowrap",
-                      u.present === 0 ? "text-faint" : u.diff < 0 ? "text-red-600" : "text-emerald-700"
+                      u.present === 0 ? "text-faint" : u.diff < 0 ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"
                     )}
                   >
                     {u.present === 0 ? "—" : formatDuration(u.diff, { withSign: true })}
@@ -420,14 +420,14 @@ export default function ZarzadzajZadaniami({
         </p>
 
         {detail.total > detail.limit && (
-          <p className="mb-2 p-2 bg-amber-50 border border-amber-300 rounded text-sm">
+          <p className="mb-2 p-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/40 rounded text-sm">
             Pokazano {detail.limit} z {detail.total} wpisów. Zawęź filtry albo pobierz CSV — eksport obejmuje
             komplet.
           </p>
         )}
 
         {err && (
-          <p className="mb-2 p-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded">{err}</p>
+          <p className="mb-2 p-2 bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/40 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>
         )}
 
         {detail.rows.length === 0 ? (
@@ -514,7 +514,7 @@ export default function ZarzadzajZadaniami({
 const dayLabel = (data) => dayjs(data).format("DD.MM.YY");
 
 const EntryRow = ({ entry, busy, onEdit }) => (
-  <tr className={classNames("border-b border-line-subtle", entry.autoClosed && "bg-amber-50")}>
+  <tr className={classNames("border-b border-line-subtle", entry.autoClosed && "bg-amber-50 dark:bg-amber-500/10")}>
     <Td className="whitespace-nowrap">{dayLabel(entry.data)}</Td>
     <Td className="whitespace-nowrap">
       {entry.surname} {entry.name}
@@ -527,7 +527,7 @@ const EntryRow = ({ entry, busy, onEdit }) => (
     </Td>
     <Td>
       {entry.description || <span className="text-faint">(bez opisu)</span>}
-      {entry.autoClosed && <span className="ml-2 text-xs text-amber-800">auto</span>}
+      {entry.autoClosed && <span className="ml-2 text-xs text-amber-800 dark:text-amber-300">auto</span>}
       {entry.editedByName && <span className="ml-2 text-xs text-muted">popr. {entry.editedByName}</span>}
     </Td>
     <Td
@@ -565,7 +565,7 @@ const PencilButton = ({ busy, onClick }) => (
 const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave }) => {
   if (editing) {
     return (
-      <li className="p-3 border border-line rounded bg-indigo-50">
+      <li className="p-3 border border-line rounded bg-indigo-50 dark:bg-indigo-500/10">
         <EntryForm entry={entry} projects={projects} busy={busy} onCancel={onCancel} onSave={onSave} />
       </li>
     );
@@ -575,7 +575,7 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
     <li
       className={classNames(
         "p-3 border border-line rounded",
-        entry.autoClosed && "bg-amber-50 border-amber-300"
+        entry.autoClosed && "bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/40"
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -586,9 +586,9 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
         <span className="text-sm text-muted tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
       </div>
 
-      <p className="mt-1 text-indigo-500 break-words">
+      <p className="mt-1 text-indigo-500 dark:text-indigo-300 break-words">
         {entry.description || <span className="text-faint">(bez opisu)</span>}
-        {entry.autoClosed && <span className="ml-2 text-xs text-amber-800">auto</span>}
+        {entry.autoClosed && <span className="ml-2 text-xs text-amber-800 dark:text-amber-300">auto</span>}
       </p>
 
       <p className="text-sm text-body">
@@ -630,7 +630,7 @@ const projectOptions = (available, entry) =>
  * służy karcie na telefonie — obwoluta różni się wyłącznie tym, w co go opakować.
  */
 const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => (
-  <tr className="border-b border-line bg-indigo-50">
+  <tr className="border-b border-line bg-indigo-50 dark:bg-indigo-500/10">
     {/* Formularz przez całą szerokość wiersza, a nie pole w każdej komórce:
         sześć wąskich kolumn nie pomieściłoby ani selecta z nazwą projektu,
         ani opisu. */}
@@ -750,10 +750,10 @@ const Field = ({ label, children }) => (
 );
 
 const Kpi = ({ label, value, warn, hint }) => (
-  <div className={classNames("p-3 rounded border", warn ? "bg-amber-50 border-amber-300" : "border-line")}>
+  <div className={classNames("p-3 rounded border", warn ? "bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/40" : "border-line")}>
     <p className="text-xs text-muted">{label}</p>
     <p className="text-xl font-bold tabular-nums">{value}</p>
-    {hint && <p className="text-xs text-amber-800">{hint}</p>}
+    {hint && <p className="text-xs text-amber-800 dark:text-amber-300">{hint}</p>}
   </div>
 );
 

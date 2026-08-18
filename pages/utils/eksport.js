@@ -87,7 +87,7 @@ export default function Eksport({ users }) {
           ))}
         </select>
 
-        {err && <p className="mb-4 text-red-600 text-sm">{err}</p>}
+        {err && <p className="mb-4 text-red-600 dark:text-red-300 text-sm">{err}</p>}
 
         <button
           onClick={(e) => {
