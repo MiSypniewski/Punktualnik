@@ -126,12 +126,12 @@ export default function Projekty({ projects, sections, colorKeys }) {
     <BaseLayout>
       <section className="mx-auto p-4 mt-6 mb-8 max-w-4xl">
         <h1 className="text-2xl font-bold mb-1">Projekty</h1>
-        <p className="text-sm text-gray-600 mb-6">
+        <p className="text-sm text-muted mb-6">
           Projekty wybierają pracownicy przy raportowaniu zadań. Projektu nie da się skasować — można go
           zarchiwizować, wtedy znika z wyboru, ale dotychczasowe wpisy zostają nienaruszone.
         </p>
 
-        <form onSubmit={submit} className="mb-8 p-4 border border-gray-300 rounded bg-gray-50">
+        <form onSubmit={submit} className="mb-8 p-4 border border-line rounded bg-raised">
           <h2 className="font-bold mb-4">{editId ? "Edycja projektu" : "Nowy projekt"}</h2>
 
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -170,7 +170,7 @@ export default function Projekty({ projects, sections, colorKeys }) {
                   className={classNames(
                     "w-8 h-8 rounded-full border-2",
                     projectColor(key).dot,
-                    form.color === key ? "border-gray-800" : "border-transparent"
+                    form.color === key ? "border-body" : "border-transparent"
                   )}
                 />
               ))}
@@ -179,7 +179,7 @@ export default function Projekty({ projects, sections, colorKeys }) {
 
           <div className="mb-4">
             <span className="block mb-1 text-sm font-medium">Sekcje</span>
-            <p className="text-xs text-gray-600 mb-2">
+            <p className="text-xs text-muted mb-2">
               Nie zaznaczaj żadnej, jeśli projekt ma być dostępny dla całej firmy.
             </p>
             <div className="flex gap-4 flex-wrap">
@@ -195,7 +195,7 @@ export default function Projekty({ projects, sections, colorKeys }) {
                 </label>
               ))}
               {sections.length === 0 && (
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted">
                   Nie masz przypisanej żadnej sekcji — założysz tylko projekt ogólnofirmowy.
                 </span>
               )}
@@ -213,7 +213,7 @@ export default function Projekty({ projects, sections, colorKeys }) {
               {editId ? "Zapisz zmiany" : "Dodaj projekt"}
             </button>
             {editId && (
-              <button type="button" onClick={cancelEdit} className="py-2 px-6 border border-gray-400 rounded">
+              <button type="button" onClick={cancelEdit} className="py-2 px-6 border border-line-strong rounded">
                 Anuluj
               </button>
             )}
@@ -221,7 +221,7 @@ export default function Projekty({ projects, sections, colorKeys }) {
         </form>
 
         <h2 className="font-bold mb-3">Aktywne ({active.length})</h2>
-        {active.length === 0 && <p className="text-sm text-gray-500 mb-6">Brak aktywnych projektów.</p>}
+        {active.length === 0 && <p className="text-sm text-muted mb-6">Brak aktywnych projektów.</p>}
         <ul className="mb-8">
           {active.map((p) => (
             <ProjectRow key={p.id} p={p} busy={busy} onEdit={startEdit} onToggle={setActive} />
@@ -246,17 +246,17 @@ export default function Projekty({ projects, sections, colorKeys }) {
 const ProjectRow = ({ p, busy, onEdit, onToggle }) => (
   <li
     className={classNames(
-      "flex items-center gap-3 p-3 border-b border-gray-200 flex-wrap",
+      "flex items-center gap-3 p-3 border-b border-line-subtle flex-wrap",
       !p.isActive && "opacity-60"
     )}
   >
     <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(p.color).dot}`} />
     <span className="font-medium">{p.name}</span>
-    {p.client && <span className="text-sm text-gray-600">· {p.client}</span>}
+    {p.client && <span className="text-sm text-muted">· {p.client}</span>}
 
     <span className="flex gap-1 flex-wrap">
       {p.sections.length === 0 ? (
-        <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">cała firma</span>
+        <span className="text-xs px-2 py-0.5 rounded bg-raised text-body">cała firma</span>
       ) : (
         p.sections.map((s) => (
           <span key={s} className={`text-xs px-2 py-0.5 rounded ${projectColor(p.color).chip}`}>
@@ -271,7 +271,7 @@ const ProjectRow = ({ p, busy, onEdit, onToggle }) => (
         <button
           onClick={() => onEdit(p)}
           disabled={busy}
-          className="text-sm py-1 px-3 border border-gray-400 rounded disabled:opacity-50"
+          className="text-sm py-1 px-3 border border-line-strong rounded disabled:opacity-50"
         >
           Edytuj
         </button>
@@ -279,7 +279,7 @@ const ProjectRow = ({ p, busy, onEdit, onToggle }) => (
       <button
         onClick={() => onToggle(p.id, !p.isActive)}
         disabled={busy}
-        className="text-sm py-1 px-3 border border-gray-400 rounded disabled:opacity-50"
+        className="text-sm py-1 px-3 border border-line-strong rounded disabled:opacity-50"
       >
         {p.isActive ? "Archiwizuj" : "Przywróć"}
       </button>

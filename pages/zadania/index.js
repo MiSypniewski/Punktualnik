@@ -202,7 +202,7 @@ export default function Zadania({
         />
 
         {days.length === 0 && (
-          <p className="mt-8 text-gray-500 text-sm">
+          <p className="mt-8 text-muted text-sm">
             Nie masz jeszcze żadnych wpisów. Wybierz projekt, opisz zadanie i naciśnij Start.
           </p>
         )}
@@ -239,14 +239,14 @@ const Bar = ({ tone = "idle", title, children }) => (
   // Zewnętrzna warstwa jest pełnoszerokościowa i NIEPRZEZROCZYSTA, bo karta ma
   // zaokrąglone rogi — bez niej przy `sticky` przez rogi prześwitywałaby
   // przewijana pod spodem lista wpisów.
-  <div className="sticky top-0 z-10 -mx-4 px-4 pt-2 pb-4 bg-white">
+  <div className="sticky top-0 z-10 -mx-4 px-4 pt-2 pb-4 bg-surface">
     <div
       className={classNames(
         "rounded-lg border-2 p-3 shadow-sm",
         tone === "running" ? "border-rose-400 bg-rose-50" : "border-indigo-400 bg-indigo-50"
       )}
     >
-      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-600">{title}</h2>
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">{title}</h2>
       {children}
     </div>
   </div>
@@ -432,7 +432,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
           Stop
         </button>
       </div>
-      <p className="mt-1 text-xs text-gray-500">
+      <p className="mt-1 text-xs text-muted">
         od {hhmm(running.startedAt)} · opis i projekt zapisują się same
         {saved && <span className="ml-2 text-emerald-700 font-medium">zapisano ✓</span>}
       </p>
@@ -508,7 +508,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
         </button>
       </div>
       {projects.length === 0 && (
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-muted">
           Nie masz dostępnych projektów — poproś kierownika o założenie projektu dla twojej sekcji.
         </p>
       )}
@@ -537,7 +537,7 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
   <div className="mt-8">
     {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
         bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
-    <h2 className="text-sm font-bold text-gray-700 mb-2">{running ? "Przełącz na" : "Wznów"}</h2>
+    <h2 className="text-sm font-bold text-body mb-2">{running ? "Przełącz na" : "Wznów"}</h2>
     <div className="flex gap-2 flex-wrap">
       {suggestions.map((s) => (
         <button
@@ -545,11 +545,11 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
           disabled={busy}
           title={running ? "Zamknij bieżące zadanie i zacznij to" : "Zacznij to zadanie"}
           onClick={() => onResume(s)}
-          className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-gray-300 rounded-full text-sm hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-line rounded-full text-sm hover:bg-raised disabled:opacity-50"
         >
           <span className={`w-2 h-2 rounded-full shrink-0 ${projectColor(s.projectColor).dot}`} />
           <span className="truncate text-indigo-500">{s.description}</span>
-          <span className="text-gray-500 shrink-0">▶</span>
+          <span className="text-muted shrink-0">▶</span>
         </button>
       ))}
     </div>
@@ -585,7 +585,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
   };
 
   return (
-    <form onSubmit={submit} className="mt-6 p-3 border border-gray-300 rounded bg-gray-50">
+    <form onSubmit={submit} className="mt-6 p-3 border border-line rounded bg-raised">
       {/* Dwa wyraźne rzędy zamiast jednego flex-wrap z siedmioma polami: przy
           wąskim ekranie tamten zawijał godzinę końca i przyciski w przypadkowe
           miejsca. Tu podział jest stały — "co robiłem" nad "kiedy". */}
@@ -597,12 +597,12 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
           maxLength={200}
           placeholder="Opis zadania"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="flex-grow min-w-0 p-2 border border-gray-400 rounded text-indigo-500"
+          className="flex-grow min-w-0 p-2 border border-line-strong rounded text-indigo-500"
         />
         <select
           value={form.projectID}
           onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-          className="p-2 border border-gray-400 rounded sm:w-56 shrink-0"
+          className="p-2 border border-line-strong rounded sm:w-56 shrink-0"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -625,14 +625,14 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
               value={form.data}
               max={today}
               onChange={(e) => setForm({ ...form, data: e.target.value })}
-              className="p-2 border border-gray-400 rounded"
+              className="p-2 border border-line-strong rounded"
               required
             />
           ) : (
             <select
               value={form.data}
               onChange={(e) => setForm({ ...form, data: e.target.value })}
-              className="p-2 border border-gray-400 rounded"
+              className="p-2 border border-line-strong rounded"
             >
               <option value={today}>dziś</option>
               <option value={yesterday}>wczoraj</option>
@@ -644,7 +644,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
             type="time"
             value={form.from}
             onChange={(e) => setForm({ ...form, from: e.target.value })}
-            className="p-2 border border-gray-400 rounded"
+            className="p-2 border border-line-strong rounded"
             required
           />
         </SmallField>
@@ -653,7 +653,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
             type="time"
             value={form.to}
             onChange={(e) => setForm({ ...form, to: e.target.value })}
-            className="p-2 border border-gray-400 rounded"
+            className="p-2 border border-line-strong rounded"
             required
           />
         </SmallField>
@@ -666,7 +666,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
           >
             Dodaj
           </button>
-          <button type="button" onClick={() => setOpen(false)} className="py-2 px-3 text-gray-600">
+          <button type="button" onClick={() => setOpen(false)} className="py-2 px-3 text-muted">
             Zwiń
           </button>
         </span>
@@ -678,7 +678,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
 
 const SmallField = ({ label, children }) => (
   <label className="flex flex-col">
-    <span className="mb-1 text-xs font-medium text-gray-700">{label}</span>
+    <span className="mb-1 text-xs font-medium text-body">{label}</span>
     {children}
   </label>
 );
@@ -703,11 +703,11 @@ const DaySection = ({
     // mt-10, bo przy kilkunastu wpisach dziennie odstęp równy odstępowi między
     // wierszami sprawiał, że "Dziś" i "Wczoraj" ginęły w ścianie tekstu.
     <div className="mt-10">
-      <div className="flex items-baseline justify-between border-b border-gray-300 pb-2 mb-2">
+      <div className="flex items-baseline justify-between border-b border-line pb-2 mb-2">
         {/* first-letter, nie `capitalize`: ten drugi podniósłby też nazwę
             miesiąca ("Środa, 12 Sierpnia"), a po polsku miesiąc piszemy małą. */}
         <h2 className="text-lg font-bold first-letter:uppercase">{label}</h2>
-        <span className="text-sm text-gray-600">{formatDuration(total)}</span>
+        <span className="text-sm text-muted">{formatDuration(total)}</span>
       </div>
       <ul>
         {list.map((e) => (
@@ -743,7 +743,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
   if (editing) {
     return (
-      <li className="py-2 border-b border-gray-100">
+      <li className="py-2 border-b border-line-subtle">
         <div className="flex gap-2 flex-wrap items-center">
           <input
             type="text"
@@ -751,12 +751,12 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             list={`opisy-${form.projectID}`}
             maxLength={200}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="flex-grow min-w-[8rem] p-1.5 border border-gray-400 rounded text-sm text-indigo-500"
+            className="flex-grow min-w-[8rem] p-1.5 border border-line-strong rounded text-sm text-indigo-500"
           />
           <select
             value={form.projectID}
             onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-            className="p-1.5 border border-gray-400 rounded text-sm"
+            className="p-1.5 border border-line-strong rounded text-sm"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -772,16 +772,16 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             title="Od"
             value={form.from}
             onChange={(e) => setForm({ ...form, from: e.target.value })}
-            className="p-1.5 border border-gray-400 rounded text-sm"
+            className="p-1.5 border border-line-strong rounded text-sm"
           />
-          <span className="text-gray-400 text-sm">–</span>
+          <span className="text-faint text-sm">–</span>
           <input
             type="time"
             aria-label="Godzina zakończenia"
             title="Do"
             value={form.to}
             onChange={(e) => setForm({ ...form, to: e.target.value })}
-            className="p-1.5 border border-gray-400 rounded text-sm"
+            className="p-1.5 border border-line-strong rounded text-sm"
           />
           <button
             disabled={busy}
@@ -801,7 +801,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
           >
             Zapisz
           </button>
-          <button onClick={() => setEditing(false)} className="py-1.5 px-2 text-sm text-gray-600">
+          <button onClick={() => setEditing(false)} className="py-1.5 px-2 text-sm text-muted">
             Anuluj
           </button>
         </div>
@@ -812,7 +812,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
   return (
     <li
-      className={classNames("py-2.5 border-b border-gray-100", entry.autoClosed && "bg-amber-50")}
+      className={classNames("py-2.5 border-b border-line-subtle", entry.autoClosed && "bg-amber-50")}
     >
       {/* Rząd BEZ flex-wrap. Wcześniej wiersz był jednym `flex flex-wrap` i długi
           opis wypychał godziny oraz przyciski do drugiej linii — bo `truncate`
@@ -834,12 +834,12 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             <span
               className={classNames(
                 "block break-words",
-                entry.description ? "text-indigo-500" : "text-gray-400"
+                entry.description ? "text-indigo-500" : "text-faint"
               )}
             >
               {entry.description || "(bez opisu)"}
             </span>
-            <span className="block text-xs text-gray-600">
+            <span className="block text-xs text-muted">
               {entry.projectName}
               {entry.editedByName && ` · popr. ${entry.editedByName}`}
             </span>
@@ -853,7 +853,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
               minuta wygląda wtedy jak "9:12–9:12". Sekundy siedzą w podpowiedzi,
               a wymiar obok i tak podaje je wprost. */}
           <span
-            className="text-sm text-gray-600 tabular-nums"
+            className="text-sm text-muted tabular-nums"
             title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
           >
             {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
@@ -869,7 +869,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
               disabled={busy}
               title={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
               onClick={() => onResume(entry)}
-              className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+              className="py-1 px-2 border border-line rounded text-sm hover:bg-raised disabled:opacity-50"
             >
               ▶
             </button>
@@ -877,7 +877,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
               disabled={busy || !editable}
               title={editable ? "Edytuj" : "Edycja możliwa tylko dla dziś i wczoraj"}
               onClick={() => setEditing(true)}
-              className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-30"
+              className="py-1 px-2 border border-line rounded text-sm hover:bg-raised disabled:opacity-30"
             >
               ✎
             </button>
@@ -888,7 +888,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
                 window.confirm("Usunąć ten wpis?") &&
                 call(`/api/entries/${entry.id}`, { method: "DELETE" })
               }
-              className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-30"
+              className="py-1 px-2 border border-line rounded text-sm hover:bg-raised disabled:opacity-30"
             >
               🗑
             </button>

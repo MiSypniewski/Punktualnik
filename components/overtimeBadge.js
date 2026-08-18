@@ -8,7 +8,7 @@ const OvertimeBadge = ({ status }) => {
     "bg-yellow-200 text-yellow-900": status === "pending",
     "bg-green-200 text-green-900": status === "approved",
     "bg-red-200 text-red-900": status === "rejected",
-    "bg-gray-200 text-gray-700": status === "cancelled",
+    "bg-raised text-body": status === "cancelled",
   });
 
   return <span className={className}>{statusLabel(status)}</span>;

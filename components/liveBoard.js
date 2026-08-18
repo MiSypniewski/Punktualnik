@@ -71,15 +71,15 @@ export default function LiveBoard({ initial, currentUserID }) {
   const total = running.length + idle.length;
 
   return (
-    <section className="mb-6 border border-gray-300 rounded overflow-hidden">
-      <header className="flex items-baseline justify-between gap-2 flex-wrap px-3 py-2 bg-gray-50 border-b border-gray-300">
+    <section className="mb-6 border border-line rounded overflow-hidden">
+      <header className="flex items-baseline justify-between gap-2 flex-wrap px-3 py-2 bg-raised border-b border-line">
         <h2 className="font-bold">
           Teraz w toku{" "}
-          <span className="font-normal text-gray-600">
+          <span className="font-normal text-muted">
             ({running.length} z {total})
           </span>
         </h2>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted">
           Stan bieżący, <span className="font-medium">niezależny od filtrów poniżej</span>
           {board?.generatedAt && ` · ${hhmm(board.generatedAt)}`}
           {error && <span className="text-amber-800"> · brak łączności, dane mogą być nieaktualne</span>}
@@ -87,7 +87,7 @@ export default function LiveBoard({ initial, currentUserID }) {
       </header>
 
       {running.length === 0 ? (
-        <p className="px-3 py-3 text-sm text-gray-500">
+        <p className="px-3 py-3 text-sm text-muted">
           Nikt z twoich sekcji nie ma teraz uruchomionego timera.
         </p>
       ) : (
@@ -100,7 +100,7 @@ export default function LiveBoard({ initial, currentUserID }) {
               <li
                 key={r.id}
                 className={classNames(
-                  "flex items-center gap-3 px-3 py-2 border-b border-gray-100",
+                  "flex items-center gap-3 px-3 py-2 border-b border-line-subtle",
                   tooLong && "bg-amber-50"
                 )}
               >
@@ -109,10 +109,10 @@ export default function LiveBoard({ initial, currentUserID }) {
                   <p className="font-medium truncate">
                     {fullName(r)}
                     {Number(r.userID) === Number(currentUserID) && (
-                      <span className="ml-2 text-xs font-normal text-gray-500">(Ty)</span>
+                      <span className="ml-2 text-xs font-normal text-muted">(Ty)</span>
                     )}
                   </p>
-                  <p className="text-sm text-gray-600 truncate">
+                  <p className="text-sm text-muted truncate">
                     {r.projectName} ·{" "}
                     {/* Opis w kolorze przycisku "Pokaż" (indigo-500) — to jedyna
                         rzecz w wierszu, której kierownik naprawdę szuka wzrokiem;
@@ -128,7 +128,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                 <span
                   className={classNames(
                     "font-mono tabular-nums whitespace-nowrap",
-                    tooLong ? "text-amber-800" : "text-gray-800"
+                    tooLong ? "text-amber-800" : "text-body"
                   )}
                   title={tooLong ? "Biegnie ponad 8 godzin — sprawdź, czy to nie zapomniany timer" : null}
                 >
@@ -144,15 +144,15 @@ export default function LiveBoard({ initial, currentUserID }) {
         // Bezczynni zwięźle, w jednym akapicie zamiast drugiej tabeli: sekcja
         // stoi nad całym raportem i przy kilkunastu osobach zepchnęłaby go
         // poza ekran telefonu.
-        <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-          <p className="text-xs font-medium text-gray-700 mb-1">Bez timera ({idle.length})</p>
-          <p className="text-xs text-gray-600 leading-5">
+        <div className="px-3 py-2 bg-raised border-t border-line-subtle">
+          <p className="text-xs font-medium text-body mb-1">Bez timera ({idle.length})</p>
+          <p className="text-xs text-muted leading-5">
             {idle.map((u, i) => (
               <span key={u.id}>
                 {i > 0 && " · "}
                 {fullName(u)}
                 {Number(u.id) === Number(currentUserID) && " (Ty)"}
-                <span className="text-gray-400">
+                <span className="text-faint">
                   {u.lastEndedAt
                     ? ` — ostatni wpis ${hhmm(u.lastEndedAt)}, dziś ${formatDuration(u.seconds)}`
                     : " — brak wpisów dzisiaj"}
@@ -162,7 +162,7 @@ export default function LiveBoard({ initial, currentUserID }) {
           </p>
           {/* Aplikacja nie wie nic o urlopach ani zwolnieniach — bez tego zdania
               lista czyta się jak spis obiboków, a zwykle jest spisem nieobecnych. */}
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-muted">
             Brak timera nie znaczy braku pracy — aplikacja nie zna urlopów, zwolnień ani zadań
             raportowanych ręcznie po fakcie.
           </p>
