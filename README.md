@@ -606,6 +606,12 @@ Szerokość strony ustawia się propsem: `<BaseLayout width="narrow">` dla
 formularzy, `"wide"` dla raportów, `"full"` dla kiosku, domyślnie `"page"`.
 Ekrany sprzed zalogowania używają `AuthLayout`.
 
+Pozycje menu buduje `navItems` w `components/stationRail.js` — widoczność idzie
+przez predykaty z `services/roles.js`, a nie przez ręczne porównania ról. Pełny
+pasek pokazuje się od **1280 px**; niżej pozycje chowają się pod przycisk menu,
+bo przy ośmiu pozycjach kierownika nie mieszczą się obok zegara i konta. Dodając
+kolejną pozycję sprawdź pasek na 1280 px — to tam kończy się miejsce.
+
 Uwaga na `@tailwindcss/forms`: plugin twardo maluje pola na biało selektorami
 atrybutowymi (`[type='text']`), które wygrywają specyficznością z gołym `input`.
 Nadpisanie w `globals.css` przepisuje jego listę selektorów i musi taka zostać.

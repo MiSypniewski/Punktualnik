@@ -32,12 +32,18 @@ const StationClock = () => {
   }, [router]);
 
   if (now === null) {
-    return <span className="w-[9.5rem] shrink-0" aria-hidden="true" />;
+    return <span className="w-[7.5rem] shrink-0" aria-hidden="true" />;
   }
 
   return (
     <span className="flex items-baseline gap-2 shrink-0 leading-none">
-      <span className="hidden md:inline text-xs text-muted first-letter:uppercase whitespace-nowrap">
+      {/* Data w dwóch długościach: od 1536 px pełna, niżej skrócona. Przy ośmiu
+          pozycjach menu pełna data zjadała tyle miejsca, że pozycje wchodziły
+          na nazwisko. Poniżej 768 px znika zupełnie — zostaje sama godzina. */}
+      <span className="hidden md:inline 2xl:hidden text-xs text-muted first-letter:uppercase whitespace-nowrap">
+        {now.format("ddd, D.MM")}
+      </span>
+      <span className="hidden 2xl:inline text-xs text-muted first-letter:uppercase whitespace-nowrap">
         {now.format("dddd, D MMMM")}
       </span>
       <time

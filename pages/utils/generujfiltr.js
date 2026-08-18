@@ -47,7 +47,7 @@ export default function GenerujFiltr() {
   return (
     <BaseLayout width="narrow">
       <PageHeader
-        title="Generator filtra"
+        title="Filtr GAM"
         description="Narzędzie doraźne spoza ewidencji czasu: wkleja się MMkę, wychodzi sklejony filtr z numerami SN."
       />
 

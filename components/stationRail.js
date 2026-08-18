@@ -43,6 +43,12 @@ const navItems = (user) => {
   if (canExportTimes(role))
     items.push({ href: "/utils/eksport", match: "/utils/eksport", label: "Eksport" });
 
+  // Narzędzie doraźne spoza ewidencji czasu, stąd na końcu. Bez kiosku:
+  // to konto stoi przy ekranie dotykowym w miejscu publicznym i ma prowadzić
+  // do kafelków, a nie do narzędzi.
+  if (role !== "editor")
+    items.push({ href: "/utils/generujfiltr", match: "/utils/generujfiltr", label: "Filtr GAM" });
+
   return items;
 };
 
@@ -115,7 +121,7 @@ export default function StationRail({ user }) {
               znaku, koncie i przełączniku motywu pasek nie mieścił się na
               tablecie i wypychał stronę w poziomie. Poniżej — menu pod
               przyciskiem. */}
-          <nav className="hidden xl:flex items-center gap-5 flex-grow min-w-0" aria-label="Sekcje aplikacji">
+          <nav className="hidden xl:flex items-center gap-4 2xl:gap-5 flex-grow min-w-0" aria-label="Sekcje aplikacji">
             {items.map((item) => (
               <RailLink key={item.href} item={item} active={router.pathname === item.match} />
             ))}
