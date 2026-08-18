@@ -69,4 +69,12 @@
   select {
     @apply bg-surface text-body;
   }
+
+  /* Checkboxy i radia mają w pluginie własną regułę z białym tłem. Celujemy
+     tylko w NIEZAZNACZONE — zaznaczone malują się kolorem akcentu i ta reguła
+     nie ma prawa im w tym przeszkodzić. */
+  [type="checkbox"]:not(:checked),
+  [type="radio"]:not(:checked) {
+    @apply bg-surface;
+  }
 }
