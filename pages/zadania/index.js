@@ -517,7 +517,7 @@ const DescriptionOptions = ({ descByProject }) => (
 // --- wznawianie -------------------------------------------------------------
 
 const Resume = ({ suggestions, running, busy, onResume }) => (
-  <div className="mt-4">
+  <div className="mt-8">
     {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
         bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
     <h2 className="text-sm font-bold text-gray-700 mb-2">{running ? "Przełącz na" : "Wznów"}</h2>
@@ -554,7 +554,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="mt-4 text-sm text-indigo-600 hover:underline">
+      <button onClick={() => setOpen(true)} className="mt-6 text-sm text-indigo-600 hover:underline">
         + Dodaj wpis ręcznie
       </button>
     );
@@ -568,7 +568,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
   };
 
   return (
-    <form onSubmit={submit} className="mt-4 p-3 border border-gray-300 rounded bg-gray-50">
+    <form onSubmit={submit} className="mt-6 p-3 border border-gray-300 rounded bg-gray-50">
       {/* Dwa wyraźne rzędy zamiast jednego flex-wrap z siedmioma polami: przy
           wąskim ekranie tamten zawijał godzinę końca i przyciski w przypadkowe
           miejsca. Tu podział jest stały — "co robiłem" nad "kiedy". */}
@@ -683,11 +683,13 @@ const DaySection = ({
   const total = list.reduce((sum, e) => sum + (e.seconds || 0), 0);
 
   return (
-    <div className="mt-6">
-      <div className="flex items-baseline justify-between border-b border-gray-300 pb-1 mb-1">
+    // mt-10, bo przy kilkunastu wpisach dziennie odstęp równy odstępowi między
+    // wierszami sprawiał, że "Dziś" i "Wczoraj" ginęły w ścianie tekstu.
+    <div className="mt-10">
+      <div className="flex items-baseline justify-between border-b border-gray-300 pb-2 mb-2">
         {/* first-letter, nie `capitalize`: ten drugi podniósłby też nazwę
             miesiąca ("Środa, 12 Sierpnia"), a po polsku miesiąc piszemy małą. */}
-        <h2 className="font-bold first-letter:uppercase">{label}</h2>
+        <h2 className="text-lg font-bold first-letter:uppercase">{label}</h2>
         <span className="text-sm text-gray-600">{formatDuration(total)}</span>
       </div>
       <ul>
