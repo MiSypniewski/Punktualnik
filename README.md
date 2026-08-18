@@ -1,4 +1,9 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Punktualnik
+
+Ewidencja czasu pracy, nadgodzin i zadań: kiosk dotykowy do odbijania kart
+w dziale, timer zadań na koncie pracownika, wnioski o nadgodziny i raporty
+kierownika. Next.js 12 (pages router), SQLite przez `better-sqlite3`, Tailwind.
+Wygląd opisuje rozdział [System wizualny](#system-wizualny).
 
 ## Ściąga — wszystkie komendy
 
@@ -472,12 +477,36 @@ jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
 Czas jest w dwóch kolumnach: godziny dziesiętnie z przecinkiem (`2,50` — do
 sumowania w arkuszu) i tekst `2h 30min` dla człowieka.
 
-## Motyw jasny i ciemny
+## System wizualny
 
-Przełącznik stoi na końcu górnego paska, na każdej stronie i dla każdej roli,
-łącznie z kioskiem: to ustawienie wyglądu, nie konta — nie ma czego przestawić
-na cudzą szkodę, a kiosk stoi w konkretnym pomieszczeniu i bywa, że trzeba mu po
-prostu przygasić ekran. Trzy stany:
+Wygląd aplikacji jest jeden i nazywa się **„tablica odjazdów”**. Punkt odniesienia
+to dworcowa tablica i zegar stacyjny: sygnalizacja czytelna z drugiego końca
+pomieszczenia, włosowe linie zamiast ramek, wszystkie liczby monospace, jeden
+kolor sygnałowy. Wynika to wprost z tego, jak aplikacja jest używana — kiosk
+dotykowy w hali ogląda się z dystansu, a raport kierownika czyta się z bliska.
+
+### Zasada, która trzyma to w ryzach
+
+**Bursztyn znaczy „teraz”.** Biegnący timer, pracujący kafelek na kiosku, wiersz
+w „Teraz w toku”, licznik przekraczający osiem godzin, wpis domknięty
+automatycznie. Nigdzie indziej. Jedyny wyjątek to belka w znaku firmowym.
+Wszystko poza tym jest ciche: promienie 3 px, cienie ledwie obecne, żadnych
+gradientów, jedna animacja w całej aplikacji (pulsujący punkt), wyłączana przez
+`prefers-reduced-motion`.
+
+Do tego rozróżnienie kształtem: **okrągły punkt = stan na żywo**
+(`components/liveDot.js`), **kwadrat = kolor projektu** (`ProjectMark`
+w `components/projectColors.js`). Bez tego projekt o kolorze `amber` udawałby
+biegnący timer.
+
+### Motyw jasny i ciemny
+
+Przełącznik stoi w pasku stacyjnym, na każdej stronie i dla każdej roli, łącznie
+z kioskiem: to ustawienie wyglądu, nie konta — nie ma czego przestawić na cudzą
+szkodę, a kiosk stoi w konkretnym pomieszczeniu i bywa, że trzeba mu po prostu
+przygasić ekran. Na ekranach węższych niż 640 px przenosi się do rozwijanego
+menu, bo w jednym rzędzie nie mieści się razem ze znakiem, zegarem i hamburgerem.
+Trzy stany:
 
 | Ikona | Znaczenie |
 |---|---|
@@ -487,40 +516,102 @@ prostu przygasić ekran. Trzy stany:
 
 Wybór siedzi w `localStorage` pod kluczem `theme`, **nie w bazie**: kiosk to konto
 współdzielone, więc ustawienie per konto zmieniałoby motyw wszystkim naraz. Brak
-wpisu znaczy „auto". Konsekwencja: na nowym urządzeniu albo po wyczyszczeniu
+wpisu znaczy „auto”. Konsekwencja: na nowym urządzeniu albo po wyczyszczeniu
 danych przeglądarki trzeba wybrać ponownie.
 
 Klasę `dark` na `<html>` ustawia blokujący skrypt w `pages/_document.js`, przed
 pierwszym malowaniem strony — gdyby robił to dopiero React, przy każdym wejściu
 mignęłoby białe tło.
 
-### Konwencja kolorów — dla nowych ekranów
+### Kolory — dla nowych ekranów
 
-Kolory neutralne (tła, tekst, ramki) idą **wyłącznie przez nazwy semantyczne**
-zdefiniowane w `tailwind.config.js` i podpięte pod zmienne CSS w
-`styles/globals.css`. W kodzie stron nie ma już ani jednej klasy z palety `gray`.
+Kolory idą **wyłącznie przez nazwy semantyczne** zdefiniowane w
+`tailwind.config.js` i podpięte pod zmienne CSS w `styles/globals.css`. W kodzie
+stron nie ma ani jednej klasy z palety Tailwinda i ani jednego wariantu `dark:`
+(wyjątkiem jest `components/projectColors.js`, gdzie pełne nazwy klas są wymuszone
+przez skaner Tailwinda — patrz komentarz w pliku).
+
+Neutrale:
 
 | Token | Do czego |
 |---|---|
 | `bg-page` | tło strony (ustawione na `body`, rzadko potrzebne wprost) |
-| `bg-surface` | karty, pola, wiersze |
-| `bg-raised` | tła wyróżnione — formularze, paski postępu, chipy |
+| `bg-surface` | płyty, pola, wiersze |
+| `bg-raised` | tła wyróżnione — formularze, paski postępu, nagłówki płyt |
 | `text-body` | tekst główny |
 | `text-muted` | tekst drugoplanowy — nazwy projektów, godziny, podpisy |
-| `text-faint` | tekst wygaszony — „(bez opisu)" |
+| `text-faint` | tekst wygaszony — „(bez opisu)” |
 | `border-line` | zwykłe ramki |
 | `border-line-strong` | ramki pól formularza |
 | `border-line-subtle` | separatory wierszy |
 
-Piszemy `text-muted`, a **nie** `text-gray-600 dark:text-gray-300` — dzięki temu
-nowy ekran dziedziczy oba motywy za darmo i nie da się zapomnieć o wariancie
-ciemnym. Wyjątkiem są kolory niosące znaczenie (status wniosku, wpis domknięty
-automatycznie, komunikat błędu, kolory projektów) — te zostają kolorowe
-i mają punktowy wariant `dark:` dopisany na miejscu.
+Kolory znaczeniowe występują w czterech odmianach każdy:
+
+| Rodzina | Znaczenie |
+|---|---|
+| `accent` | działanie główne, linki, aktywna pozycja menu |
+| `signal` | **wyłącznie stan „teraz”** i ostrzeżenia |
+| `ok` | zatwierdzone, saldo dodatnie, pełna dniówka |
+| `danger` | odrzucone, saldo ujemne, błąd |
+
+| Odmiana | Do czego |
+|---|---|
+| `X` | sam kolor: wypełnienia przycisków, kropki, ramki, duże liczby |
+| `X-ink` | tekst kładziony NA `X` |
+| `X-soft` | przygaszone tło pod baner, chip, wyróżniony wiersz |
+| `X-strong` | tekst drobny — na tle strony i na tle `X-soft` |
+
+Rozdział `X` od `X-strong` jest liczbowy, nie estetyczny: bursztyn o kontraście
+wystarczającym dla ramki i dwuipółcentymetrowego licznika nie dociąga do 4,5:1
+przy dwunastopunktowym podpisie. Piszemy `text-signal-strong` dla tekstu,
+`bg-signal` dla płyty.
+
+### Typografia
+
+| Rola | Krój |
+|---|---|
+| nagłówki, etykiety, statusy — wersaliki z `tracking-signage` | **Archivo** 600–700 |
+| tekst | **Archivo** 400–500 |
+| **każda liczba** — zegar, czasy trwania, godziny, salda, kolumny | **IBM Plex Mono** |
+
+Oba kroje leżą w `public/fonts` jako `woff2` i są podpięte przez `@font-face`
+w `styles/globals.css`. **Podzbiór `latin-ext` jest obowiązkowy** — bez niego nie
+ma polskich znaków. Nie ma tu `next/font` (to Next 12) ani zapytań do Google:
+kiosk i telefony w hali bywają na słabym łączu, a produkcja stoi na Mikrusie.
+Archivo jest krojem zmiennym, więc cała oś wagi 400–700 mieści się w jednym pliku
+na podzbiór.
+
+Podmiana kroju to podmiana plików w `public/fonts`, deklaracji `@font-face`
+i `fontFamily` w `tailwind.config.js` — nic więcej nie zna nazw krojów.
+
+### Komponenty
+
+Nowy ekran składa się z `components/ui/`, nie z klas pisanych na miejscu:
+
+| Zamiast | Użyj |
+|---|---|
+| przycisku z klasami tła i stanu `disabled` | `Button` (`primary`/`secondary`/`ghost`/`danger`/`signal`), `IconButton` |
+| pola z etykietą | `Field` + `Input` / `Select` / `Textarea` |
+| `<table>` z klasami w każdej komórce | `TableWrap`, `Table`, `Th`, `Td`, `Tr`, `Num` |
+| karty albo panelu | `Plate`, `PlateHeader` |
+| kolorowego akapitu z komunikatem | `Alert` (`danger`/`ok`/`warn`/`info`) |
+| chipa ze statusem | `Badge` |
+| kafla z liczbą | `Stat` |
+| `<h1>` z opisem strony | `PageHeader` |
+| „brak danych” | `EmptyState` |
+| emoji jako ikony | `components/ui/icons.js` |
+
+Powłokę daje `BaseLayout` (strażnik sesji) → `AppShell` (pasek, kontener, stopka).
+Szerokość strony ustawia się propsem: `<BaseLayout width="narrow">` dla
+formularzy, `"wide"` dla raportów, `"full"` dla kiosku, domyślnie `"page"`.
+Ekrany sprzed zalogowania używają `AuthLayout`.
 
 Uwaga na `@tailwindcss/forms`: plugin twardo maluje pola na biało selektorami
 atrybutowymi (`[type='text']`), które wygrywają specyficznością z gołym `input`.
 Nadpisanie w `globals.css` przepisuje jego listę selektorów i musi taka zostać.
+Druga pułapka stamtąd: pole jest domyślnie `w-full`, więc wąskie pole trzeba
+wymusić przez `!w-24` — sam `w-24` przegrywa, bo o zwycięzcy decyduje kolejność
+reguł w arkuszu, nie kolejność w atrybucie `class`.
 
 ## Migracja kont z Airtable (jednorazowo)
 
@@ -538,36 +629,3 @@ Wymaga w `.env.local`: `AIRTABLE_API_KEY`, `AIRTABLE_BASE`. Skrypt **przerwie
 się, jeśli tabela `Users` nie jest pusta** (ochrona przed dublowaniem).
 Rekordy bez hasła lub ze zdublowanym e-mailem są pomijane i raportowane.
 Zachowuje numerację kont (`fields.ID` → `Users.id`).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
-
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
-
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
