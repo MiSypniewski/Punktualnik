@@ -793,72 +793,94 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
   return (
     <li
-      className={classNames(
-        "flex items-center gap-2 py-2 border-b border-gray-100 flex-wrap",
-        entry.autoClosed && "bg-amber-50"
-      )}
+      className={classNames("py-2.5 border-b border-gray-100", entry.autoClosed && "bg-amber-50")}
     >
-      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${projectColor(entry.projectColor).dot}`} />
-      <span className="flex-grow min-w-0">
-        <span
-          className={classNames(
-            "block truncate",
-            entry.description ? "text-indigo-500" : "text-gray-400"
-          )}
-        >
-          {entry.description || "(bez opisu)"}
-        </span>
-        <span className="block text-xs text-gray-600">
-          {entry.projectName}
-          {entry.editedByName && ` · popr. ${entry.editedByName}`}
-        </span>
-      </span>
+      {/* Rząd BEZ flex-wrap. Wcześniej wiersz był jednym `flex flex-wrap` i długi
+          opis wypychał godziny oraz przyciski do drugiej linii — bo `truncate`
+          ustawia `white-space: nowrap`, więc naturalna szerokość opisu jest
+          ogromna, a flex najpierw ZAWIJA pozostałe elementy, zamiast ŚCISNĄĆ ten
+          jeden. Teraz opis się zawija (`break-words`), a prawa kolumna jest
+          `shrink-0` i to ona wyznacza prawą krawędź — dla każdego wpisu tak samo.
 
-      {/* Zakres w "HH:mm", bo tak się o godzinach mówi — ale wpis krótszy niż
-          minuta wygląda wtedy jak "9:12–9:12". Sekundy siedzą w podpowiedzi,
-          a wymiar obok i tak podaje je wprost. */}
-      <span
-        className="text-sm text-gray-600 tabular-nums"
-        title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
-      >
-        {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
-      </span>
-      {/* Szerokość pod pełny wymiar z sekundami ("12h 05min 30s"), żeby kolumna
-          czasu stała w jednej linii pionowej niezależnie od długości wpisu. */}
-      <span className="text-sm font-medium tabular-nums w-28 text-right">{formatDuration(entry.seconds)}</span>
+          `flex-col sm:flex-row`, bo prawa kolumna ma ok. 330px i na telefonie nie
+          zmieści się obok opisu; tam schodzi pod niego, dosunięta do prawej. */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
+        <div className="flex gap-2 flex-grow min-w-0">
+          {/* mt-1.5 zamiast wyrównania do środka: przy opisie na dwie linie kropka
+              ma stać przy pierwszej z nich, a nie dryfować do połowy wysokości. */}
+          <span
+            className={`w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 ${projectColor(entry.projectColor).dot}`}
+          />
+          <span className="min-w-0">
+            <span
+              className={classNames(
+                "block break-words",
+                entry.description ? "text-indigo-500" : "text-gray-400"
+              )}
+            >
+              {entry.description || "(bez opisu)"}
+            </span>
+            <span className="block text-xs text-gray-600">
+              {entry.projectName}
+              {entry.editedByName && ` · popr. ${entry.editedByName}`}
+            </span>
+          </span>
+        </div>
 
-      <span className="flex gap-1">
-        <button
-          disabled={busy}
-          title={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
-          onClick={() => onResume(entry)}
-          className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
-        >
-          ▶
-        </button>
-        <button
-          disabled={busy || !editable}
-          title={editable ? "Edytuj" : "Edycja możliwa tylko dla dziś i wczoraj"}
-          onClick={() => setEditing(true)}
-          className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-30"
-        >
-          ✎
-        </button>
-        <button
-          disabled={busy || !editable}
-          title={editable ? "Usuń" : "Usuwanie możliwe tylko dla dziś i wczoraj"}
-          onClick={() =>
-            window.confirm("Usunąć ten wpis?") &&
-            call(`/api/entries/${entry.id}`, { method: "DELETE" })
-          }
-          className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-30"
-        >
-          🗑
-        </button>
-      </span>
+        {/* shrink-0 na CAŁEJ prawej kolumnie — godziny, wymiar i przyciski trzymają
+            się razem i nigdy nie ustępują miejsca opisowi. */}
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
+          {/* Zakres w "HH:mm", bo tak się o godzinach mówi — ale wpis krótszy niż
+              minuta wygląda wtedy jak "9:12–9:12". Sekundy siedzą w podpowiedzi,
+              a wymiar obok i tak podaje je wprost. */}
+          <span
+            className="text-sm text-gray-600 tabular-nums"
+            title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
+          >
+            {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
+          </span>
+          {/* Szerokość pod pełny wymiar z sekundami ("12h 05min 30s"), żeby kolumna
+              czasu stała w jednej linii pionowej niezależnie od długości wpisu. */}
+          <span className="text-sm font-medium tabular-nums w-28 text-right">
+            {formatDuration(entry.seconds)}
+          </span>
 
+          <span className="flex gap-1">
+            <button
+              disabled={busy}
+              title={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
+              onClick={() => onResume(entry)}
+              className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+            >
+              ▶
+            </button>
+            <button
+              disabled={busy || !editable}
+              title={editable ? "Edytuj" : "Edycja możliwa tylko dla dziś i wczoraj"}
+              onClick={() => setEditing(true)}
+              className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-30"
+            >
+              ✎
+            </button>
+            <button
+              disabled={busy || !editable}
+              title={editable ? "Usuń" : "Usuwanie możliwe tylko dla dziś i wczoraj"}
+              onClick={() =>
+                window.confirm("Usunąć ten wpis?") &&
+                call(`/api/entries/${entry.id}`, { method: "DELETE" })
+              }
+              className="py-1 px-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-30"
+            >
+              🗑
+            </button>
+          </span>
+        </div>
+      </div>
+
+      {/* Poza rzędem flexowym: bez `flex-wrap` sztuczka z `w-full` przestałaby
+          działać, a komunikat ma iść pełną szerokością pod całym wpisem. */}
       {entry.autoClosed && (
-        <p className="w-full text-xs text-amber-800">
+        <p className="mt-1 text-xs text-amber-800">
           Timer domknął się automatycznie na koniec doby — sprawdź czas i popraw wpis.
         </p>
       )}
