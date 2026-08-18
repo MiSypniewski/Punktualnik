@@ -95,7 +95,7 @@ export default function UserData({ userData, id }) {
     <BaseLayout>
       <section className="container mx-auto p-2 mt-3 mb-8">
         <div className="sm:mt-8 md:mt-8 sm:w-1/3 md:w-1/3 mx-auto flex justify-between">
-          <h2 className="block mx-auto sm:text-3xl text-3xl font-medium title-font mb-4 px-4 text-gray-900 text-center">
+          <h2 className="block mx-auto sm:text-3xl text-3xl font-medium title-font mb-4 px-4 text-body text-center">
             {user.name} {user.surname}
           </h2>
           <div className="block grow-0 shrink-0 ">
@@ -109,7 +109,7 @@ export default function UserData({ userData, id }) {
         <div className="container mx-auto md:w-2/3">
           <form ref={userForm} onSubmit={handleSubmit}>
             <div className="p-2 w-full">
-              <label htmlFor="oldPassword" className="leading-7 text-sm text-gray-600">
+              <label htmlFor="oldPassword" className="leading-7 text-sm text-muted">
                 Stare hasło:
               </label>
               <input
@@ -117,11 +117,11 @@ export default function UserData({ userData, id }) {
                 id="oldPassword"
                 name="oldPassword"
                 required
-                className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
               />
             </div>
             <div className="p-2 w-full">
-              <label htmlFor="newPassword" className="leading-7 text-sm text-gray-600">
+              <label htmlFor="newPassword" className="leading-7 text-sm text-muted">
                 Nowe Hasło:
               </label>
               <input
@@ -129,11 +129,11 @@ export default function UserData({ userData, id }) {
                 id="newPassword"
                 name="newPassword"
                 required
-                className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
               />
             </div>
             <div className="p-2 w-full ">
-              <label htmlFor="passwordConfirm" className="leading-7 text-sm text-gray-600">
+              <label htmlFor="passwordConfirm" className="leading-7 text-sm text-muted">
                 Potwierdź Hasło:
               </label>
               <input
@@ -141,7 +141,7 @@ export default function UserData({ userData, id }) {
                 id="passwordConfirm"
                 name="passwordConfirm"
                 required
-                className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
               />
             </div>
             <div className="p-6 w-full">

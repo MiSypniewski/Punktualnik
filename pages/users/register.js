@@ -70,14 +70,14 @@ export default function CreateUser({ sections }) {
     <BaseLayout>
       <section className="mx-auto p-2 mt-3 mb-8">
         <div className="sm:mt-4 md:mt-8 lg:mt-16">
-          <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-gray-900 text-center">
+          <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-body text-center">
             Nowy użytkownik
           </h2>
         </div>
         <div className="container mx-auto lg:w-2/3">
           <form ref={userForm} onSubmit={handleSubmit}>
             <div className="p-2 w-full">
-              <label htmlFor="email" className="leading-7 text-sm text-gray-600">
+              <label htmlFor="email" className="leading-7 text-sm text-muted">
                 E-mail:
               </label>
               <input
@@ -85,11 +85,11 @@ export default function CreateUser({ sections }) {
                 id="email"
                 name="email"
                 required
-                className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
               />
             </div>
             <div className="p-2 w-full">
-              <label htmlFor="password" className="leading-7 text-sm text-gray-600">
+              <label htmlFor="password" className="leading-7 text-sm text-muted">
                 Hasło:
               </label>
               <input
@@ -97,11 +97,11 @@ export default function CreateUser({ sections }) {
                 id="password"
                 name="password"
                 required
-                className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
               />
             </div>
             <div className="p-2 w-full ">
-              <label htmlFor="passwordConfirm" className="leading-7 text-sm text-gray-600">
+              <label htmlFor="passwordConfirm" className="leading-7 text-sm text-muted">
                 Powtórz Hasło:
               </label>
               <input
@@ -109,12 +109,12 @@ export default function CreateUser({ sections }) {
                 id="passwordConfirm"
                 name="passwordConfirm"
                 required
-                className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
               />
             </div>
             <div className="flex">
               <div className="p-2 w-full">
-                <label htmlFor="name" className="leading-7 text-sm text-gray-600">
+                <label htmlFor="name" className="leading-7 text-sm text-muted">
                   Imię:
                 </label>
                 <input
@@ -122,11 +122,11 @@ export default function CreateUser({ sections }) {
                   id="name"
                   name="name"
                   required
-                  className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-gray-700 leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
+                  className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
                 />
               </div>
               <div className="p-2 w-full">
-                <label htmlFor="surname" className="leading-7 text-sm text-gray-600">
+                <label htmlFor="surname" className="leading-7 text-sm text-muted">
                   Nazwisko:
                 </label>
                 <input
@@ -134,20 +134,20 @@ export default function CreateUser({ sections }) {
                   id="surname"
                   name="surname"
                   required
-                  className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-gray-700 leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
+                  className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
                 />
               </div>
             </div>
             <div className="flex">
               <div className="p-2 w-full">
-                <label htmlFor="section" className="leading-7 text-sm text-gray-600">
+                <label htmlFor="section" className="leading-7 text-sm text-muted">
                   Dział:
                 </label>
                 <select
                   name="section"
                   id="section"
                   required
-                  className="appearance-none w-full h-10 bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-gray-700 leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
+                  className="appearance-none w-full h-10 bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
                 >
                   <option value=""></option>
                   {sections.map(({ slug, label }) => (
@@ -163,14 +163,14 @@ export default function CreateUser({ sections }) {
                 )}
               </div>
               <div className="p-2 w-full">
-                <label htmlFor="location" className="leading-7 text-sm text-gray-600">
+                <label htmlFor="location" className="leading-7 text-sm text-muted">
                   Miejsce pracy:
                 </label>
                 <select
                   name="location"
                   id="location"
                   required
-                  className="appearance-none w-full h-10 bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-gray-700 leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
+                  className="appearance-none w-full h-10 bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
                 >
                   <option value=""></option>
                   <option value="gajowa 6">Gajowa 6</option>
@@ -188,9 +188,9 @@ export default function CreateUser({ sections }) {
                   id="K15"
                   name="numerKasy"
                   value="K15"
-                  className="appearance-none indeterminate:bg-gray-300 h-4 w-4 border border-gray-300 rounded-sm bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="appearance-none indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
-                <label htmlFor="K15" className="inline-block leading-7 text-sm text-gray-600">
+                <label htmlFor="K15" className="inline-block leading-7 text-sm text-muted">
                   K15
                 </label>
               </div>
@@ -201,9 +201,9 @@ export default function CreateUser({ sections }) {
                   id="K16"
                   name="numerKasy"
                   value="K16"
-                  className="indeterminate:bg-gray-300 h-4 w-4 border border-gray-300 rounded-sm bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
-                <label htmlFor="K16" className="leading-7 text-sm text-gray-600">
+                <label htmlFor="K16" className="leading-7 text-sm text-muted">
                   K16
                 </label>
               </div>
@@ -213,16 +213,16 @@ export default function CreateUser({ sections }) {
                   id="K17"
                   name="numerKasy"
                   value="K17"
-                  className=" indeterminate:bg-gray-300 h-4 w-4 border border-gray-300 rounded-sm bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className=" indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
-                <label htmlFor="K17" className="leading-7 text-sm text-gray-600">
+                <label htmlFor="K17" className="leading-7 text-sm text-muted">
                   K17
                 </label>
               </div>
             </fieldset>
           </div>
           <div className="p-2 w-full">
-            <p className="leading-7 text-sm text-gray-600">Podaj liczbę kas:</p>
+            <p className="leading-7 text-sm text-muted">Podaj liczbę kas:</p>
             <input
               type="range"
               id="iloscKas"
@@ -236,10 +236,10 @@ export default function CreateUser({ sections }) {
               }}
               className="w-full  accent-indigo-500  focus:accent-indigo-600 slider-thumb:bg-red-500"
             />
-            <p className="leading-7 text-sm text-gray-600">{cashregisterNumbers}</p>
+            <p className="leading-7 text-sm text-muted">{cashregisterNumbers}</p>
           </div>
           <div className="p-2 w-full">
-            <p className="leading-7 text-sm text-gray-600">Czy będziesz głosować na PiS?</p>
+            <p className="leading-7 text-sm text-muted">Czy będziesz głosować na PiS?</p>
             <fieldset className="md:flex">
               <div className="p-2 md:mx-4 ">
                 <input
@@ -247,9 +247,9 @@ export default function CreateUser({ sections }) {
                   id="tak"
                   name="glosowanie"
                   value="tak"
-                  className="appearance-none indeterminate:bg-gray-300 h-4 w-4 rounded-full border border-gray-300  bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="appearance-none indeterminate:bg-line h-4 w-4 rounded-full border border-line  bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
-                <label htmlFor="tak" className="inline-block leading-3 text-sm text-gray-600 cursor-pointer">
+                <label htmlFor="tak" className="inline-block leading-3 text-sm text-muted cursor-pointer">
                   Tak, jestem pedałem
                 </label>
               </div>
@@ -260,9 +260,9 @@ export default function CreateUser({ sections }) {
                   id="nie"
                   name="glosowanie"
                   value="nie"
-                  className="indeterminate:bg-gray-300 h-4 w-4 rounded-full border border-gray-300 bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className="indeterminate:bg-line h-4 w-4 rounded-full border border-line bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
-                <label htmlFor="nie" className="leading-3 text-sm text-gray-600">
+                <label htmlFor="nie" className="leading-3 text-sm text-muted">
                   Nie, jebać PiS!
                 </label>
               </div>
@@ -272,9 +272,9 @@ export default function CreateUser({ sections }) {
                   id="nieumiem"
                   name="glosowanie"
                   value="nieumiem"
-                  className=" indeterminate:bg-gray-300 h-4 w-4 border rounded-full border-gray-300 bg-gray-100 text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
+                  className=" indeterminate:bg-line h-4 w-4 border rounded-full border-line bg-raised text-indigo-500  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
                 />
-                <label htmlFor="nieumiem" className="leading-3 text-sm text-gray-600">
+                <label htmlFor="nieumiem" className="leading-3 text-sm text-muted">
                   Nie umiem
                 </label>
               </div>

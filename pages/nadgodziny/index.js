@@ -93,7 +93,7 @@ export default function Nadgodziny({ balance, requests }) {
   const balanceClass = classNames("text-4xl font-bold", {
     "text-green-600": balance > 0,
     "text-red-600": balance < 0,
-    "text-gray-600": balance === 0,
+    "text-muted": balance === 0,
   });
 
   const pending = requests.filter((r) => r.status === "pending");
@@ -104,9 +104,9 @@ export default function Nadgodziny({ balance, requests }) {
         <h1 className="text-2xl font-bold mb-6">Moje nadgodziny</h1>
 
         <div className="mb-8 p-4 border border-indigo-200 rounded shadow-sm">
-          <p className="text-sm text-gray-500 mb-1">Aktualne saldo</p>
+          <p className="text-sm text-muted mb-1">Aktualne saldo</p>
           <p className={balanceClass}>{formatMinutes(balance, { withSign: true })}</p>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted mt-2">
             Liczone tylko z wniosków zatwierdzonych przez kierownika.
             {pending.length > 0 && ` Oczekujących wniosków: ${pending.length}.`}
           </p>
@@ -175,7 +175,7 @@ export default function Nadgodziny({ balance, requests }) {
           <button
             type="submit"
             disabled={busy}
-            className="self-start text-white bg-indigo-500 border-0 py-2 px-8 hover:bg-indigo-600 disabled:bg-gray-400 rounded text-lg"
+            className="self-start text-white bg-indigo-500 border-0 py-2 px-8 hover:bg-indigo-600 disabled:bg-faint rounded text-lg"
           >
             {busy ? "Wysyłam..." : "Wyślij wniosek"}
           </button>
@@ -198,12 +198,12 @@ export default function Nadgodziny({ balance, requests }) {
           )}
         </div>
         {requests.length === 0 ? (
-          <p className="text-gray-500">Brak zgłoszeń.</p>
+          <p className="text-muted">Brak zgłoszeń.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-gray-300">
+                <tr className="text-left border-b border-line">
                   <th className="py-2 pr-3">Data</th>
                   <th className="py-2 pr-3">Rodzaj</th>
                   <th className="py-2 pr-3 text-right">Wymiar</th>
@@ -214,7 +214,7 @@ export default function Nadgodziny({ balance, requests }) {
               </thead>
               <tbody>
                 {requests.map((r) => (
-                  <tr key={r.id} className="border-b border-gray-100 align-top">
+                  <tr key={r.id} className="border-b border-line-subtle align-top">
                     <td className="py-2 pr-3 whitespace-nowrap">{r.data}</td>
                     <td className="py-2 pr-3">{kindLabel(r.kind)}</td>
                     <td
@@ -228,7 +228,7 @@ export default function Nadgodziny({ balance, requests }) {
                     <td className="py-2 pr-3">
                       <OvertimeBadge status={r.status} />
                     </td>
-                    <td className="py-2 pr-3 text-gray-600">
+                    <td className="py-2 pr-3 text-muted">
                       {r.reason && <span className="block">{r.reason}</span>}
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
@@ -243,7 +243,7 @@ export default function Nadgodziny({ balance, requests }) {
                         <button
                           onClick={() => cancel(r.id)}
                           disabled={busy}
-                          className="text-xs text-red-600 hover:underline disabled:text-gray-400"
+                          className="text-xs text-red-600 hover:underline disabled:text-faint"
                         >
                           Anuluj
                         </button>
