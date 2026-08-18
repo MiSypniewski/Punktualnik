@@ -8,10 +8,14 @@ import classNames from "classnames";
 // Klucz i wartości muszą się zgadzać ze skryptem w pages/_document.js, który
 // ustawia klasę przed pierwszym malowaniem strony.
 const KEY = "theme";
+// Znaki tekstowe, nie emoji: "\uFE0E" (variation selector-15) każe przeglądarce
+// narysować je czcionką, a nie kolorową ikoną. Dzięki temu wszystkie trzy
+// dziedziczą kolor tekstu i są tak samo czytelne w obu motywach — emoji 💻 na
+// ciemnym tle robiło się nierozpoznawalną ciemną plamą.
 const MODES = [
-  { id: "light", icon: "☀", label: "Jasny" },
-  { id: "dark", icon: "🌙", label: "Ciemny" },
-  { id: "system", icon: "💻", label: "Auto (jak system)" },
+  { id: "light", icon: "☀\uFE0E", label: "Jasny" },
+  { id: "dark", icon: "☾\uFE0E", label: "Ciemny" },
+  { id: "system", icon: "◐\uFE0E", label: "Auto (jak system)" },
 ];
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;

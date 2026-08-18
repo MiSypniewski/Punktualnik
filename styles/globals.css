@@ -45,11 +45,28 @@
   }
 
   /* @tailwindcss/forms twardo maluje pola na biało (background-color: #fff
-     w swojej warstwie base). Bez tego w trybie ciemnym każdy input i select
-     jest jasną plamą. */
-  input,
-  select,
-  textarea {
+     w swojej warstwie base). Bez tego w trybie ciemnym każde pole jest jasną
+     plamą.
+
+     Lista selektorów jest PRZEPISANA z pluginu (src/index.js) i musi taka
+     zostać: plugin celuje w [type='text'], czyli selektor atrybutowy, który
+     wygrywa specyficznością z gołym `input` — reguła na samym `input` po prostu
+     nie dochodziła do skutku. */
+  [type="text"],
+  [type="email"],
+  [type="url"],
+  [type="password"],
+  [type="number"],
+  [type="date"],
+  [type="datetime-local"],
+  [type="month"],
+  [type="search"],
+  [type="tel"],
+  [type="time"],
+  [type="week"],
+  [multiple],
+  textarea,
+  select {
     @apply bg-surface text-body;
   }
 }
