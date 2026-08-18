@@ -6,6 +6,11 @@ import classNames from "classnames";
 //
 // `focus:ring-0` jest konieczne: @tailwindcss/forms dokłada własny niebieski
 // pierścień na :focus, który kłóci się z globalnym :focus-visible z globals.css.
+//
+// Pole jest domyślnie `w-full`, bo tak wygląda w formularzu. Wąskie pole (godziny,
+// minuty) trzeba wymusić przez `!w-24` — sam `w-24` przegrywa z `w-full`, które
+// Tailwind generuje PÓŹNIEJ w arkuszu, a o zwycięzcy decyduje kolejność w pliku,
+// nie kolejność w atrybucie class.
 const control =
   "w-full rounded border border-line-strong bg-surface text-body px-3 py-2 text-sm placeholder:text-faint focus:ring-0 focus:border-accent-strong disabled:opacity-50";
 
