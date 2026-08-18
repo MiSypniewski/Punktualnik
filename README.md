@@ -377,6 +377,14 @@ Wpis dostaje flagę „domknięty automatycznie" i żółty pasek; edycja jest
 potwierdzeniem i flagę zdejmuje. Nie ma tu crona — domykanie dzieje się przy okazji
 wejścia na stronę, więc działa też na Mikrusie.
 
+**Wiersz wpisu ma stałą prawą krawędź.** Godziny, wymiar i przyciski
+▶ / ✎ / 🗑 stoją w jednej kolumnie niezależnie od długości opisu — długi opis
+zawija się na kolejne linie, zamiast wypychać resztę wiersza niżej. Wcześniej
+wiersz był jednym `flex flex-wrap` i to właśnie robił: `truncate` na opisie
+ustawia `white-space: nowrap`, więc naturalna szerokość opisu była ogromna,
+a flex zawijał pozostałe elementy, zamiast ścisnąć ten jeden. Na telefonie
+prawa kolumna schodzi pod opis, dosunięta do prawej.
+
 ### Raport kierownika — `/zadania/zarzadzaj`
 
 Na samej górze **„Teraz w toku”** — migawka bieżącej pracy zespołu: kto ma
@@ -463,6 +471,56 @@ jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
 
 Czas jest w dwóch kolumnach: godziny dziesiętnie z przecinkiem (`2,50` — do
 sumowania w arkuszu) i tekst `2h 30min` dla człowieka.
+
+## Motyw jasny i ciemny
+
+Przełącznik stoi na końcu górnego paska, na każdej stronie i dla każdej roli,
+łącznie z kioskiem: to ustawienie wyglądu, nie konta — nie ma czego przestawić
+na cudzą szkodę, a kiosk stoi w konkretnym pomieszczeniu i bywa, że trzeba mu po
+prostu przygasić ekran. Trzy stany:
+
+| Ikona | Znaczenie |
+|---|---|
+| ☀ | jasny na stałe, niezależnie od systemu |
+| ☾ | ciemny na stałe, niezależnie od systemu |
+| ◐ | auto — idzie za ustawieniem systemu i reaguje na jego zmianę bez odświeżania |
+
+Wybór siedzi w `localStorage` pod kluczem `theme`, **nie w bazie**: kiosk to konto
+współdzielone, więc ustawienie per konto zmieniałoby motyw wszystkim naraz. Brak
+wpisu znaczy „auto". Konsekwencja: na nowym urządzeniu albo po wyczyszczeniu
+danych przeglądarki trzeba wybrać ponownie.
+
+Klasę `dark` na `<html>` ustawia blokujący skrypt w `pages/_document.js`, przed
+pierwszym malowaniem strony — gdyby robił to dopiero React, przy każdym wejściu
+mignęłoby białe tło.
+
+### Konwencja kolorów — dla nowych ekranów
+
+Kolory neutralne (tła, tekst, ramki) idą **wyłącznie przez nazwy semantyczne**
+zdefiniowane w `tailwind.config.js` i podpięte pod zmienne CSS w
+`styles/globals.css`. W kodzie stron nie ma już ani jednej klasy z palety `gray`.
+
+| Token | Do czego |
+|---|---|
+| `bg-page` | tło strony (ustawione na `body`, rzadko potrzebne wprost) |
+| `bg-surface` | karty, pola, wiersze |
+| `bg-raised` | tła wyróżnione — formularze, paski postępu, chipy |
+| `text-body` | tekst główny |
+| `text-muted` | tekst drugoplanowy — nazwy projektów, godziny, podpisy |
+| `text-faint` | tekst wygaszony — „(bez opisu)" |
+| `border-line` | zwykłe ramki |
+| `border-line-strong` | ramki pól formularza |
+| `border-line-subtle` | separatory wierszy |
+
+Piszemy `text-muted`, a **nie** `text-gray-600 dark:text-gray-300` — dzięki temu
+nowy ekran dziedziczy oba motywy za darmo i nie da się zapomnieć o wariancie
+ciemnym. Wyjątkiem są kolory niosące znaczenie (status wniosku, wpis domknięty
+automatycznie, komunikat błędu, kolory projektów) — te zostają kolorowe
+i mają punktowy wariant `dark:` dopisany na miejscu.
+
+Uwaga na `@tailwindcss/forms`: plugin twardo maluje pola na biało selektorami
+atrybutowymi (`[type='text']`), które wygrywają specyficznością z gołym `input`.
+Nadpisanie w `globals.css` przepisuje jego listę selektorów i musi taka zostać.
 
 ## Migracja kont z Airtable (jednorazowo)
 
