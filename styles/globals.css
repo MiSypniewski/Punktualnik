@@ -2,10 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* .btn-primary {
-  @apply text-white bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg;
-}
+@layer base {
+  /* Paleta w dwóch wariantach, podpięta pod nazwy semantyczne w
+     tailwind.config.js. Wartości jasne są DOSŁOWNYMI odpowiednikami tego, co
+     było wpisane w kodzie na sztywno (gray-900/600/400/300/100) — po przejściu
+     na tokeny tryb jasny ma wyglądać tak samo jak wcześniej.
 
-.btn-secondary {
-  @apply text-indigo-500 border-2 border-indigo-500 py-2 px-8 focus:outline-none hover:text-indigo-700 hover:border-indigo-700 rounded text-lg;
-} */
+     Kanały RGB bez funkcji rgb(), bo Tailwind dokleja do nich kanał alfa. */
+  :root {
+    color-scheme: light;
+    --c-page: 255 255 255; /* tło strony było białe i takie zostaje */
+    --c-surface: 255 255 255; /* karty, pola, wiersze */
+    --c-raised: 243 244 246; /* gray-100 — tła wyróżnione */
+    --c-body: 17 24 39; /* gray-900 — tekst główny */
+    --c-muted: 75 85 99; /* gray-600 — tekst drugoplanowy */
+    --c-faint: 156 163 175; /* gray-400 — tekst wygaszony */
+    --c-line: 209 213 219; /* gray-300 — ramki */
+    --c-line-strong: 156 163 175; /* gray-400 — ramki pól formularza */
+    --c-line-subtle: 243 244 246; /* gray-100 — separatory wierszy */
+  }
+
+  /* Ciemny wariant na skali zinc, nie gray: gray ma niebieskawy odcień, który
+     przy indygo i różu z akcentów robi się brudny. */
+  .dark {
+    /* color-scheme przestawia natywne widżety przeglądarki — <input type="time">
+       i type="date" w edycji wpisu, paski przewijania, autouzupełnianie. Bez
+       tego kalendarz i zegar zostają jasnymi plamami na ciemnej stronie. */
+    color-scheme: dark;
+    --c-page: 24 24 27; /* zinc-900 */
+    --c-surface: 39 39 42; /* zinc-800 */
+    --c-raised: 63 63 70; /* zinc-700 */
+    --c-body: 244 244 245; /* zinc-100 */
+    --c-muted: 161 161 170; /* zinc-400 */
+    --c-faint: 113 113 122; /* zinc-500 */
+    --c-line: 82 82 91; /* zinc-600 */
+    --c-line-strong: 113 113 122; /* zinc-500 */
+    --c-line-subtle: 63 63 70; /* zinc-700 */
+  }
+
+  body {
+    @apply bg-page text-body;
+  }
+
+  /* @tailwindcss/forms twardo maluje pola na biało (background-color: #fff
+     w swojej warstwie base). Bez tego w trybie ciemnym każde pole jest jasną
+     plamą.
+
+     Lista selektorów jest PRZEPISANA z pluginu (src/index.js) i musi taka
+     zostać: plugin celuje w [type='text'], czyli selektor atrybutowy, który
+     wygrywa specyficznością z gołym `input` — reguła na samym `input` po prostu
+     nie dochodziła do skutku. */
+  [type="text"],
+  [type="email"],
+  [type="url"],
+  [type="password"],
+  [type="number"],
+  [type="date"],
+  [type="datetime-local"],
+  [type="month"],
+  [type="search"],
+  [type="tel"],
+  [type="time"],
+  [type="week"],
+  [multiple],
+  textarea,
+  select {
+    @apply bg-surface text-body;
+  }
+
+  /* Checkboxy i radia mają w pluginie własną regułę z białym tłem. Celujemy
+     tylko w NIEZAZNACZONE — zaznaczone malują się kolorem akcentu i ta reguła
+     nie ma prawa im w tym przeszkodzić. */
+  [type="checkbox"]:not(:checked),
+  [type="radio"]:not(:checked) {
+    @apply bg-surface;
+  }
+}

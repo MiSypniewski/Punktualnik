@@ -10,7 +10,7 @@ export default function Comfirm() {
 
   return (
     <section className="sm:container mx-auto p-2 mt-16 mb-8">
-      <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-gray-900 text-center">
+      <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-body text-center">
         Użytkownik utworzony
       </h2>
       <p className="text-center">Proszę czekać na aktywację konta.</p>

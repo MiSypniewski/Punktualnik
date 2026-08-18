@@ -123,56 +123,56 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
 
   const balanceClass = (v) =>
     classNames("text-right font-medium whitespace-nowrap", {
-      "text-green-600": v > 0,
-      "text-red-600": v < 0,
-      "text-gray-500": v === 0,
+      "text-green-600 dark:text-green-300": v > 0,
+      "text-red-600 dark:text-red-300": v < 0,
+      "text-muted": v === 0,
     });
 
   return (
     <BaseLayout>
       <section className="mx-auto p-4 mt-6 mb-8 max-w-5xl">
         <h1 className="text-2xl font-bold mb-1">Nadgodziny — panel kierownika</h1>
-        <p className="mb-6 text-sm text-gray-500">
+        <p className="mb-6 text-sm text-muted">
           {sections.length > 0 ? `Obsługiwane sekcje: ${sections.join(", ")}` : "Brak przypisanych sekcji"}
         </p>
 
         {sections.length === 0 && (
-          <p className="mb-6 p-3 bg-yellow-100 text-yellow-900 text-sm rounded">
+          <p className="mb-6 p-3 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-900 dark:text-yellow-300 text-sm rounded">
             Nie masz przypisanej żadnej sekcji, więc panel jest pusty. Przypisanie nadaje się z linii poleceń:{" "}
             <code className="font-mono">npm run admin -- sections &lt;e-mail&gt; nazwaSekcji</code>
           </p>
         )}
 
-        {err && <p className="mb-4 p-2 bg-red-100 text-red-700 text-sm rounded">{err}</p>}
+        {err && <p className="mb-4 p-2 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>}
 
         <h2 className="text-xl font-bold mb-4">
-          Do rozpatrzenia {pending.length > 0 && <span className="text-indigo-600">({pending.length})</span>}
+          Do rozpatrzenia {pending.length > 0 && <span className="text-indigo-600 dark:text-indigo-300">({pending.length})</span>}
         </h2>
 
         {pending.length === 0 ? (
-          <p className="mb-10 text-gray-500">Brak wniosków oczekujących na decyzję.</p>
+          <p className="mb-10 text-muted">Brak wniosków oczekujących na decyzję.</p>
         ) : (
           <div className="mb-10 flex flex-col gap-3">
             {pending.map((r) => (
-              <div key={r.id} className="p-3 border border-indigo-200 rounded shadow-sm">
+              <div key={r.id} className="p-3 border border-indigo-200 dark:border-indigo-500/40 rounded shadow-sm">
                 <div className="flex flex-wrap gap-x-4 gap-y-1 items-baseline">
                   <span className="font-bold">
                     {r.surname} {r.name}
                   </span>
-                  <span className="text-sm text-gray-500">{r.section}</span>
+                  <span className="text-sm text-muted">{r.section}</span>
                   <span className="text-sm">{r.data}</span>
                   <span className="text-sm">{kindLabel(r.kind)}</span>
                   <span
                     className={classNames("font-medium", {
-                      "text-green-600": signedMinutes(r) > 0,
-                      "text-red-600": signedMinutes(r) < 0,
+                      "text-green-600 dark:text-green-300": signedMinutes(r) > 0,
+                      "text-red-600 dark:text-red-300": signedMinutes(r) < 0,
                     })}
                   >
                     {formatMinutes(signedMinutes(r), { withSign: true })}
                   </span>
                 </div>
 
-                {r.reason && <p className="mt-1 text-sm text-gray-600">{r.reason}</p>}
+                {r.reason && <p className="mt-1 text-sm text-muted">{r.reason}</p>}
 
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
                   <input
@@ -180,19 +180,19 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                     placeholder="Notatka do decyzji (opcjonalna)"
                     value={note[r.id] || ""}
                     onChange={(e) => setNote({ ...note, [r.id]: e.target.value })}
-                    className="p-2 border border-gray-300 rounded text-sm flex-grow min-w-[12rem]"
+                    className="p-2 border border-line rounded text-sm flex-grow min-w-[12rem]"
                   />
                   <button
                     onClick={() => decide(r.id, "approve")}
                     disabled={busy}
-                    className="text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 border-0 py-2 px-6 rounded"
+                    className="text-white bg-green-600 hover:bg-green-700 disabled:bg-faint border-0 py-2 px-6 rounded"
                   >
                     Zatwierdź
                   </button>
                   <button
                     onClick={() => decide(r.id, "reject")}
                     disabled={busy}
-                    className="text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 border-0 py-2 px-6 rounded"
+                    className="text-white bg-red-600 hover:bg-red-700 disabled:bg-faint border-0 py-2 px-6 rounded"
                   >
                     Odrzuć
                   </button>
@@ -206,7 +206,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
         <div className="mb-10 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left border-b border-gray-300">
+              <tr className="text-left border-b border-line">
                 <th className="py-2 pr-3">Pracownik</th>
                 <th className="py-2 pr-3">Sekcja</th>
                 <th className="py-2 pr-3 text-right">Saldo</th>
@@ -216,19 +216,19 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
             </thead>
             <tbody>
               {balances.map((u) => (
-                <tr key={u.id} className="border-b border-gray-100">
+                <tr key={u.id} className="border-b border-line-subtle">
                   <td className="py-2 pr-3">
                     {u.surname} {u.name}
                   </td>
-                  <td className="py-2 pr-3 text-gray-500">{u.section}</td>
+                  <td className="py-2 pr-3 text-muted">{u.section}</td>
                   <td className={`py-2 pr-3 ${balanceClass(u.balance)}`}>
                     {formatMinutes(u.balance, { withSign: true })}
                   </td>
-                  <td className="py-2 pr-3 text-right text-gray-500">{u.pendingCount || ""}</td>
+                  <td className="py-2 pr-3 text-right text-muted">{u.pendingCount || ""}</td>
                   <td className="py-2 text-right">
                     <button
                       onClick={() => router.push(`/nadgodziny/zarzadzaj?userID=${u.id}`)}
-                      className="text-xs text-indigo-600 hover:underline"
+                      className="text-xs text-indigo-600 dark:text-indigo-300 hover:underline"
                     >
                       Historia
                     </button>
@@ -303,7 +303,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
           <button
             type="button"
             onClick={() => router.push("/nadgodziny/zarzadzaj")}
-            className="py-2 px-4 text-sm text-gray-600 hover:underline"
+            className="py-2 px-4 text-sm text-muted hover:underline"
           >
             Wyczyść
           </button>
@@ -316,21 +316,21 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
           </button>
         </form>
 
-        <p className="mb-4 text-xs text-gray-500">
+        <p className="mb-4 text-xs text-muted">
           „Pobierz CSV” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
-          <button type="button" onClick={() => downloadCsv("salda")} className="text-indigo-600 hover:underline">
+          <button type="button" onClick={() => downloadCsv("salda")} className="text-indigo-600 dark:text-indigo-300 hover:underline">
             Pobierz zestawienie sald wszystkich pracowników
           </button>
           .
         </p>
 
         {history.length === 0 ? (
-          <p className="text-gray-500">Brak wniosków dla wybranych filtrów.</p>
+          <p className="text-muted">Brak wniosków dla wybranych filtrów.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-gray-300">
+                <tr className="text-left border-b border-line">
                   <th className="py-2 pr-3">Data</th>
                   <th className="py-2 pr-3">Pracownik</th>
                   <th className="py-2 pr-3">Rodzaj</th>
@@ -341,7 +341,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
               </thead>
               <tbody>
                 {history.map((r) => (
-                  <tr key={r.id} className="border-b border-gray-100 align-top">
+                  <tr key={r.id} className="border-b border-line-subtle align-top">
                     <td className="py-2 pr-3 whitespace-nowrap">{r.data}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {r.surname} {r.name}
@@ -353,7 +353,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                     <td className="py-2 pr-3">
                       <OvertimeBadge status={r.status} />
                     </td>
-                    <td className="py-2 pr-3 text-gray-600">
+                    <td className="py-2 pr-3 text-muted">
                       {r.reason && <span className="block">{r.reason}</span>}
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">

@@ -53,7 +53,7 @@ export default function Home({}) {
 
   return (
     <BaseLayout>
-      <div className="lg:container mx-auto bg-white">
+      <div className="lg:container mx-auto bg-surface">
         <h1 className="text-center mt-10 font-bold text-3xl py-1 px-2">Punktualnik</h1>
         <p className="text-center mt-20">Za chwilę zostaniesz przekierowany na odpowiednią sekcję</p>
         <Spinner />

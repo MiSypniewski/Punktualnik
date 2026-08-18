@@ -25,22 +25,30 @@ const Card = ({ data }) => {
   // i kursor strzałki: karta ma nie udawać, że jest przyciskiem.
   const canPunch = canPunchCards(session?.user?.role);
 
+  // Kafelek to nasycona płyta, a napis na niej dziedziczy `text-body`: ciemny
+  // w motywie jasnym, jasny w ciemnym. Dlatego tła MUSZĄ być dobrane osobno dla
+  // każdego motywu — te same odcienie w obu dawały kontrast 2,3:1 dla "czeka"
+  // (blue-400 + jasny napis), czyli poniżej progu 3:1 nawet dla dużego tekstu.
+  //
+  // Odcienie jasne zostają jak były (6–7:1 z ciemnym napisem), ciemne schodzą
+  // o dwa–trzy stopnie i trzymają 6,2–9,1:1 z jasnym napisem. `text-body` jest
+  // wpisane jawnie, żeby ta zależność była widoczna w miejscu, gdzie się liczy.
   let statusClass = classNames(
-    "flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl",
+    "flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl text-body",
     canPunch ? "cursor-pointer" : "cursor-default",
     {
-      "bg-blue-400": status === "wait",
-      "bg-red-500": status === "workInProgress",
-      "bg-yellow-600": status === "overTime",
-      "bg-green-600": status === "finishWork" && overTime,
-      "bg-red-600": status === "finishWork" && !overTime,
+      "bg-blue-400 dark:bg-blue-800": status === "wait",
+      "bg-red-500 dark:bg-red-800": status === "workInProgress",
+      "bg-yellow-600 dark:bg-yellow-800": status === "overTime",
+      "bg-green-600 dark:bg-green-800": status === "finishWork" && overTime,
+      "bg-red-600 dark:bg-red-900": status === "finishWork" && !overTime,
     },
     canPunch && {
-      "hover:bg-blue-500": status === "wait",
-      "hover:bg-red-600": status === "workInProgress",
-      "hover:bg-yellow-700": status === "overTime",
-      "hover:bg-green-700": status === "finishWork" && overTime,
-      "hover:bg-red-700": status === "finishWork" && !overTime,
+      "hover:bg-blue-500 dark:hover:bg-blue-700": status === "wait",
+      "hover:bg-red-600 dark:hover:bg-red-700": status === "workInProgress",
+      "hover:bg-yellow-700 dark:hover:bg-yellow-700": status === "overTime",
+      "hover:bg-green-700 dark:hover:bg-green-700": status === "finishWork" && overTime,
+      "hover:bg-red-700 dark:hover:bg-red-800": status === "finishWork" && !overTime,
     }
   );
 

@@ -3,7 +3,15 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Spinner from "./spinner";
-import { canExportTimes, canApproveOvertime } from "../services/roles";
+import ThemeToggle from "./themeToggle";
+import TimerTitle from "./timerTitle";
+import {
+  canExportTimes,
+  canApproveOvertime,
+  canTrackTasks,
+  canManageProjects,
+  canSeeTeamTasks,
+} from "../services/roles";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
@@ -33,13 +41,37 @@ const TopNavigation = () => {
   }, [firtstRun]);
 
   return (
-    <div className="flex gap-6 w-full px-4 py-1">
+    // flex-wrap jest tu konieczne: pozycji w menu przybyło wraz z modułem zadań
+    // i na telefonie nie mieszczą się już w jednej linii — bez zawijania
+    // wypychały stronę w poziomie i pojawiał się pasek przewijania.
+    // Data ma `w-full sm:w-auto`, żeby na wąskim ekranie zajęła własną linię,
+    // a nie wciskała linki w resztę miejsca.
+    <div className="flex flex-wrap items-baseline gap-x-4 sm:gap-x-6 gap-y-1 w-full px-4 py-1">
       <Link href={`/`}>
-        <a className="capitalize flex-grow font-bold">{dayjs().format(`dddd, DD MMMM YYYY, HH:mm:ss `)}</a>
+        <a className="first-letter:uppercase w-full sm:w-auto sm:flex-grow font-bold">
+          {dayjs().format(`dddd, DD MMMM YYYY, HH:mm:ss `)}
+        </a>
       </Link>
+      {/* Kiosk (editor) nie raportuje zadań — konto jest współdzielone, więc
+          wpis nie miałby właściciela. Stąd link tylko dla canTrackTasks. */}
+      {canTrackTasks(session.user.role) && (
+        <Link href={`/zadania`}>
+          <a className="font-bold hover:underline">Zadania</a>
+        </Link>
+      )}
       <Link href={`/nadgodziny`}>
         <a className="font-bold hover:underline">Nadgodziny</a>
       </Link>
+      {canSeeTeamTasks(session.user.role) && (
+        <Link href={`/zadania/zarzadzaj`}>
+          <a className="font-bold hover:underline">Raport zadań</a>
+        </Link>
+      )}
+      {canManageProjects(session.user.role) && (
+        <Link href={`/zadania/projekty`}>
+          <a className="font-bold hover:underline">Projekty</a>
+        </Link>
+      )}
       {canExportTimes(session.user.role) && (
         <Link href={`/utils/eksport`}>
           <a className="font-bold hover:underline">Eksport</a>
@@ -60,6 +92,10 @@ const TopNavigation = () => {
           <a className="capitalize font-bold hover:underline">{session.user.name}</a>
         </Link>
       )}
+      {/* Także dla kiosku: stoi w konkretnym pomieszczeniu i bywa, że trzeba mu
+          po prostu przygasić ekran. To ustawienie wyglądu, nie konta — nie ma
+          czego przestawić na cudzą szkodę. */}
+      <ThemeToggle />
     </div>
   );
 };
@@ -96,6 +132,10 @@ export default function BaseLayout({ children }) {
   // console.log(session.user);
   return (
     <>
+      {/* Timer w pasku karty na KAŻDEJ stronie — stąd tutaj, a nie na /zadania.
+          Kiosk (`editor`) nie raportuje zadań, więc nie ma własnego timera i nie
+          ma po co odpytywać serwera. */}
+      {canTrackTasks(session.user.role) && <TimerTitle />}
       <TopNavigation />
       {children}
       {/* <Footer /> */}

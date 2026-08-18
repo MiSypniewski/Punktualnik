@@ -31,12 +31,12 @@ export default function LogIn() {
   return (
     <section className="p-2 mt-3 mb-8">
       <div className="mt-16">
-        <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-gray-900 text-center">Logowanie</h2>
+        <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-body text-center">Logowanie</h2>
       </div>
       <div className="container mx-auto lg:w-2/3">
         <form ref={loginForm} onSubmit={handleSubmit}>
           <div className="p-2">
-            <label htmlFor="email" className="leading-7 text-sm text-gray-600">
+            <label htmlFor="email" className="leading-7 text-sm text-muted">
               E-mail:
             </label>
             <input
@@ -44,11 +44,11 @@ export default function LogIn() {
               id="email"
               name="email"
               required
-              className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+              className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
             />
           </div>
           <div className="p-2 w-full">
-            <label htmlFor="password" className="leading-7 text-sm text-gray-600">
+            <label htmlFor="password" className="leading-7 text-sm text-muted">
               Hasło:
             </label>
             <input
@@ -56,7 +56,7 @@ export default function LogIn() {
               id="password"
               name="password"
               required
-              className="w-full bg-gray-100 bg-opacity-50 rounded border border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 text-base outline-none text-gray-700 py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
+              className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
             />
           </div>
           <div className="p-6 w-full">
