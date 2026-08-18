@@ -6,7 +6,7 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../components/baseLayout";
-import { projectColor } from "../../components/projectColors";
+import { ProjectMark } from "../../components/projectColors";
 import { listProjects, projectScope } from "../../services/projects";
 import { getEntriesForUser, getRunningEntry, closeStaleEntries } from "../../services/taskEntries";
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
@@ -395,7 +395,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
   return (
     <Bar tone="running" title="Pracujesz nad">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(project?.color).dot}`} />
+        <ProjectMark color={project?.color} size="lg" />
         {/* Te same pola co przed startem, w tym samym układzie — pasek nie zmienia
             kształtu po naciśnięciu Start, zmienia się tylko przycisk po prawej. */}
         <input
@@ -547,7 +547,7 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
           onClick={() => onResume(s)}
           className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-line rounded-full text-sm hover:bg-raised disabled:opacity-50"
         >
-          <span className={`w-2 h-2 rounded-full shrink-0 ${projectColor(s.projectColor).dot}`} />
+          <ProjectMark color={s.projectColor} size="sm" />
           <span className="truncate text-indigo-500 dark:text-indigo-300">{s.description}</span>
           <span className="text-muted shrink-0">▶</span>
         </button>
@@ -825,11 +825,10 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
           zmieści się obok opisu; tam schodzi pod niego, dosunięta do prawej. */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
         <div className="flex gap-2 flex-grow min-w-0">
-          {/* mt-1.5 zamiast wyrównania do środka: przy opisie na dwie linie kropka
-              ma stać przy pierwszej z nich, a nie dryfować do połowy wysokości. */}
-          <span
-            className={`w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 ${projectColor(entry.projectColor).dot}`}
-          />
+          {/* mt-1.5 zamiast wyrównania do środka: przy opisie na dwie linie
+              znacznik ma stać przy pierwszej z nich, a nie dryfować do połowy
+              wysokości. */}
+          <ProjectMark color={entry.projectColor} className="mt-1.5" />
           <span className="min-w-0">
             <span
               className={classNames(

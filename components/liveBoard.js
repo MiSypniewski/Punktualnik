@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import classNames from "classnames";
-import { ProjectDot } from "./projectColors";
+import { ProjectMark } from "./projectColors";
 import { formatDuration, hhmm } from "../utils";
 
 // Sekcja "Teraz w toku" na górze raportu kierownika.
@@ -104,7 +104,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                   tooLong && "bg-amber-50 dark:bg-amber-500/10"
                 )}
               >
-                <ProjectDot color={r.projectColor} />
+                <ProjectMark color={r.projectColor} />
                 <div className="flex-grow min-w-0">
                   <p className="font-medium truncate">
                     {fullName(r)}

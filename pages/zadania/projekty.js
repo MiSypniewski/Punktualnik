@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
 import BaseLayout from "../../components/baseLayout";
-import { projectColor, COLOR_KEYS } from "../../components/projectColors";
+import { projectColor, ProjectMark, COLOR_KEYS } from "../../components/projectColors";
 import { listProjects, projectScope, PROJECT_COLOR_KEYS } from "../../services/projects";
 import { listSections } from "../../services/sections";
 import { canManageProjects } from "../../services/roles";
@@ -168,8 +168,8 @@ export default function Projekty({ projects, sections, colorKeys }) {
                   aria-label={`Kolor ${key}`}
                   onClick={() => setForm({ ...form, color: key })}
                   className={classNames(
-                    "w-8 h-8 rounded-full border-2",
-                    projectColor(key).dot,
+                    "w-8 h-8 rounded border-2",
+                    projectColor(key).mark,
                     form.color === key ? "border-body" : "border-transparent"
                   )}
                 />
@@ -250,7 +250,7 @@ const ProjectRow = ({ p, busy, onEdit, onToggle }) => (
       !p.isActive && "opacity-60"
     )}
   >
-    <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(p.color).dot}`} />
+    <ProjectMark color={p.color} size="lg" />
     <span className="font-medium">{p.name}</span>
     {p.client && <span className="text-sm text-muted">· {p.client}</span>}
 

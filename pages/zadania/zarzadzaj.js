@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../components/baseLayout";
 import LiveBoard from "../../components/liveBoard";
-import { projectColor, ProjectDot } from "../../components/projectColors";
+import { projectColor, ProjectMark } from "../../components/projectColors";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
@@ -321,7 +321,7 @@ export default function ZarzadzajZadaniami({
                 <tr key={p.id} className="border-b border-line-subtle">
                   <Td>
                     <span className="flex items-center">
-                      <span className={`w-2.5 h-2.5 rounded-full mr-2 shrink-0 ${projectColor(p.color).dot}`} />
+                      <ProjectMark color={p.color} className="mr-2" />
                       {p.name}
                     </span>
                   </Td>
@@ -521,7 +521,7 @@ const EntryRow = ({ entry, busy, onEdit }) => (
     </Td>
     <Td>
       <span className="flex items-center">
-        <span className={`w-2 h-2 rounded-full mr-2 shrink-0 ${projectColor(entry.projectColor).dot}`} />
+        <ProjectMark color={entry.projectColor} size="sm" className="mr-2" />
         {entry.projectName}
       </span>
     </Td>
@@ -580,7 +580,7 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="flex items-baseline min-w-0">
-          <ProjectDot color={entry.projectColor} />
+          <ProjectMark color={entry.projectColor} className="mr-2" />
           <span className="text-sm text-muted truncate">{entry.projectName}</span>
         </span>
         <span className="text-sm text-muted tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
