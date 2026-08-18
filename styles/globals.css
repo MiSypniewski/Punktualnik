@@ -108,9 +108,11 @@
     --c-raised: 228 232 237; /* #E4E8ED tło wyróżnione */
     --c-body: 20 33 61; /* #14213D atrament */
     --c-muted: 72 86 110; /* #48566E */
-    --c-faint: 138 148 166; /* #8A94A6 */
+    --c-faint: 120 130 143; /* #78828F — 3,4:1 na tle strony; niżej nie schodzi,
+                                 bo „(bez opisu)” to treść, nie ozdoba */
     --c-line: 201 209 219; /* #C9D1DB włos */
-    --c-line-strong: 169 180 194; /* #A9B4C2 ramka pola */
+    --c-line-strong: 120 135 155; /* #78879B ramka pola — 3:1, bo pole odróżnia
+                                    od tła wyłącznie ramka (WCAG 1.4.11) */
     --c-line-subtle: 225 230 236; /* #E1E6EC separator wiersza */
 
     --c-accent: 20 33 61; /* #14213D przycisk atramentowy */
@@ -152,7 +154,7 @@
     --c-muted: 154 165 180; /* #9AA5B4 */
     --c-faint: 107 118 134; /* #6B7686 */
     --c-line: 44 51 62; /* #2C333E */
-    --c-line-strong: 59 68 82; /* #3B4452 */
+    --c-line-strong: 94 107 126; /* #5E6B7E — jak wyżej, próg 3:1 */
     --c-line-subtle: 35 41 50; /* #232932 */
 
     --c-accent: 231 234 240; /* #E7EAF0 przycisk odwrócony */

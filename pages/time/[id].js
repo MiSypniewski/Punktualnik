@@ -153,8 +153,12 @@ export default function Home({ newCardData, id, sectionLabel, workdayLabel }) {
         // Cztery kolumny od 1280 px: tablet kiosku stoi zwykle w poziomie,
         // a przy kilkunastu osobach trzy kolumny zeszły poniżej krawędzi ekranu.
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {/* Klucz po userID, nie po ID: wiersze z tabeli Times mają `airtableID`
+              (patrz services/getSectionTime.js), a `ID` tylko kafelki dorobione
+              dla nieobecnych — czyli połowa listy szła bez klucza i React mógł
+              podmienić stan licznika między osobami. */}
           {cards.map((card) => (
-            <Card data={card} key={card.ID} />
+            <Card data={card} key={card.userID} />
           ))}
         </div>
       )}
