@@ -40,3 +40,21 @@ export const ButtonLink = ({ href, variant, size, className, external, ...rest }
 };
 
 export default Button;
+
+/** Kwadratowy przycisk z samą ikoną — w wierszach list, gdzie na etykietę nie
+ *  ma miejsca. `title` i `aria-label` są OBOWIĄZKOWE: bez nich zostaje sam
+ *  obrazek bez znaczenia. */
+export const IconButton = ({ label, className, children, ...rest }) => (
+  <button
+    type="button"
+    title={label}
+    aria-label={label}
+    className={classNames(
+      "inline-flex items-center justify-center w-8 h-8 rounded border border-line text-muted transition-colors hover:text-body hover:bg-raised disabled:opacity-40 disabled:cursor-not-allowed",
+      className
+    )}
+    {...rest}
+  >
+    {children}
+  </button>
+);
