@@ -2,46 +2,199 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  /* Paleta w dwóch wariantach, podpięta pod nazwy semantyczne w
-     tailwind.config.js. Wartości jasne są DOSŁOWNYMI odpowiednikami tego, co
-     było wpisane w kodzie na sztywno (gray-900/600/400/300/100) — po przejściu
-     na tokeny tryb jasny ma wyglądać tak samo jak wcześniej.
+/* ==========================================================================
+   Kroje pisma — hostowane u siebie (public/fonts), bez zapytań do CDN-u.
+   Powód: kiosk i telefony w hali bywają na słabym łączu, a produkcja stoi na
+   Mikrusie. Podzbiór `latin-ext` jest OBOWIĄZKOWY — bez niego nie ma polskich
+   znaków (ą, ć, ę, ł, ń, ś, ź, ż); `latin` dociąga resztę, w tym „ó”.
 
-     Kanały RGB bez funkcji rgb(), bo Tailwind dokleja do nich kanał alfa. */
+   Archivo to krój ZMIENNY: jeden plik na podzbiór obsługuje całą oś wagi
+   400-700, stąd `font-weight: 400 700` zamiast osobnych deklaracji.
+   ========================================================================== */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/archivo-400-700-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/archivo-400-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-400-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-500-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-600-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-600-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@layer base {
+  /* ========================================================================
+     Paleta „Tablica odjazdów” w dwóch wariantach, podpięta pod nazwy
+     semantyczne w tailwind.config.js.
+
+     Kanały RGB bez funkcji rgb(), bo Tailwind dokleja do nich kanał alfa
+     (`bg-surface/50`). Wartość musi być trójką liczb oddzielonych spacjami.
+     ======================================================================== */
+
+  /* Jasny — emaliowana tabliczka stacyjna: chłodna porcelana, atramentowy
+     granat zamiast czerni, bursztyn jako jedyny sygnał. */
   :root {
     color-scheme: light;
-    --c-page: 255 255 255; /* tło strony było białe i takie zostaje */
-    --c-surface: 255 255 255; /* karty, pola, wiersze */
-    --c-raised: 243 244 246; /* gray-100 — tła wyróżnione */
-    --c-body: 17 24 39; /* gray-900 — tekst główny */
-    --c-muted: 75 85 99; /* gray-600 — tekst drugoplanowy */
-    --c-faint: 156 163 175; /* gray-400 — tekst wygaszony */
-    --c-line: 209 213 219; /* gray-300 — ramki */
-    --c-line-strong: 156 163 175; /* gray-400 — ramki pól formularza */
-    --c-line-subtle: 243 244 246; /* gray-100 — separatory wierszy */
+
+    --c-page: 237 239 242; /* #EDEFF2 porcelana */
+    --c-surface: 255 255 255; /* #FFFFFF płyta */
+    --c-raised: 228 232 237; /* #E4E8ED tło wyróżnione */
+    --c-body: 20 33 61; /* #14213D atrament */
+    --c-muted: 72 86 110; /* #48566E */
+    --c-faint: 138 148 166; /* #8A94A6 */
+    --c-line: 201 209 219; /* #C9D1DB włos */
+    --c-line-strong: 169 180 194; /* #A9B4C2 ramka pola */
+    --c-line-subtle: 225 230 236; /* #E1E6EC separator wiersza */
+
+    --c-accent: 20 33 61; /* #14213D przycisk atramentowy */
+    --c-accent-ink: 255 255 255;
+    --c-accent-soft: 227 232 242; /* #E3E8F2 */
+    --c-accent-strong: 29 59 122; /* #1D3B7A linki, fokus */
+
+    --c-signal: 160 96 10; /* #A0600A bursztyn wypełnienia */
+    --c-signal-ink: 255 255 255;
+    --c-signal-soft: 253 240 220; /* #FDF0DC */
+    --c-signal-strong: 122 71 8; /* #7A4708 drobny tekst */
+
+    --c-ok: 11 110 91; /* #0B6E5B */
+    --c-ok-ink: 255 255 255;
+    --c-ok-soft: 220 240 233; /* #DCF0E9 */
+    --c-ok-strong: 8 84 70; /* #085446 */
+
+    --c-danger: 179 38 30; /* #B3261E */
+    --c-danger-ink: 255 255 255;
+    --c-danger-soft: 251 228 226; /* #FBE4E2 */
+    --c-danger-strong: 142 29 23; /* #8E1D17 */
+
+    --shadow-plate: 0 1px 2px rgb(20 33 61 / 0.07), 0 1px 1px rgb(20 33 61 / 0.04);
+    --shadow-rail: 0 1px 0 rgb(20 33 61 / 0.06);
   }
 
-  /* Ciemny wariant na skali zinc, nie gray: gray ma niebieskawy odcień, który
-     przy indygo i różu z akcentów robi się brudny. */
+  /* Ciemny — nocna tablica: prawie czarny granat, ciepła biel, ten sam
+     bursztyn tylko rozjaśniony. */
   .dark {
     /* color-scheme przestawia natywne widżety przeglądarki — <input type="time">
        i type="date" w edycji wpisu, paski przewijania, autouzupełnianie. Bez
        tego kalendarz i zegar zostają jasnymi plamami na ciemnej stronie. */
     color-scheme: dark;
-    --c-page: 24 24 27; /* zinc-900 */
-    --c-surface: 39 39 42; /* zinc-800 */
-    --c-raised: 63 63 70; /* zinc-700 */
-    --c-body: 244 244 245; /* zinc-100 */
-    --c-muted: 161 161 170; /* zinc-400 */
-    --c-faint: 113 113 122; /* zinc-500 */
-    --c-line: 82 82 91; /* zinc-600 */
-    --c-line-strong: 113 113 122; /* zinc-500 */
-    --c-line-subtle: 63 63 70; /* zinc-700 */
+
+    --c-page: 14 17 22; /* #0E1116 */
+    --c-surface: 22 26 33; /* #161A21 */
+    --c-raised: 31 37 46; /* #1F252E */
+    --c-body: 237 239 242; /* #EDEFF2 */
+    --c-muted: 154 165 180; /* #9AA5B4 */
+    --c-faint: 107 118 134; /* #6B7686 */
+    --c-line: 44 51 62; /* #2C333E */
+    --c-line-strong: 59 68 82; /* #3B4452 */
+    --c-line-subtle: 35 41 50; /* #232932 */
+
+    --c-accent: 231 234 240; /* #E7EAF0 przycisk odwrócony */
+    --c-accent-ink: 14 17 22;
+    --c-accent-soft: 28 36 49; /* #1C2431 */
+    --c-accent-strong: 168 196 255; /* #A8C4FF linki, fokus */
+
+    --c-signal: 232 163 61; /* #E8A33D */
+    --c-signal-ink: 20 33 61;
+    --c-signal-soft: 58 44 21; /* #3A2C15 */
+    --c-signal-strong: 242 189 107; /* #F2BD6B */
+
+    --c-ok: 70 201 168; /* #46C9A8 */
+    --c-ok-ink: 14 17 22;
+    --c-ok-soft: 16 48 42; /* #10302A */
+    --c-ok-strong: 111 220 192; /* #6FDCC0 */
+
+    --c-danger: 255 138 128; /* #FF8A80 */
+    --c-danger-ink: 14 17 22;
+    --c-danger-soft: 58 28 26; /* #3A1C1A */
+    --c-danger-strong: 255 175 167; /* #FFAFA7 */
+
+    /* Na ciemnym tle cień nie niesie żadnej informacji — rolę wypukłości
+       przejmuje włosowa ramka. Zostaje ślad, żeby pasek nie zlewał się
+       z treścią przy przewijaniu. */
+    --shadow-plate: none;
+    --shadow-rail: 0 1px 0 rgb(0 0 0 / 0.5);
   }
 
   body {
-    @apply bg-page text-body;
+    @apply bg-page text-body font-sans;
+    /* Tablica jest gęsta od liczb — cyfry tabelaryczne wszędzie, żeby kolumny
+       nie drgały przy tykaniu licznika. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Fokus klawiatury musi być widoczny na KAŻDYM tle, także na bursztynowym
+     przycisku — stąd podwójny pierścień: kolor akcentu w środku, tło strony
+     jako przerwa. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-accent-strong));
+    outline-offset: 2px;
   }
 
   /* @tailwindcss/forms twardo maluje pola na biało (background-color: #fff
@@ -76,5 +229,18 @@
   [type="checkbox"]:not(:checked),
   [type="radio"]:not(:checked) {
     @apply bg-surface;
+  }
+
+  /* Pulsujący punkt sygnału to jedyna animacja w aplikacji. Licznik ma dalej
+     tykać — zatrzymujemy ruch, nie dane. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
