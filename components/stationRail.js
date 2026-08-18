@@ -130,7 +130,13 @@ export default function StationRail({ user }) {
                 <SignOutButton className="hidden lg:block text-sm" />
               </>
             )}
-            <ThemeToggle />
+            {/* Poniżej 640 px przełącznik przenosi się do menu: znak, zegar,
+                trzy przyciski motywu i hamburger nie mieszczą się w jednym
+                rzędzie na telefonie. Kiosk stoi na tablecie, więc ma go dalej
+                pod ręką w pasku. */}
+            <span className="hidden sm:block">
+              <ThemeToggle />
+            </span>
             <button
               type="button"
               onClick={() => setOpen((prev) => !prev)}
@@ -169,6 +175,11 @@ export default function StationRail({ user }) {
                 <SignOutButton className="px-2 py-2 text-sm" />
               </div>
             )}
+
+            <div className="sm:hidden mt-2 pt-2 border-t border-line-subtle flex items-center justify-between">
+              <span className="px-2 text-xs font-semibold uppercase tracking-signage text-muted">Motyw</span>
+              <ThemeToggle />
+            </div>
           </div>
         </nav>
       )}

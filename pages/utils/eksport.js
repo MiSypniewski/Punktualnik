@@ -5,6 +5,11 @@ import BaseLayout from "../../components/baseLayout";
 import getAllUsers from "../../services/getAllUsers";
 import { canExportTimes } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
+import Button from "../../components/ui/button";
+import { Field, Input, Select } from "../../components/ui/field";
+import Alert from "../../components/ui/alert";
+import PageHeader from "../../components/ui/pageHeader";
+import { DownloadIcon } from "../../components/ui/icons";
 
 // Dwuwarstwowe zabezpieczenie: tu blokujemy wejście na stronę,
 // a /api/report niezależnie blokuje samo pobranie pliku.
@@ -53,52 +58,40 @@ export default function Eksport({ users }) {
   };
 
   return (
-    <BaseLayout>
-      <section className="mx-auto p-4 mt-6 mb-8 max-w-xl flex flex-col">
-        <h1 className="text-2xl font-bold mb-6">Eksport czasów pracy</h1>
+    <BaseLayout width="narrow">
+      <PageHeader
+        title="Eksport czasów pracy"
+        description="Odbicia z kiosku za wybrany okres, w pliku CSV gotowym dla polskiego Excela."
+      />
 
-        <label className="mb-1 text-sm font-medium">Data od</label>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="mb-4 p-2 border border-indigo-400 rounded"
-        />
+      <div className="flex flex-col gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Data od" htmlFor="from">
+            <Input type="date" id="from" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </Field>
+          <Field label="Data do" htmlFor="to">
+            <Input type="date" id="to" value={to} onChange={(e) => setTo(e.target.value)} />
+          </Field>
+        </div>
 
-        <label className="mb-1 text-sm font-medium">Data do</label>
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="mb-4 p-2 border border-indigo-400 rounded"
-        />
+        <Field label="Pracownik" htmlFor="userID">
+          <Select id="userID" value={userID} onChange={(e) => setUserID(e.target.value)}>
+            <option value="">— wszyscy —</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.surname} {u.name} ({u.section})
+              </option>
+            ))}
+          </Select>
+        </Field>
 
-        <label className="mb-1 text-sm font-medium">Pracownik</label>
-        <select
-          value={userID}
-          onChange={(e) => setUserID(e.target.value)}
-          className="mb-6 p-2 border border-indigo-400 rounded"
-        >
-          <option value="">— wszyscy —</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.surname} {u.name} ({u.section})
-            </option>
-          ))}
-        </select>
+        {err && <Alert tone="danger">{err}</Alert>}
 
-        {err && <p className="mb-4 text-red-600 dark:text-red-300 text-sm">{err}</p>}
-
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            download();
-          }}
-          className="text-white bg-indigo-500 border-0 py-2 px-8 hover:bg-indigo-600 rounded text-lg"
-        >
+        <Button size="lg" onClick={download} className="self-start mt-1">
+          <DownloadIcon />
           Pobierz CSV
-        </button>
-      </section>
+        </Button>
+      </div>
     </BaseLayout>
   );
 }
