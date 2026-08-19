@@ -1,7 +1,11 @@
-import Link from "next/link";
+import { getToken } from "next-auth/jwt";
 import getUserData from "../../services/getUserData";
 import BaseLayout from "../../components/baseLayout";
 import Spinner from "../../components/spinner";
+import Button from "../../components/ui/button";
+import { Field, Input } from "../../components/ui/field";
+import Alert from "../../components/ui/alert";
+import PageHeader from "../../components/ui/pageHeader";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
@@ -9,8 +13,27 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
 
+// Kontrola po stronie serwera. Wcześniej `getUserData` szło do bazy PRZED
+// jakimkolwiek sprawdzeniem sesji, więc dane konta (imię, nazwisko, e-mail,
+// dział, rola) trafiały do propsów każdemu, kto wpisał adres — także osobie
+// niezalogowanej. Sprawdzenie w `useEffect` przekierowywało dopiero
+// w przeglądarce, czyli PO wysłaniu danych.
 export const getServerSideProps = async (context) => {
+  const token = await getToken({ req: context.req });
+  if (!token) {
+    return { redirect: { destination: "/users/signin", permanent: false } };
+  }
+
+  // Cudzy profil to 404, a nie 403: odpowiedź „brak uprawnień” potwierdzałaby,
+  // że konto o tym identyfikatorze istnieje.
+  if (String(token.userID) !== String(context.params.id)) {
+    return { notFound: true };
+  }
+
   const userData = await getUserData(context.params.id);
+  if (userData.length === 0) {
+    return { notFound: true };
+  }
 
   return {
     props: {
@@ -18,6 +41,12 @@ export const getServerSideProps = async (context) => {
       id: context.params.id,
     },
   };
+};
+
+// Kody błędów z API po ludzku; nieznany kod pokazujemy jak leci.
+const ERROR_MESSAGES = {
+  wrong_old_password: "Stare hasło się nie zgadza.",
+  user_not_found: "Nie znaleziono konta. Zaloguj się ponownie.",
 };
 
 export default function UserData({ userData, id }) {
@@ -29,13 +58,11 @@ export default function UserData({ userData, id }) {
   const [error, setError] = useState();
   const [formProcessing, setFormProcessing] = useState(false);
 
-  //wywalenie użytkownika o innym ID
+  // Cudzy profil odcina już getServerSideProps. Tutaj zostaje wyłącznie
+  // przypadek sesji, która wygasła, kiedy strona była otwarta.
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/");
-    }
-    if (status === "authenticated" && session.user.userID.toString() !== id) {
-      router.push("/");
+      router.push("/users/signin");
     }
   }, [session, status]);
 
@@ -75,91 +102,55 @@ export default function UserData({ userData, id }) {
     if (response.ok) {
       router.push("/users/password");
     } else {
-      const payload = await response.json();
+      const body = await response.json();
       setFormProcessing(false);
-      setError(payload.error);
+      setError(ERROR_MESSAGES[body.error] || body.error);
     }
   };
 
   if (status !== "authenticated") {
     // console.log(`loading`);
-    return (
-      <div>
-        <p className="text-center mt-20"> Ładowanie ...</p>
-        <Spinner />
-      </div>
-    );
+    return <Spinner />;
   }
 
   return (
-    <BaseLayout>
-      <section className="container mx-auto p-2 mt-3 mb-8">
-        <div className="sm:mt-8 md:mt-8 sm:w-1/3 md:w-1/3 mx-auto flex justify-between">
-          <h2 className="block mx-auto sm:text-3xl text-3xl font-medium title-font mb-4 px-4 text-body text-center">
-            {user.name} {user.surname}
-          </h2>
-          <div className="block grow-0 shrink-0 ">
-            <Link href={`/api/auth/signout`}>
-              <a className="disabled:opacity-50 text-white bg-indigo-500 border-0 py-2 px-4 focus:outline-none hover:bg-indigo-600 rounded text-lg">
-                Wyloguj się
-              </a>
-            </Link>
-          </div>
-        </div>
-        <div className="container mx-auto md:w-2/3">
-          <form ref={userForm} onSubmit={handleSubmit}>
-            <div className="p-2 w-full">
-              <label htmlFor="oldPassword" className="leading-7 text-sm text-muted">
-                Stare hasło:
-              </label>
-              <input
-                type="password"
-                id="oldPassword"
-                name="oldPassword"
-                required
-                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
-              />
-            </div>
-            <div className="p-2 w-full">
-              <label htmlFor="newPassword" className="leading-7 text-sm text-muted">
-                Nowe Hasło:
-              </label>
-              <input
-                type="password"
-                id="newPassword"
-                name="newPassword"
-                required
-                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
-              />
-            </div>
-            <div className="p-2 w-full ">
-              <label htmlFor="passwordConfirm" className="leading-7 text-sm text-muted">
-                Potwierdź Hasło:
-              </label>
-              <input
-                type="password"
-                id="passwordConfirm"
-                name="passwordConfirm"
-                required
-                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
-              />
-            </div>
-            <div className="p-6 w-full">
-              <button
-                disabled={formProcessing}
-                className="disabled:opacity-50 flex mx-auto text-white bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg"
-              >
-                {formProcessing ? "Proszę czekać..." : "Zmień hasło"}
-              </button>
-              {error && (
-                <div className="flex justify-center w-full my-5">
-                  <span className="bg-red-600 w-full rounded text-white px-3 py-3 text-center">Błąd: {error}</span>
-                </div>
-              )}
-            </div>
-          </form>
-        </div>
-      </section>
+    <BaseLayout width="narrow">
+      <PageHeader
+        title={`${user.name} ${user.surname}`}
+        description={`${user.email} · dział: ${user.section}`}
+      />
+
+      <h2 className="mb-4 text-sm font-bold uppercase tracking-signage">Zmiana hasła</h2>
+
+      <form ref={userForm} onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="Stare hasło" htmlFor="oldPassword">
+          <Input
+            type="password"
+            id="oldPassword"
+            name="oldPassword"
+            autoComplete="current-password"
+            required
+          />
+        </Field>
+        <Field label="Nowe hasło" htmlFor="newPassword">
+          <Input type="password" id="newPassword" name="newPassword" autoComplete="new-password" required />
+        </Field>
+        <Field label="Potwierdź nowe hasło" htmlFor="passwordConfirm">
+          <Input
+            type="password"
+            id="passwordConfirm"
+            name="passwordConfirm"
+            autoComplete="new-password"
+            required
+          />
+        </Field>
+
+        {error && <Alert tone="danger">{error}</Alert>}
+
+        <Button type="submit" size="lg" disabled={formProcessing} className="self-start mt-1">
+          {formProcessing ? "Zmieniam…" : "Zmień hasło"}
+        </Button>
+      </form>
     </BaseLayout>
   );
 }

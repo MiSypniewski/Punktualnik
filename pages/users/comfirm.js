@@ -1,29 +1,21 @@
 import { useRouter } from "next/router";
+import AuthLayout from "../../components/authLayout";
+import Button from "../../components/ui/button";
 
+// Nazwa pliku z literówką („comfirm”) zostaje: to adres, pod który trafia
+// przeglądarka po rejestracji, i zmiana zerwałaby linki w mailach oraz
+// zakładkach. Poprawiać ją warto razem z resztą tras, nie przy okazji wyglądu.
 export default function Comfirm() {
   const router = useRouter();
 
-  const handleReturnToMain = (e) => {
-    e.preventDefault();
-    router.push("/");
-  };
-
   return (
-    <section className="sm:container mx-auto p-2 mt-16 mb-8">
-      <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-body text-center">
-        Użytkownik utworzony
-      </h2>
-      <p className="text-center">Proszę czekać na aktywację konta.</p>
-      <div className="mt-40">
-        <button
-          onClick={(e) => {
-            handleReturnToMain(e);
-          }}
-          className="disabled:opacity-50 flex mx-auto text-white bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg font-bold"
-        >
-          OK
-        </button>
-      </div>
-    </section>
+    <AuthLayout
+      title="Konto utworzone"
+      description="Zanim się zalogujesz, ktoś musi je aktywować — konta włącza kierownik albo administrator."
+    >
+      <Button size="lg" onClick={() => router.push("/users/signin")}>
+        Wróć do logowania
+      </Button>
+    </AuthLayout>
   );
 }

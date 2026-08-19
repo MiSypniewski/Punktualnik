@@ -3,13 +3,55 @@ import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
 import { DifferenceTime, Timer } from "../utils";
+import LiveDot from "./liveDot";
 
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 dayjs.locale("pl");
 
+// Kafelek pracownika na tablicy sekcji — ekran oglądany z drugiego końca
+// pomieszczenia, więc rządzi nim czytelność z dystansu: nazwisko wersalikami,
+// licznik monospace na 2,5 rem, status słowem.
+//
+// Emoji (👊 ⏱ 👋 👍 👎) wyleciały: nie skalowały się, nie dawały się odczytać
+// pod kątem i oceniały pracownika (kciuk w dół za krótszą dniówkę), zamiast
+// nazwać stan.
+//
+// Kolory kodują to samo co w reszcie aplikacji: bursztyn znaczy „teraz”,
+// zieleń „zamknięte i pełne”, czerwień „zamknięte, ale krótsze niż osiem
+// godzin”. Wcześniej „w pracy” było czerwone, a „zakończono” raz zielone, raz
+// czerwone — ten sam kolor znaczył dwie różne rzeczy.
+const STATES = {
+  wait: {
+    label: "Nie odbito",
+    plate: "bg-surface border-dashed border-line-strong text-muted",
+    caption: { punch: "Dotknij, aby odbić wejście", watch: "Brak odbicia" },
+  },
+  workInProgress: {
+    label: "W pracy",
+    plate: "bg-signal-soft border-signal text-signal-strong",
+    caption: { punch: "Do końca dniówki · dotknij, aby wyjść", watch: "Do końca dniówki" },
+    live: true,
+  },
+  overTime: {
+    label: "Nadgodziny",
+    plate: "bg-signal border-signal text-signal-ink",
+    caption: { punch: "Ponad osiem godzin · dotknij, aby wyjść", watch: "Ponad osiem godzin" },
+    live: true,
+  },
+  finishFull: {
+    label: "Zakończono",
+    plate: "bg-ok-soft border-ok/60 text-ok-strong",
+    caption: { punch: "Przepracowano", watch: "Przepracowano" },
+  },
+  finishShort: {
+    label: "Niepełna dniówka",
+    plate: "bg-danger-soft border-danger/60 text-danger-strong",
+    caption: { punch: "Przepracowano", watch: "Przepracowano" },
+  },
+};
+
 const Card = ({ data }) => {
-  // console.log(data);
   const { data: session } = useSession();
   const [airtableID, setAirtableID] = useState(data.airtableID);
   const [status, setStatus] = useState(data.status);
@@ -24,33 +66,6 @@ const Card = ({ data }) => {
   // pracownik) ogląda ją jak tablicę — stąd brak podświetlenia pod kursorem
   // i kursor strzałki: karta ma nie udawać, że jest przyciskiem.
   const canPunch = canPunchCards(session?.user?.role);
-
-  // Kafelek to nasycona płyta, a napis na niej dziedziczy `text-body`: ciemny
-  // w motywie jasnym, jasny w ciemnym. Dlatego tła MUSZĄ być dobrane osobno dla
-  // każdego motywu — te same odcienie w obu dawały kontrast 2,3:1 dla "czeka"
-  // (blue-400 + jasny napis), czyli poniżej progu 3:1 nawet dla dużego tekstu.
-  //
-  // Odcienie jasne zostają jak były (6–7:1 z ciemnym napisem), ciemne schodzą
-  // o dwa–trzy stopnie i trzymają 6,2–9,1:1 z jasnym napisem. `text-body` jest
-  // wpisane jawnie, żeby ta zależność była widoczna w miejscu, gdzie się liczy.
-  let statusClass = classNames(
-    "flex sm:w-auto md:w-auto lg:w-full h-30 rounded-lg  text-center p-2 shadow-xl text-body",
-    canPunch ? "cursor-pointer" : "cursor-default",
-    {
-      "bg-blue-400 dark:bg-blue-800": status === "wait",
-      "bg-red-500 dark:bg-red-800": status === "workInProgress",
-      "bg-yellow-600 dark:bg-yellow-800": status === "overTime",
-      "bg-green-600 dark:bg-green-800": status === "finishWork" && overTime,
-      "bg-red-600 dark:bg-red-900": status === "finishWork" && !overTime,
-    },
-    canPunch && {
-      "hover:bg-blue-500 dark:hover:bg-blue-700": status === "wait",
-      "hover:bg-red-600 dark:hover:bg-red-700": status === "workInProgress",
-      "hover:bg-yellow-700 dark:hover:bg-yellow-700": status === "overTime",
-      "hover:bg-green-700 dark:hover:bg-green-700": status === "finishWork" && overTime,
-      "hover:bg-red-700 dark:hover:bg-red-800": status === "finishWork" && !overTime,
-    }
-  );
 
   const saveToDB = async (startTime, endTime, totalWorkTime, status, overTime) => {
     // Efekt na dole komponentu odpala zapis także przy samym wejściu na stronę
@@ -73,21 +88,18 @@ const Card = ({ data }) => {
     };
 
     if (airtableID) {
-      const res = await fetch(`/api/time/${airtableID}`, {
+      await fetch(`/api/time/${airtableID}`, {
         method: "PUT",
         body: JSON.stringify(payload),
         headers: {
           "Content-Type": "application/json",
         },
       });
-
-      // console.log(`update response: `, res);
     }
 
     // jeżeli nie ma wpisu w bazie, tworzy nowy wpis i aktualizuje ID w komponencie
     if (!airtableID) {
-      // console.log(airtableID);
-      const res = await fetch(`/api/time/${data.ID}`, {
+      await fetch(`/api/time/${data.ID}`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
@@ -95,25 +107,14 @@ const Card = ({ data }) => {
         },
       });
 
-      // console.log(`create response: `, res);
-
       fetch(`/api/time/${data.userID}`, {
         method: "GET",
       })
         .then((res) => res.json())
         .then((data) => {
-          // console.log(`Pobrane dane po utworzeniu: `, data);
           setAirtableID(data[0].airtableID);
         });
     }
-  };
-
-  const icon = () => {
-    if (status === "wait") return "👊";
-    if (status === "workInProgress") return "⏱";
-    if (status === "overTime") return "👋";
-    if (status === "finishWork" && overTime) return "👍";
-    if (status === "finishWork" && !overTime) return "👎";
   };
 
   const changeStatus = () => {
@@ -152,7 +153,7 @@ const Card = ({ data }) => {
   useEffect(() => {
     switch (status) {
       case "wait": {
-        setDisplayTime("Dzień Dobry!");
+        setDisplayTime("");
         break;
       }
       case "workInProgress": {
@@ -176,18 +177,57 @@ const Card = ({ data }) => {
         break;
       }
       default:
-        setDisplayTime("Status nie rozpoznany");
+        setDisplayTime("");
     }
   }, [status, overTime]);
 
+  const stateKey = status === "finishWork" ? (overTime ? "finishFull" : "finishShort") : status;
+  const state = STATES[stateKey] || STATES.wait;
+  const punched = status !== "wait";
+
   return (
-    <div className={statusClass} onClick={canPunch ? () => changeStatus() : undefined}>
-      <div className="flex justify-center items-center w-24 h-24 rounded-full text-6xl mx-auto px-4 py-3">{icon()}</div>
-      <div className="flex-grow">
-        <h2 className="mt-5 text-xl font-bold">
-          {data.name} {data.surname}
-        </h2>
-        <p className="py-1 text-2xl mt-1">{displayTime}</p>
+    <div
+      className={classNames(
+        "flex flex-col justify-between min-h-[8.5rem] p-4 border-2 rounded",
+        state.plate,
+        canPunch ? "cursor-pointer" : "cursor-default"
+      )}
+      onClick={canPunch ? () => changeStatus() : undefined}
+      onKeyDown={
+        canPunch
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                changeStatus();
+              }
+            }
+          : undefined
+      }
+      role={canPunch ? "button" : undefined}
+      tabIndex={canPunch ? 0 : undefined}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-signage">
+          {state.live && <LiveDot tone="current" />}
+          {state.label}
+        </span>
+        {punched && (
+          <span className="font-mono text-xs tabular-nums opacity-80">od {dayjs(startTime).format("HH:mm")}</span>
+        )}
+      </div>
+
+      <div className="mt-3">
+        <p className="text-lg font-bold uppercase tracking-wide leading-tight truncate" title={`${data.surname} ${data.name}`}>
+          {data.surname}
+        </p>
+        <p className="text-sm opacity-80 truncate">{data.name}</p>
+      </div>
+
+      <div className="mt-3">
+        <p className="font-mono text-3xl sm:text-4xl font-medium tabular-nums leading-none">
+          {displayTime || "--:--:--"}
+        </p>
+        <p className="mt-1.5 text-xs opacity-80">{canPunch ? state.caption.punch : state.caption.watch}</p>
       </div>
     </div>
   );

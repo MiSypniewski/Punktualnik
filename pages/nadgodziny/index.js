@@ -5,6 +5,13 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import OvertimeBadge from "../../components/overtimeBadge";
+import { Input, Select, Textarea } from "../../components/ui/field";
+import Plate from "../../components/ui/plate";
+import Alert from "../../components/ui/alert";
+import PageHeader from "../../components/ui/pageHeader";
+import EmptyState from "../../components/ui/emptyState";
+import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
+import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeBalance from "../../services/getOvertimeBalance";
 import getOvertimeForUser from "../../services/getOvertimeForUser";
 import { OVERTIME_KINDS, KIND_KEYS, kindLabel, signedMinutes } from "../../services/overtimeKinds";
@@ -90,9 +97,9 @@ export default function Nadgodziny({ balance, requests }) {
     }
   };
 
-  const balanceClass = classNames("text-4xl font-bold", {
-    "text-green-600 dark:text-green-300": balance > 0,
-    "text-red-600 dark:text-red-300": balance < 0,
+  const balanceClass = classNames("font-mono text-4xl font-medium tabular-nums", {
+    "text-ok-strong": balance > 0,
+    "text-danger-strong": balance < 0,
     "text-muted": balance === 0,
   });
 
@@ -100,26 +107,29 @@ export default function Nadgodziny({ balance, requests }) {
 
   return (
     <BaseLayout>
-      <section className="mx-auto p-4 mt-6 mb-8 max-w-3xl">
-        <h1 className="text-2xl font-bold mb-6">Moje nadgodziny</h1>
+      <section>
+        <PageHeader
+          title="Moje nadgodziny"
+          description="Saldo rośnie od zatwierdzonych wniosków o dłuższą pracę i maleje od wcześniejszych wyjść."
+        />
 
-        <div className="mb-8 p-4 border border-indigo-200 dark:border-indigo-500/40 rounded shadow-sm">
-          <p className="text-sm text-muted mb-1">Aktualne saldo</p>
+        <Plate className="mb-8 p-4">
+          <p className="text-xs font-semibold uppercase tracking-signage text-muted">Aktualne saldo</p>
           <p className={balanceClass}>{formatMinutes(balance, { withSign: true })}</p>
-          <p className="text-xs text-muted mt-2">
+          <p className="mt-2 text-xs text-muted">
             Liczone tylko z wniosków zatwierdzonych przez kierownika.
             {pending.length > 0 && ` Oczekujących wniosków: ${pending.length}.`}
           </p>
-        </div>
+        </Plate>
 
         <form onSubmit={submit} className="mb-10 flex flex-col">
-          <h2 className="text-xl font-bold mb-4">Nowe zgłoszenie</h2>
+          <h2 className="mb-4 text-sm font-bold uppercase tracking-signage">Nowe zgłoszenie</h2>
 
-          <label className="mb-1 text-sm font-medium">Rodzaj</label>
-          <select
+          <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Rodzaj</label>
+          <Select
             value={kind}
             onChange={(e) => setKind(e.target.value)}
-            className="mb-4 p-2 border border-indigo-400 rounded"
+            className="mb-4"
           >
             {KIND_KEYS.map((k) => (
               <option key={k} value={k}>
@@ -127,62 +137,66 @@ export default function Nadgodziny({ balance, requests }) {
                 {OVERTIME_KINDS[k].sign < 0 ? " (odejmuje od salda)" : " (dodaje do salda)"}
               </option>
             ))}
-          </select>
+          </Select>
 
-          <label className="mb-1 text-sm font-medium">Data</label>
-          <input
+          <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Data</label>
+          <Input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="mb-4 p-2 border border-indigo-400 rounded"
+            className="mb-4"
           />
 
-          <label className="mb-1 text-sm font-medium">Wymiar</label>
+          <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Wymiar</label>
           <div className="mb-4 flex gap-3 items-center">
-            <input
+            <Input
               type="number"
               min="0"
               max="23"
               value={hours}
               onChange={(e) => setHours(e.target.value)}
-              className="p-2 border border-indigo-400 rounded w-24"
+              className="!w-24"
             />
             <span className="text-sm">godz.</span>
-            <input
+            <Input
               type="number"
               min="0"
               max="59"
               step="5"
               value={minutes}
               onChange={(e) => setMinutes(e.target.value)}
-              className="p-2 border border-indigo-400 rounded w-24"
+              className="!w-24"
             />
             <span className="text-sm">min.</span>
           </div>
 
-          <label className="mb-1 text-sm font-medium">Powód</label>
-          <textarea
+          <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Powód</label>
+          <Textarea
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={500}
             placeholder="np. wdrożenie u klienta"
-            className="mb-6 p-2 border border-indigo-400 rounded"
+            className="mb-6"
           />
 
-          {err && <p className="mb-4 text-red-600 dark:text-red-300 text-sm">{err}</p>}
+          {err && (
+            <Alert tone="danger" className="mb-4">
+              {err}
+            </Alert>
+          )}
 
           <button
             type="submit"
             disabled={busy}
-            className="self-start text-white bg-indigo-500 border-0 py-2 px-8 hover:bg-indigo-600 disabled:bg-faint rounded text-lg"
+            className="self-start inline-flex items-center justify-center rounded font-medium bg-accent text-accent-ink hover:bg-accent/90 py-2.5 px-6 disabled:opacity-50"
           >
             {busy ? "Wysyłam..." : "Wyślij wniosek"}
           </button>
         </form>
 
         <div className="mb-4 flex flex-wrap gap-3 items-baseline">
-          <h2 className="text-xl font-bold">Historia</h2>
+          <h2 className="text-sm font-bold uppercase tracking-signage">Historia</h2>
           {requests.length > 0 && (
             <button
               onClick={() => {
@@ -191,44 +205,48 @@ export default function Nadgodziny({ balance, requests }) {
                 // wniosków, bo rola user nie widzi cudzych.
                 window.location.href = "/api/report/nadgodziny";
               }}
-              className="text-sm text-indigo-600 dark:text-indigo-300 hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-strong hover:underline"
             >
+              <DownloadIcon className="w-3.5 h-3.5" />
               Pobierz CSV
             </button>
           )}
         </div>
         {requests.length === 0 ? (
-          <p className="text-muted">Brak zgłoszeń.</p>
+          <EmptyState
+            title="Brak zgłoszeń"
+            description="Nie złożyłeś jeszcze żadnego wniosku. Formularz jest wyżej."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <TableWrap>
+            <Table>
               <thead>
-                <tr className="text-left border-b border-line">
-                  <th className="py-2 pr-3">Data</th>
-                  <th className="py-2 pr-3">Rodzaj</th>
-                  <th className="py-2 pr-3 text-right">Wymiar</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3">Szczegóły</th>
-                  <th className="py-2" />
+                <tr>
+                  <Th>Data</Th>
+                  <Th>Rodzaj</Th>
+                  <Th align="right">Wymiar</Th>
+                  <Th>Status</Th>
+                  <Th>Szczegóły</Th>
+                  <Th />
                 </tr>
               </thead>
               <tbody>
                 {requests.map((r) => (
-                  <tr key={r.id} className="border-b border-line-subtle align-top">
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.data}</td>
-                    <td className="py-2 pr-3">{kindLabel(r.kind)}</td>
-                    <td
-                      className={classNames("py-2 pr-3 text-right whitespace-nowrap font-medium", {
-                        "text-green-600 dark:text-green-300": signedMinutes(r) > 0,
-                        "text-red-600 dark:text-red-300": signedMinutes(r) < 0,
+                  <Tr key={r.id} className="align-top">
+                    <Td className="font-mono tabular-nums whitespace-nowrap">{r.data}</Td>
+                    <Td>{kindLabel(r.kind)}</Td>
+                    <Td
+                      className={classNames("font-mono text-right tabular-nums whitespace-nowrap font-medium", {
+                        "text-ok-strong": signedMinutes(r) > 0,
+                        "text-danger-strong": signedMinutes(r) < 0,
                       })}
                     >
                       {formatMinutes(signedMinutes(r), { withSign: true })}
-                    </td>
-                    <td className="py-2 pr-3">
+                    </Td>
+                    <Td>
                       <OvertimeBadge status={r.status} />
-                    </td>
-                    <td className="py-2 pr-3 text-muted">
+                    </Td>
+                    <Td className="text-muted">
                       {r.reason && <span className="block">{r.reason}</span>}
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
@@ -237,23 +255,23 @@ export default function Nadgodziny({ balance, requests }) {
                         </span>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}
-                    </td>
-                    <td className="py-2 text-right">
+                    </Td>
+                    <Td className="text-right">
                       {r.status === "pending" && (
                         <button
                           onClick={() => cancel(r.id)}
                           disabled={busy}
-                          className="text-xs text-red-600 dark:text-red-300 hover:underline disabled:text-faint"
+                          className="text-xs font-medium text-danger-strong hover:underline disabled:text-faint"
                         >
                           Anuluj
                         </button>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableWrap>
         )}
       </section>
     </BaseLayout>

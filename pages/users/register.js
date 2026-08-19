@@ -1,8 +1,11 @@
 import { useState, useRef } from "react";
 import { jsonFetcher } from "../../utils";
 import { useRouter } from "next/router";
-import { fromJSON } from "postcss";
 import BaseLayout from "../../components/baseLayout";
+import Button from "../../components/ui/button";
+import { Field, Input, Select } from "../../components/ui/field";
+import Alert from "../../components/ui/alert";
+import PageHeader from "../../components/ui/pageHeader";
 import { listSections } from "../../services/sections";
 
 // Lista sekcji jedzie z bazy, nie z kodu — dodanie działu to komenda
@@ -22,8 +25,6 @@ export default function CreateUser({ sections }) {
   const [error, setError] = useState();
   const [formProcessing, setFormProcessing] = useState(false);
   const router = useRouter();
-  // potrzebne do innego projektu - Raportowacz master
-  // const [cashregisterNumbers, setCashRegisterNumbers] = useState(0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,13 +39,10 @@ export default function CreateUser({ sections }) {
       password: form.get("password"),
       location: form.get("location"),
       section: form.get("section"),
-      // potrzebne do innego projektu! (raportowacz master)
-      // iloscKas: form.get("iloscKas"),
-      // numeryKas: form.getAll("numerKasy"),
     };
 
     if (payload.password !== form.get("passwordConfirm")) {
-      setError("Hasła się nie zgadzają!");
+      setError("Hasła się nie zgadzają — wpisz to samo w obu polach.");
       setFormProcessing(false);
       return;
     }
@@ -60,244 +58,87 @@ export default function CreateUser({ sections }) {
     if (response.ok) {
       router.push("/users/comfirm");
     } else {
-      const payload = await response.json();
+      const body = await response.json();
       setFormProcessing(false);
-      setError(ERROR_MESSAGES[payload.error] || payload.error);
+      setError(ERROR_MESSAGES[body.error] || body.error);
     }
   };
 
   return (
-    <BaseLayout>
-      <section className="mx-auto p-2 mt-3 mb-8">
-        <div className="sm:mt-4 md:mt-8 lg:mt-16">
-          <h2 className="sm:text-3xl text-2xl font-medium title-font mb-4 text-body text-center">
-            Nowy użytkownik
-          </h2>
-        </div>
-        <div className="container mx-auto lg:w-2/3">
-          <form ref={userForm} onSubmit={handleSubmit}>
-            <div className="p-2 w-full">
-              <label htmlFor="email" className="leading-7 text-sm text-muted">
-                E-mail:
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                required
-                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
-              />
-            </div>
-            <div className="p-2 w-full">
-              <label htmlFor="password" className="leading-7 text-sm text-muted">
-                Hasło:
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                required
-                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
-              />
-            </div>
-            <div className="p-2 w-full ">
-              <label htmlFor="passwordConfirm" className="leading-7 text-sm text-muted">
-                Powtórz Hasło:
-              </label>
-              <input
-                type="password"
-                id="passwordConfirm"
-                name="passwordConfirm"
-                required
-                className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 text-base outline-none text-body py-1 px-3 leading-8 transition-colors duration-200 ease-in-out"
-              />
-            </div>
-            <div className="flex">
-              <div className="p-2 w-full">
-                <label htmlFor="name" className="leading-7 text-sm text-muted">
-                  Imię:
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  required
-                  className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
-                />
-              </div>
-              <div className="p-2 w-full">
-                <label htmlFor="surname" className="leading-7 text-sm text-muted">
-                  Nazwisko:
-                </label>
-                <input
-                  type="text"
-                  id="surname"
-                  name="surname"
-                  required
-                  className="w-full bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
-                />
-              </div>
-            </div>
-            <div className="flex">
-              <div className="p-2 w-full">
-                <label htmlFor="section" className="leading-7 text-sm text-muted">
-                  Dział:
-                </label>
-                <select
-                  name="section"
-                  id="section"
-                  required
-                  className="appearance-none w-full h-10 bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
-                >
-                  <option value=""></option>
-                  {sections.map(({ slug, label }) => (
-                    <option key={slug} value={slug}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                {sections.length === 0 && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-300">
-                    Brak zdefiniowanych działów — skontaktuj się z administratorem.
-                  </p>
-                )}
-              </div>
-              <div className="p-2 w-full">
-                <label htmlFor="location" className="leading-7 text-sm text-muted">
-                  Miejsce pracy:
-                </label>
-                <select
-                  name="location"
-                  id="location"
-                  required
-                  className="appearance-none w-full h-10 bg-raised bg-opacity-50 rounded border border-line focus:border-indigo-500 focus:bg-surface focus:ring-2 focus:ring-indigo-200 outline-none text-body leading-8 py-1 px-3 text-base transition-colors duration-200 ease-in-out"
-                >
-                  <option value=""></option>
-                  <option value="gajowa 6">Gajowa 6</option>
-                  <option value="chlebowa 22">Chlebowa 22</option>
-                  <option value="chlebowa 26">Chlebowa 26</option>
-                </select>
-              </div>
-            </div>
-            {/* Potrzebne do projektu Raportowacz - master */}
-            {/* <div className="p-2 w-full">
-            <fieldset className="flex">
-              <div className="p-2">
-                <input
-                  type="checkbox"
-                  id="K15"
-                  name="numerKasy"
-                  value="K15"
-                  className="appearance-none indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
-                />
-                <label htmlFor="K15" className="inline-block leading-7 text-sm text-muted">
-                  K15
-                </label>
-              </div>
+    <BaseLayout width="narrow">
+      <PageHeader
+        title="Nowe konto"
+        description="Konto powstaje wyłączone — zanim będzie się dało zalogować, ktoś musi je aktywować."
+      />
 
-              <div className="p-2">
-                <input
-                  type="checkbox"
-                  id="K16"
-                  name="numerKasy"
-                  value="K16"
-                  className="indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
-                />
-                <label htmlFor="K16" className="leading-7 text-sm text-muted">
-                  K16
-                </label>
-              </div>
-              <div className="p-2">
-                <input
-                  type="checkbox"
-                  id="K17"
-                  name="numerKasy"
-                  value="K17"
-                  className=" indeterminate:bg-line h-4 w-4 border border-line rounded-sm bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
-                />
-                <label htmlFor="K17" className="leading-7 text-sm text-muted">
-                  K17
-                </label>
-              </div>
-            </fieldset>
-          </div>
-          <div className="p-2 w-full">
-            <p className="leading-7 text-sm text-muted">Podaj liczbę kas:</p>
-            <input
-              type="range"
-              id="iloscKas"
-              name="iloscKas"
-              step="1"
-              min="0"
-              max="15"
-              value={cashregisterNumbers}
-              onChange={(e) => {
-                setCashRegisterNumbers(e.target.value);
-              }}
-              className="w-full  accent-indigo-500  focus:accent-indigo-600 slider-thumb:bg-red-500"
+      <form ref={userForm} onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="E-mail" htmlFor="email">
+          <Input type="email" id="email" name="email" autoComplete="email" required />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Hasło" htmlFor="password">
+            <Input type="password" id="password" name="password" autoComplete="new-password" required />
+          </Field>
+          <Field label="Powtórz hasło" htmlFor="passwordConfirm">
+            <Input
+              type="password"
+              id="passwordConfirm"
+              name="passwordConfirm"
+              autoComplete="new-password"
+              required
             />
-            <p className="leading-7 text-sm text-muted">{cashregisterNumbers}</p>
-          </div>
-          <div className="p-2 w-full">
-            <p className="leading-7 text-sm text-muted">Czy będziesz głosować na PiS?</p>
-            <fieldset className="md:flex">
-              <div className="p-2 md:mx-4 ">
-                <input
-                  type="radio"
-                  id="tak"
-                  name="glosowanie"
-                  value="tak"
-                  className="appearance-none indeterminate:bg-line h-4 w-4 rounded-full border border-line  bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
-                />
-                <label htmlFor="tak" className="inline-block leading-3 text-sm text-muted cursor-pointer">
-                  Tak, jestem pedałem
-                </label>
-              </div>
-
-              <div className="p-2 md:mx-4">
-                <input
-                  type="radio"
-                  id="nie"
-                  name="glosowanie"
-                  value="nie"
-                  className="indeterminate:bg-line h-4 w-4 rounded-full border border-line bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
-                />
-                <label htmlFor="nie" className="leading-3 text-sm text-muted">
-                  Nie, jebać PiS!
-                </label>
-              </div>
-              <div className="p-2 md:mx-4">
-                <input
-                  type="radio"
-                  id="nieumiem"
-                  name="glosowanie"
-                  value="nieumiem"
-                  className=" indeterminate:bg-line h-4 w-4 border rounded-full border-line bg-raised text-indigo-500 dark:text-indigo-300  checked:bg-indigo-500 checked:border-indigo-600 focus:border-indigo-500 focus:outline-none transition duration-200 mt-1 align-top bg-no-repeat bg-center bg-contain float-left mr-2 cursor-pointer"
-                />
-                <label htmlFor="nieumiem" className="leading-3 text-sm text-muted">
-                  Nie umiem
-                </label>
-              </div>
-            </fieldset>
-          </div> */}
-            <div className="p-6 w-full">
-              <button
-                disabled={formProcessing}
-                className="disabled:opacity-50 flex mx-auto text-white bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg"
-              >
-                {formProcessing ? "Proszę czekać..." : "Uwtórz nowe konto"}
-              </button>
-              {error && (
-                <div className="flex justify-center w-full my-5">
-                  <span className="bg-red-600 w-full rounded text-white px-3 py-3 text-center">
-                    Konto nie utworzone! Błąd: {error}
-                  </span>
-                </div>
-              )}
-            </div>
-          </form>
+          </Field>
         </div>
-      </section>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Imię" htmlFor="name">
+            <Input type="text" id="name" name="name" autoComplete="given-name" required />
+          </Field>
+          <Field label="Nazwisko" htmlFor="surname">
+            <Input type="text" id="surname" name="surname" autoComplete="family-name" required />
+          </Field>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field
+            label="Dział"
+            htmlFor="section"
+            error={sections.length === 0 ? "Brak zdefiniowanych działów — odezwij się do administratora." : undefined}
+          >
+            {/* Lista sekcji jedzie z bazy, nie z kodu — patrz getServerSideProps. */}
+            <Select name="section" id="section" defaultValue="" required>
+              <option value="" disabled>
+                — wybierz —
+              </option>
+              {sections.map(({ slug, label }) => (
+                <option key={slug} value={slug}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          {/* Adresy są tu wpisane na sztywno — w odróżnieniu od działów nie mają
+              własnej tabeli. Nowe miejsce pracy wymaga zmiany w kodzie. */}
+          <Field label="Miejsce pracy" htmlFor="location">
+            <Select name="location" id="location" defaultValue="" required>
+              <option value="" disabled>
+                — wybierz —
+              </option>
+              <option value="gajowa 6">Gajowa 6</option>
+              <option value="chlebowa 22">Chlebowa 22</option>
+              <option value="chlebowa 26">Chlebowa 26</option>
+            </Select>
+          </Field>
+        </div>
+
+        {error && <Alert tone="danger">Konto nie powstało: {error}</Alert>}
+
+        <Button type="submit" size="lg" disabled={formProcessing} className="self-start mt-1">
+          {formProcessing ? "Zakładam…" : "Utwórz konto"}
+        </Button>
+      </form>
     </BaseLayout>
   );
 }

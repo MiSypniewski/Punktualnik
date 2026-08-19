@@ -6,7 +6,15 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../components/baseLayout";
-import { projectColor } from "../../components/projectColors";
+import { ProjectMark } from "../../components/projectColors";
+import LiveDot from "../../components/liveDot";
+import Button, { IconButton } from "../../components/ui/button";
+import { PlayIcon, PencilIcon, TrashIcon } from "../../components/ui/icons";
+import { Input, Select } from "../../components/ui/field";
+import Plate from "../../components/ui/plate";
+import Alert from "../../components/ui/alert";
+import PageHeader from "../../components/ui/pageHeader";
+import EmptyState from "../../components/ui/emptyState";
 import { listProjects, projectScope } from "../../services/projects";
 import { getEntriesForUser, getRunningEntry, closeStaleEntries } from "../../services/taskEntries";
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
@@ -166,7 +174,11 @@ export default function Zadania({
 
   return (
     <BaseLayout>
-      <section className="mx-auto p-4 mb-8 max-w-5xl">
+      <PageHeader
+        title="Moje zadania"
+        description="Timer liczy czas na bieżąco, wpis ręczny dopisuje go po fakcie. Historia obejmuje ostatnie dwa tygodnie."
+      />
+      <div>
         <TimerBar
           running={running}
           projects={projects}
@@ -177,13 +189,15 @@ export default function Zadania({
         />
 
         {err && (
-          <p className="my-3 p-2 bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/40 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>
+          <Alert tone="danger" className="my-3">
+            {err}
+          </Alert>
         )}
 
         {info && (
-          <p className="my-3 p-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-sm rounded">
+          <Alert tone="ok" className="my-3">
             {info}
-          </p>
+          </Alert>
         )}
 
         {/* Podpowiedzi zostają na ekranie TAKŻE przy biegnącym timerze — to jedyne
@@ -202,9 +216,11 @@ export default function Zadania({
         />
 
         {days.length === 0 && (
-          <p className="mt-8 text-muted text-sm">
-            Nie masz jeszcze żadnych wpisów. Wybierz projekt, opisz zadanie i naciśnij Start.
-          </p>
+          <EmptyState
+            className="mt-6"
+            title="Brak wpisów"
+            description="Wybierz projekt, opisz zadanie i naciśnij Start. Czas policzy się sam."
+          />
         )}
 
         {days.map(([data, list]) => (
@@ -222,7 +238,7 @@ export default function Zadania({
             onResume={resume}
           />
         ))}
-      </section>
+      </div>
     </BaseLayout>
   );
 }
@@ -236,20 +252,17 @@ export default function Zadania({
 // Nagłówek zamiast samego placeholdera: placeholder znika po pierwszej literze,
 // więc po wpisaniu opisu pasek przestawał się przedstawiać.
 const Bar = ({ tone = "idle", title, children }) => (
-  // Zewnętrzna warstwa jest pełnoszerokościowa i NIEPRZEZROCZYSTA, bo karta ma
-  // zaokrąglone rogi — bez niej przy `sticky` przez rogi prześwitywałaby
-  // przewijana pod spodem lista wpisów.
-  <div className="sticky top-0 z-10 -mx-4 px-4 pt-2 pb-4 bg-surface">
-    <div
-      className={classNames(
-        "rounded-lg border-2 p-3 shadow-sm",
-        tone === "running" ? "border-rose-400 bg-rose-50 dark:bg-rose-500/10" : "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/10"
-      )}
-    >
-      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">{title}</h2>
-      {children}
-    </div>
-  </div>
+  // Pasek NIE jest już przyklejony do góry. Biegnący timer widać teraz na każdej
+  // stronie w bursztynowej linii paska stacyjnego (components/runningStrip.js),
+  // która jest zarazem linkiem tutaj — drugi lepki element mierzyłby się z tamtym
+  // o miejsce i musiałby znać jego zmienną wysokość.
+  <Plate tone={tone === "running" ? "signal" : "default"} className="p-3 border-2 mb-4">
+    <h2 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-signage text-muted">
+      {tone === "running" && <LiveDot />}
+      {title}
+    </h2>
+    {children}
+  </Plate>
 );
 
 // Ile czekamy z zapisem opisu po ostatnim znaku. Na tyle długo, żeby nie wysyłać
@@ -395,10 +408,10 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
   return (
     <Bar tone="running" title="Pracujesz nad">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`w-3 h-3 rounded-full shrink-0 ${projectColor(project?.color).dot}`} />
+        <ProjectMark color={project?.color} size="lg" />
         {/* Te same pola co przed startem, w tym samym układzie — pasek nie zmienia
             kształtu po naciśnięciu Start, zmienia się tylko przycisk po prawej. */}
-        <input
+        <Input
           type="text"
           value={draft.description}
           list={`opisy-${draft.projectID}`}
@@ -407,34 +420,30 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
           onChange={(e) => edit({ description: e.target.value })}
           onBlur={flush}
           onKeyDown={(e) => e.key === "Enter" && flush()}
-          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500 dark:text-indigo-300"
+          className="flex-grow w-auto min-w-[12rem]"
         />
         <DescriptionOptions descByProject={descByProject} />
 
-        <select
+        <Select
           value={draft.projectID}
           onChange={(e) => edit({ projectID: Number(e.target.value) }, { now: true })}
-          className="p-2 border border-indigo-400 rounded w-full sm:w-56 shrink-0"
+          className="w-full sm:w-56 shrink-0"
         >
           {options.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <span className="font-mono text-xl tabular-nums">{elapsed || "…"}</span>
-        <button
-          disabled={busy}
-          onClick={stop}
-          className="text-white bg-rose-500 hover:bg-rose-600 py-2 px-6 rounded font-bold disabled:opacity-50"
-        >
+        <span className="font-mono text-xl font-medium tabular-nums">{elapsed || "…"}</span>
+        <Button variant="signal" size="lg" disabled={busy} onClick={stop}>
           Stop
-        </button>
+        </Button>
       </div>
       <p className="mt-1 text-xs text-muted">
         od {hhmm(running.startedAt)} · opis i projekt zapisują się same
-        {saved && <span className="ml-2 text-emerald-700 dark:text-emerald-300 font-medium">zapisano ✓</span>}
+        {saved && <span className="ml-2 font-medium text-ok-strong">zapisano ✓</span>}
       </p>
     </Bar>
   );
@@ -471,7 +480,7 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
           a projekt jest doprecyzowaniem. Opis dostaje też całą wolną szerokość,
           bo bywa dłuższy niż nazwa projektu. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <input
+        <Input
           type="text"
           value={description}
           list={`opisy-${projectID}`}
@@ -479,17 +488,17 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
           placeholder="np. Weryfikacja raportów z instalacji"
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && start()}
-          className="flex-grow min-w-[12rem] p-2 border border-indigo-400 rounded text-indigo-500 dark:text-indigo-300"
+          className="flex-grow w-auto min-w-[12rem]"
         />
         <DescriptionOptions descByProject={descByProject} />
 
         {/* Stała szerokość, bo nazwy projektów bywają długie ("Nowe i remontowane
             sklepy") i bez niej select albo rozpycha pasek, albo ucina tekst
             na krawędzi. */}
-        <select
+        <Select
           value={projectID}
           onChange={(e) => setProjectID(Number(e.target.value))}
-          className="p-2 border border-indigo-400 rounded w-full sm:w-56 shrink-0"
+          className="w-full sm:w-56 shrink-0"
         >
           {projects.length === 0 && <option value="">— brak projektów —</option>}
           {projects.map((p) => (
@@ -497,15 +506,11 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
               {p.name}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <button
-          disabled={busy || projects.length === 0}
-          onClick={start}
-          className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-8 rounded font-bold disabled:opacity-50"
-        >
+        <Button size="lg" disabled={busy || projects.length === 0} onClick={start}>
           Start
-        </button>
+        </Button>
       </div>
       {projects.length === 0 && (
         <p className="mt-2 text-sm text-muted">
@@ -537,7 +542,9 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
   <div className="mt-8">
     {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
         bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
-    <h2 className="text-sm font-bold text-body mb-2">{running ? "Przełącz na" : "Wznów"}</h2>
+    <h2 className="mb-2 text-xs font-bold uppercase tracking-signage text-muted">
+      {running ? "Przełącz na" : "Wznów"}
+    </h2>
     <div className="flex gap-2 flex-wrap">
       {suggestions.map((s) => (
         <button
@@ -545,11 +552,11 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
           disabled={busy}
           title={running ? "Zamknij bieżące zadanie i zacznij to" : "Zacznij to zadanie"}
           onClick={() => onResume(s)}
-          className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-line rounded-full text-sm hover:bg-raised disabled:opacity-50"
+          className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-line rounded bg-surface text-sm hover:bg-raised disabled:opacity-50"
         >
-          <span className={`w-2 h-2 rounded-full shrink-0 ${projectColor(s.projectColor).dot}`} />
-          <span className="truncate text-indigo-500 dark:text-indigo-300">{s.description}</span>
-          <span className="text-muted shrink-0">▶</span>
+          <ProjectMark color={s.projectColor} size="sm" />
+          <span className="truncate">{s.description}</span>
+          <PlayIcon className="w-3.5 h-3.5 shrink-0 text-muted" />
         </button>
       ))}
     </div>
@@ -571,7 +578,7 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="mt-6 text-sm text-indigo-600 dark:text-indigo-300 hover:underline">
+      <button onClick={() => setOpen(true)} className="mt-6 text-sm font-medium text-accent-strong hover:underline">
         + Dodaj wpis ręcznie
       </button>
     );
@@ -590,26 +597,26 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
           wąskim ekranie tamten zawijał godzinę końca i przyciski w przypadkowe
           miejsca. Tu podział jest stały — "co robiłem" nad "kiedy". */}
       <div className="flex gap-2 flex-col sm:flex-row mb-2">
-        <input
+        <Input
           type="text"
           value={form.description}
           list={`opisy-${form.projectID}`}
           maxLength={200}
           placeholder="Opis zadania"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="flex-grow min-w-0 p-2 border border-line-strong rounded text-indigo-500 dark:text-indigo-300"
+          className="flex-grow w-auto min-w-0"
         />
-        <select
+        <Select
           value={form.projectID}
           onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-          className="p-2 border border-line-strong rounded sm:w-56 shrink-0"
+          className="sm:w-56 shrink-0"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="flex gap-2 items-end flex-wrap">
@@ -620,55 +627,47 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
               pole daty, bo uzupełnia braki z dowolnego okresu; `max` pilnuje jedynie,
               żeby nie wpisać pracy w przyszłość (serwer tego nie zabrania). */}
           {anyDay ? (
-            <input
+            <Input
               type="date"
               value={form.data}
               max={today}
               onChange={(e) => setForm({ ...form, data: e.target.value })}
-              className="p-2 border border-line-strong rounded"
               required
             />
           ) : (
-            <select
+            <Select
               value={form.data}
               onChange={(e) => setForm({ ...form, data: e.target.value })}
-              className="p-2 border border-line-strong rounded"
             >
               <option value={today}>dziś</option>
               <option value={yesterday}>wczoraj</option>
-            </select>
+            </Select>
           )}
         </SmallField>
         <SmallField label="Od">
-          <input
+          <Input
             type="time"
             value={form.from}
             onChange={(e) => setForm({ ...form, from: e.target.value })}
-            className="p-2 border border-line-strong rounded"
             required
           />
         </SmallField>
         <SmallField label="Do">
-          <input
+          <Input
             type="time"
             value={form.to}
             onChange={(e) => setForm({ ...form, to: e.target.value })}
-            className="p-2 border border-line-strong rounded"
             required
           />
         </SmallField>
 
         <span className="flex gap-2 ml-auto">
-          <button
-            type="submit"
-            disabled={busy}
-            className="text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
-          >
+          <Button type="submit" disabled={busy}>
             Dodaj
-          </button>
-          <button type="button" onClick={() => setOpen(false)} className="py-2 px-3 text-muted">
+          </Button>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
             Zwiń
-          </button>
+          </Button>
         </span>
       </div>
       <DescriptionOptions descByProject={descByProject} />
@@ -676,9 +675,11 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
   );
 };
 
+// Lokalna etykieta nad wąskim polem — Field z components/ui rozciąga się na całą
+// szerokość, a tu pola daty i godziny mają zostać przy swoich rozmiarach.
 const SmallField = ({ label, children }) => (
   <label className="flex flex-col">
-    <span className="mb-1 text-xs font-medium text-body">{label}</span>
+    <span className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">{label}</span>
     {children}
   </label>
 );
@@ -706,8 +707,8 @@ const DaySection = ({
       <div className="flex items-baseline justify-between border-b border-line pb-2 mb-2">
         {/* first-letter, nie `capitalize`: ten drugi podniósłby też nazwę
             miesiąca ("Środa, 12 Sierpnia"), a po polsku miesiąc piszemy małą. */}
-        <h2 className="text-lg font-bold first-letter:uppercase">{label}</h2>
-        <span className="text-sm text-muted">{formatDuration(total)}</span>
+        <h2 className="text-sm font-bold uppercase tracking-signage first-letter:uppercase">{label}</h2>
+        <span className="font-mono text-sm tabular-nums text-muted">{formatDuration(total)}</span>
       </div>
       <ul>
         {list.map((e) => (
@@ -743,45 +744,45 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
   if (editing) {
     return (
-      <li className="py-2 border-b border-line-subtle">
+      <li className="py-2 px-2 -mx-2 rounded bg-accent-soft border-b border-line-subtle">
         <div className="flex gap-2 flex-wrap items-center">
-          <input
+          <Input
             type="text"
             value={form.description}
             list={`opisy-${form.projectID}`}
             maxLength={200}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="flex-grow min-w-[8rem] p-1.5 border border-line-strong rounded text-sm text-indigo-500 dark:text-indigo-300"
+            className="flex-grow w-auto min-w-[8rem] py-1.5"
           />
-          <select
+          <Select
             value={form.projectID}
             onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-            className="p-1.5 border border-line-strong rounded text-sm"
+            className="py-1.5 w-auto"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
+          </Select>
           {/* W wierszu nie ma miejsca na widoczne etykiety, ale dwa gołe pola
               czasu muszą się dać rozróżnić — stąd aria-label i title. */}
-          <input
+          <Input
             type="time"
             aria-label="Godzina rozpoczęcia"
             title="Od"
             value={form.from}
             onChange={(e) => setForm({ ...form, from: e.target.value })}
-            className="p-1.5 border border-line-strong rounded text-sm"
+            className="py-1.5 w-auto"
           />
           <span className="text-faint text-sm">–</span>
-          <input
+          <Input
             type="time"
             aria-label="Godzina zakończenia"
             title="Do"
             value={form.to}
             onChange={(e) => setForm({ ...form, to: e.target.value })}
-            className="p-1.5 border border-line-strong rounded text-sm"
+            className="py-1.5 w-auto"
           />
           <button
             disabled={busy}
@@ -797,7 +798,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
                 }),
               }).then((ok) => ok && setEditing(false))
             }
-            className="text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-4 rounded text-sm disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded font-medium whitespace-nowrap transition-colors disabled:opacity-50 bg-accent text-accent-ink hover:bg-accent/90 py-1.5 px-3 text-sm"
           >
             Zapisz
           </button>
@@ -812,7 +813,10 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
   return (
     <li
-      className={classNames("py-2.5 border-b border-line-subtle", entry.autoClosed && "bg-amber-50 dark:bg-amber-500/10")}
+      className={classNames(
+        "py-2.5 border-b border-line-subtle",
+        entry.autoClosed && "px-2 -mx-2 rounded bg-signal-soft"
+      )}
     >
       {/* Rząd BEZ flex-wrap. Wcześniej wiersz był jednym `flex flex-wrap` i długi
           opis wypychał godziny oraz przyciski do drugiej linii — bo `truncate`
@@ -825,16 +829,15 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
           zmieści się obok opisu; tam schodzi pod niego, dosunięta do prawej. */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
         <div className="flex gap-2 flex-grow min-w-0">
-          {/* mt-1.5 zamiast wyrównania do środka: przy opisie na dwie linie kropka
-              ma stać przy pierwszej z nich, a nie dryfować do połowy wysokości. */}
-          <span
-            className={`w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 ${projectColor(entry.projectColor).dot}`}
-          />
+          {/* mt-1.5 zamiast wyrównania do środka: przy opisie na dwie linie
+              znacznik ma stać przy pierwszej z nich, a nie dryfować do połowy
+              wysokości. */}
+          <ProjectMark color={entry.projectColor} className="mt-1.5" />
           <span className="min-w-0">
             <span
               className={classNames(
                 "block break-words",
-                entry.description ? "text-indigo-500 dark:text-indigo-300" : "text-faint"
+                entry.description ? "font-medium" : "text-faint"
               )}
             >
               {entry.description || "(bez opisu)"}
@@ -853,45 +856,42 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
               minuta wygląda wtedy jak "9:12–9:12". Sekundy siedzą w podpowiedzi,
               a wymiar obok i tak podaje je wprost. */}
           <span
-            className="text-sm text-muted tabular-nums"
+            className="font-mono text-sm text-muted tabular-nums"
             title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
           >
             {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
           </span>
           {/* Szerokość pod pełny wymiar z sekundami ("12h 05min 30s"), żeby kolumna
               czasu stała w jednej linii pionowej niezależnie od długości wpisu. */}
-          <span className="text-sm font-medium tabular-nums w-28 text-right">
+          <span className="font-mono text-sm font-medium tabular-nums w-28 text-right">
             {formatDuration(entry.seconds)}
           </span>
 
           <span className="flex gap-1">
-            <button
+            <IconButton
               disabled={busy}
-              title={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
+              label={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
               onClick={() => onResume(entry)}
-              className="py-1 px-2 border border-line rounded text-sm hover:bg-raised disabled:opacity-50"
             >
-              ▶
-            </button>
-            <button
+              <PlayIcon />
+            </IconButton>
+            <IconButton
               disabled={busy || !editable}
-              title={editable ? "Edytuj" : "Edycja możliwa tylko dla dziś i wczoraj"}
+              label={editable ? "Popraw wpis" : "Poprawka możliwa tylko dla dziś i wczoraj"}
               onClick={() => setEditing(true)}
-              className="py-1 px-2 border border-line rounded text-sm hover:bg-raised disabled:opacity-30"
             >
-              ✎
-            </button>
-            <button
+              <PencilIcon />
+            </IconButton>
+            <IconButton
               disabled={busy || !editable}
-              title={editable ? "Usuń" : "Usuwanie możliwe tylko dla dziś i wczoraj"}
+              label={editable ? "Usuń wpis" : "Usuwanie możliwe tylko dla dziś i wczoraj"}
               onClick={() =>
                 window.confirm("Usunąć ten wpis?") &&
                 call(`/api/entries/${entry.id}`, { method: "DELETE" })
               }
-              className="py-1 px-2 border border-line rounded text-sm hover:bg-raised disabled:opacity-30"
             >
-              🗑
-            </button>
+              <TrashIcon />
+            </IconButton>
           </span>
         </div>
       </div>
@@ -899,7 +899,7 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
       {/* Poza rzędem flexowym: bez `flex-wrap` sztuczka z `w-full` przestałaby
           działać, a komunikat ma iść pełną szerokością pod całym wpisem. */}
       {entry.autoClosed && (
-        <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+        <p className="mt-1 text-xs text-signal-strong">
           Timer domknął się automatycznie na koniec doby — sprawdź czas i popraw wpis.
         </p>
       )}

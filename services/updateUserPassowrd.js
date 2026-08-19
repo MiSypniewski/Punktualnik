@@ -28,7 +28,9 @@ const updateUserPassword = async (payload) => {
   const oldPasswordHash = crypto.pbkdf2Sync(oldPassword, oldPasswordSalt, 2137, 256, "sha512").toString("hex");
 
   if (oldPasswordHash !== existingUser.passwordHash) {
-    throw new Error("old password incorect");
+    // Kod, nie zdanie: komunikat dla człowieka składa strona (pages/users/[id].js),
+    // tak samo jak przy rejestracji.
+    throw new Error("wrong_old_password");
   }
 
   const newPasswordSalt = crypto.randomBytes(256).toString("hex");

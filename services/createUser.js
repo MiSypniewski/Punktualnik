@@ -29,9 +29,10 @@ const createUser = async (payload) => {
   checkEmail(email);
 
   // Sekcja MUSI być ze słownika. Formularz podsuwa wyłącznie istniejące sekcje,
-  // ale POST /api/users jest publiczny (nie wymaga sesji), więc bez tej kontroli
-  // dowolny tekst wjeżdżałby do Users.section — a konto z sekcją spoza słownika
-  // jest niewidoczne dla każdego kierownika i praktycznie nie do znalezienia.
+  // ale do POST /api/users da się strzelić z pominięciem formularza, więc bez
+  // tej kontroli dowolny tekst wjeżdżałby do Users.section — a konto z sekcją
+  // spoza słownika jest niewidoczne dla każdego kierownika i praktycznie nie
+  // do znalezienia.
   // Normalizacja przy okazji zamyka temat "Spedycja" kontra "spedycja".
   // Do bazy trafia slug w postaci ZAPISANEJ w słowniku, nie w tej wpisanej przez
   // użytkownika — inaczej sekcja odziedziczona jako 'Spedycja' dostałaby drugi,

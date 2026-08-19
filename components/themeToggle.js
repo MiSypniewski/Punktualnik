@@ -56,7 +56,7 @@ export default function ThemeToggle() {
   };
 
   // Do czasu zamontowania rezerwujemy miejsce, żeby pasek nawigacji nie skoczył.
-  if (mode === null) return <span className="w-[5.5rem]" aria-hidden="true" />;
+  if (mode === null) return <span className="w-[6.5rem]" aria-hidden="true" />;
 
   return (
     <span className="flex gap-1" role="group" aria-label="Motyw">
@@ -69,8 +69,10 @@ export default function ThemeToggle() {
           aria-pressed={mode === m.id}
           onClick={() => choose(m.id)}
           className={classNames(
-            "w-7 h-7 rounded text-sm leading-none border",
-            mode === m.id ? "border-indigo-500 bg-raised" : "border-transparent hover:bg-raised"
+            "w-8 h-8 rounded text-sm leading-none border",
+            mode === m.id
+              ? "border-accent-strong text-accent-strong bg-raised"
+              : "border-transparent text-muted hover:text-body hover:bg-raised"
           )}
         >
           {m.icon}

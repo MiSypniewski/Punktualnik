@@ -5,6 +5,14 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import OvertimeBadge from "../../components/overtimeBadge";
+import Button from "../../components/ui/button";
+import { Input, Select } from "../../components/ui/field";
+import Plate from "../../components/ui/plate";
+import Alert from "../../components/ui/alert";
+import PageHeader from "../../components/ui/pageHeader";
+import EmptyState from "../../components/ui/emptyState";
+import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
+import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeRequests from "../../services/getOvertimeRequests";
 import getOvertimeBalances from "../../services/getOvertimeBalances";
 import getAllUsers from "../../services/getAllUsers";
@@ -122,39 +130,50 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
   };
 
   const balanceClass = (v) =>
-    classNames("text-right font-medium whitespace-nowrap", {
-      "text-green-600 dark:text-green-300": v > 0,
-      "text-red-600 dark:text-red-300": v < 0,
+    classNames("font-mono text-right tabular-nums font-medium whitespace-nowrap", {
+      "text-ok-strong": v > 0,
+      "text-danger-strong": v < 0,
       "text-muted": v === 0,
     });
 
   return (
     <BaseLayout>
-      <section className="mx-auto p-4 mt-6 mb-8 max-w-5xl">
-        <h1 className="text-2xl font-bold mb-1">Nadgodziny — panel kierownika</h1>
-        <p className="mb-6 text-sm text-muted">
-          {sections.length > 0 ? `Obsługiwane sekcje: ${sections.join(", ")}` : "Brak przypisanych sekcji"}
-        </p>
+      <section>
+        <PageHeader
+          title="Wnioski o nadgodziny"
+          description={
+            sections.length > 0 ? `Obsługiwane sekcje: ${sections.join(", ")}` : "Brak przypisanych sekcji"
+          }
+        />
 
         {sections.length === 0 && (
-          <p className="mb-6 p-3 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-900 dark:text-yellow-300 text-sm rounded">
+          <Alert tone="warn" className="mb-6">
             Nie masz przypisanej żadnej sekcji, więc panel jest pusty. Przypisanie nadaje się z linii poleceń:{" "}
             <code className="font-mono">npm run admin -- sections &lt;e-mail&gt; nazwaSekcji</code>
-          </p>
+          </Alert>
         )}
 
-        {err && <p className="mb-4 p-2 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>}
+        {err && (
+          <Alert tone="danger" className="mb-4">
+            {err}
+          </Alert>
+        )}
 
-        <h2 className="text-xl font-bold mb-4">
-          Do rozpatrzenia {pending.length > 0 && <span className="text-indigo-600 dark:text-indigo-300">({pending.length})</span>}
+        <h2 className="mb-4 text-sm font-bold uppercase tracking-signage">
+          Do rozpatrzenia{" "}
+          {pending.length > 0 && <span className="font-mono text-accent-strong">({pending.length})</span>}
         </h2>
 
         {pending.length === 0 ? (
-          <p className="mb-10 text-muted">Brak wniosków oczekujących na decyzję.</p>
+          <EmptyState
+            className="mb-10"
+            title="Nic nie czeka"
+            description="Wszystkie wnioski z twoich sekcji są rozpatrzone."
+          />
         ) : (
           <div className="mb-10 flex flex-col gap-3">
             {pending.map((r) => (
-              <div key={r.id} className="p-3 border border-indigo-200 dark:border-indigo-500/40 rounded shadow-sm">
+              <Plate key={r.id} className="p-3">
                 <div className="flex flex-wrap gap-x-4 gap-y-1 items-baseline">
                   <span className="font-bold">
                     {r.surname} {r.name}
@@ -164,8 +183,8 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                   <span className="text-sm">{kindLabel(r.kind)}</span>
                   <span
                     className={classNames("font-medium", {
-                      "text-green-600 dark:text-green-300": signedMinutes(r) > 0,
-                      "text-red-600 dark:text-red-300": signedMinutes(r) < 0,
+                      "text-ok-strong": signedMinutes(r) > 0,
+                      "text-danger-strong": signedMinutes(r) < 0,
                     })}
                   >
                     {formatMinutes(signedMinutes(r), { withSign: true })}
@@ -175,79 +194,77 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                 {r.reason && <p className="mt-1 text-sm text-muted">{r.reason}</p>}
 
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
-                  <input
+                  <Input
                     type="text"
                     placeholder="Notatka do decyzji (opcjonalna)"
                     value={note[r.id] || ""}
                     onChange={(e) => setNote({ ...note, [r.id]: e.target.value })}
-                    className="p-2 border border-line rounded text-sm flex-grow min-w-[12rem]"
+                    className="flex-grow w-auto min-w-[12rem]"
                   />
                   <button
                     onClick={() => decide(r.id, "approve")}
                     disabled={busy}
-                    className="text-white bg-green-600 hover:bg-green-700 disabled:bg-faint border-0 py-2 px-6 rounded"
+                    className="inline-flex items-center justify-center rounded font-medium bg-ok text-ok-ink hover:bg-ok/90 py-2 px-6 text-sm disabled:opacity-50"
                   >
                     Zatwierdź
                   </button>
                   <button
                     onClick={() => decide(r.id, "reject")}
                     disabled={busy}
-                    className="text-white bg-red-600 hover:bg-red-700 disabled:bg-faint border-0 py-2 px-6 rounded"
+                    className="inline-flex items-center justify-center rounded font-medium bg-danger text-danger-ink hover:bg-danger/90 py-2 px-6 text-sm disabled:opacity-50"
                   >
                     Odrzuć
                   </button>
                 </div>
-              </div>
+              </Plate>
             ))}
           </div>
         )}
 
-        <h2 className="text-xl font-bold mb-4">Salda pracowników</h2>
-        <div className="mb-10 overflow-x-auto">
-          <table className="w-full text-sm">
+        <h2 className="mb-4 text-sm font-bold uppercase tracking-signage">Salda pracowników</h2>
+        <TableWrap className="mb-10">
+          <Table>
             <thead>
-              <tr className="text-left border-b border-line">
-                <th className="py-2 pr-3">Pracownik</th>
-                <th className="py-2 pr-3">Sekcja</th>
-                <th className="py-2 pr-3 text-right">Saldo</th>
-                <th className="py-2 pr-3 text-right">Oczekujące</th>
-                <th className="py-2" />
+              <tr>
+                <Th>Pracownik</Th>
+                <Th>Sekcja</Th>
+                <Th align="right">Saldo</Th>
+                <Th align="right">Oczekujące</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
               {balances.map((u) => (
-                <tr key={u.id} className="border-b border-line-subtle">
-                  <td className="py-2 pr-3">
+                <Tr key={u.id}>
+                  <Td>
                     {u.surname} {u.name}
-                  </td>
-                  <td className="py-2 pr-3 text-muted">{u.section}</td>
-                  <td className={`py-2 pr-3 ${balanceClass(u.balance)}`}>
-                    {formatMinutes(u.balance, { withSign: true })}
-                  </td>
-                  <td className="py-2 pr-3 text-right text-muted">{u.pendingCount || ""}</td>
-                  <td className="py-2 text-right">
+                  </Td>
+                  <Td className="text-muted">{u.section}</Td>
+                  <Td className={balanceClass(u.balance)}>{formatMinutes(u.balance, { withSign: true })}</Td>
+                  <Td className="font-mono text-right tabular-nums text-muted">{u.pendingCount || ""}</Td>
+                  <Td className="text-right">
                     <button
                       onClick={() => router.push(`/nadgodziny/zarzadzaj?userID=${u.id}`)}
-                      className="text-xs text-indigo-600 dark:text-indigo-300 hover:underline"
+                      className="text-xs font-medium text-accent-strong hover:underline"
                     >
                       Historia
                     </button>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </TableWrap>
 
-        <h2 className="text-xl font-bold mb-4">Historia wniosków</h2>
+        <h2 className="mb-4 text-sm font-bold uppercase tracking-signage">Historia wniosków</h2>
 
         <form onSubmit={applyFilters} className="mb-4 flex flex-wrap gap-3 items-end">
           <div className="flex flex-col">
-            <label className="mb-1 text-sm font-medium">Pracownik</label>
-            <select
+            <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Pracownik</label>
+            <Select
               value={userID}
               onChange={(e) => setUserID(e.target.value)}
-              className="p-2 border border-indigo-400 rounded"
+              
             >
               <option value="">— wszyscy —</option>
               {users.map((u) => (
@@ -255,15 +272,15 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                   {u.surname} {u.name} ({u.section})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="flex flex-col">
-            <label className="mb-1 text-sm font-medium">Status</label>
-            <select
+            <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Status</label>
+            <Select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="p-2 border border-indigo-400 rounded"
+              
             >
               <option value="">— wszystkie —</option>
               {Object.entries(OVERTIME_STATUSES).map(([key, label]) => (
@@ -271,89 +288,80 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                   {label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="flex flex-col">
-            <label className="mb-1 text-sm font-medium">Od</label>
-            <input
+            <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Od</label>
+            <Input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="p-2 border border-indigo-400 rounded"
+              
             />
           </div>
 
           <div className="flex flex-col">
-            <label className="mb-1 text-sm font-medium">Do</label>
-            <input
+            <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Do</label>
+            <Input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="p-2 border border-indigo-400 rounded"
+              
             />
           </div>
 
-          <button
-            type="submit"
-            className="text-white bg-indigo-500 border-0 py-2 px-6 hover:bg-indigo-600 rounded"
-          >
-            Filtruj
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/nadgodziny/zarzadzaj")}
-            className="py-2 px-4 text-sm text-muted hover:underline"
-          >
+          <Button type="submit">Filtruj</Button>
+          <Button variant="ghost" onClick={() => router.push("/nadgodziny/zarzadzaj")}>
             Wyczyść
-          </button>
-          <button
-            type="button"
-            onClick={() => downloadCsv("wnioski")}
-            className="text-white bg-green-700 border-0 py-2 px-6 hover:bg-green-800 rounded"
-          >
+          </Button>
+          <Button variant="secondary" onClick={() => downloadCsv("wnioski")}>
+            <DownloadIcon />
             Pobierz CSV
-          </button>
+          </Button>
         </form>
 
         <p className="mb-4 text-xs text-muted">
           „Pobierz CSV” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
-          <button type="button" onClick={() => downloadCsv("salda")} className="text-indigo-600 dark:text-indigo-300 hover:underline">
+          <button type="button" onClick={() => downloadCsv("salda")} className="font-medium text-accent-strong hover:underline">
             Pobierz zestawienie sald wszystkich pracowników
           </button>
           .
         </p>
 
         {history.length === 0 ? (
-          <p className="text-muted">Brak wniosków dla wybranych filtrów.</p>
+          <EmptyState
+            title="Brak wniosków"
+            description="Dla tych filtrów nie ma nic do pokazania. Zdejmij filtry albo poszerz zakres dat."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <TableWrap>
+            <Table>
               <thead>
-                <tr className="text-left border-b border-line">
-                  <th className="py-2 pr-3">Data</th>
-                  <th className="py-2 pr-3">Pracownik</th>
-                  <th className="py-2 pr-3">Rodzaj</th>
-                  <th className="py-2 pr-3 text-right">Wymiar</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3">Szczegóły</th>
+                <tr>
+                  <Th>Data</Th>
+                  <Th>Pracownik</Th>
+                  <Th>Rodzaj</Th>
+                  <Th align="right">Wymiar</Th>
+                  <Th>Status</Th>
+                  <Th>Szczegóły</Th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((r) => (
-                  <tr key={r.id} className="border-b border-line-subtle align-top">
-                    <td className="py-2 pr-3 whitespace-nowrap">{r.data}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">
+                  <Tr key={r.id} className="align-top">
+                    <Td className="font-mono tabular-nums whitespace-nowrap">{r.data}</Td>
+                    <Td className="whitespace-nowrap">
                       {r.surname} {r.name}
-                    </td>
-                    <td className="py-2 pr-3">{kindLabel(r.kind)}</td>
-                    <td className={`py-2 pr-3 ${balanceClass(signedMinutes(r))}`}>
+                    </Td>
+                    <Td>{kindLabel(r.kind)}</Td>
+                    <Td className={balanceClass(signedMinutes(r))}>
                       {formatMinutes(signedMinutes(r), { withSign: true })}
-                    </td>
-                    <td className="py-2 pr-3">
+                    </Td>
+                    <Td>
                       <OvertimeBadge status={r.status} />
-                    </td>
-                    <td className="py-2 pr-3 text-muted">
+                    </Td>
+                    <Td className="text-muted">
                       {r.reason && <span className="block">{r.reason}</span>}
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
@@ -362,12 +370,12 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
                         </span>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableWrap>
         )}
       </section>
     </BaseLayout>

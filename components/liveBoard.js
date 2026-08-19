@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import classNames from "classnames";
-import { ProjectDot } from "./projectColors";
+import { ProjectMark } from "./projectColors";
+import LiveDot from "./liveDot";
+import Plate, { PlateHeader } from "./ui/plate";
 import { formatDuration, hhmm } from "../utils";
 
 // Sekcja "Teraz w toku" na górze raportu kierownika.
@@ -71,20 +73,21 @@ export default function LiveBoard({ initial, currentUserID }) {
   const total = running.length + idle.length;
 
   return (
-    <section className="mb-6 border border-line rounded overflow-hidden">
-      <header className="flex items-baseline justify-between gap-2 flex-wrap px-3 py-2 bg-raised border-b border-line">
-        <h2 className="font-bold">
-          Teraz w toku{" "}
-          <span className="font-normal text-muted">
-            ({running.length} z {total})
+    <Plate className="mb-6 overflow-hidden">
+      <PlateHeader className="bg-raised">
+        <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-signage">
+          {running.length > 0 && <LiveDot />}
+          Teraz w toku
+          <span className="font-mono font-normal normal-case tracking-normal text-muted">
+            {running.length} z {total}
           </span>
         </h2>
         <p className="text-xs text-muted">
           Stan bieżący, <span className="font-medium">niezależny od filtrów poniżej</span>
           {board?.generatedAt && ` · ${hhmm(board.generatedAt)}`}
-          {error && <span className="text-amber-800 dark:text-amber-300"> · brak łączności, dane mogą być nieaktualne</span>}
+          {error && <span className="text-signal-strong"> · brak łączności, dane mogą być nieaktualne</span>}
         </p>
-      </header>
+      </PlateHeader>
 
       {running.length === 0 ? (
         <p className="px-3 py-3 text-sm text-muted">
@@ -101,10 +104,10 @@ export default function LiveBoard({ initial, currentUserID }) {
                 key={r.id}
                 className={classNames(
                   "flex items-center gap-3 px-3 py-2 border-b border-line-subtle",
-                  tooLong && "bg-amber-50 dark:bg-amber-500/10"
+                  tooLong && "bg-signal-soft"
                 )}
               >
-                <ProjectDot color={r.projectColor} />
+                <ProjectMark color={r.projectColor} />
                 <div className="flex-grow min-w-0">
                   <p className="font-medium truncate">
                     {fullName(r)}
@@ -114,11 +117,11 @@ export default function LiveBoard({ initial, currentUserID }) {
                   </p>
                   <p className="text-sm text-muted truncate">
                     {r.projectName} ·{" "}
-                    {/* Opis w kolorze przycisku "Pokaż" (indigo-500) — to jedyna
-                        rzecz w wierszu, której kierownik naprawdę szuka wzrokiem;
-                        projekt i godzina są kontekstem i zostają szare. */}
+                    {/* Opis najmocniejszym kolorem tekstu — to jedyna rzecz
+                        w wierszu, której kierownik naprawdę szuka wzrokiem;
+                        projekt i godzina są kontekstem i zostają przygaszone. */}
                     {r.description ? (
-                      <span className="text-indigo-500 dark:text-indigo-300">{r.description}</span>
+                      <span className="font-medium text-body">{r.description}</span>
                     ) : (
                       "(bez opisu)"
                     )}{" "}
@@ -127,8 +130,8 @@ export default function LiveBoard({ initial, currentUserID }) {
                 </div>
                 <span
                   className={classNames(
-                    "font-mono tabular-nums whitespace-nowrap",
-                    tooLong ? "text-amber-800 dark:text-amber-300" : "text-body"
+                    "font-mono font-medium tabular-nums whitespace-nowrap",
+                    tooLong ? "text-signal-strong" : "text-body"
                   )}
                   title={tooLong ? "Biegnie ponad 8 godzin — sprawdź, czy to nie zapomniany timer" : null}
                 >
@@ -168,6 +171,6 @@ export default function LiveBoard({ initial, currentUserID }) {
           </p>
         </div>
       )}
-    </section>
+    </Plate>
   );
 }

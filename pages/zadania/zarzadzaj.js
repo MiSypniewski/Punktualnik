@@ -6,7 +6,16 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../components/baseLayout";
 import LiveBoard from "../../components/liveBoard";
-import { projectColor, ProjectDot } from "../../components/projectColors";
+import { projectColor, ProjectMark } from "../../components/projectColors";
+import Button, { IconButton } from "../../components/ui/button";
+import { Input, Select } from "../../components/ui/field";
+import Plate from "../../components/ui/plate";
+import Alert from "../../components/ui/alert";
+import Stat from "../../components/ui/stat";
+import PageHeader from "../../components/ui/pageHeader";
+import EmptyState from "../../components/ui/emptyState";
+import { TableWrap, Table as UiTable, Th as UiTh, Td as UiTd } from "../../components/ui/table";
+import { PencilIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
@@ -168,12 +177,12 @@ export default function ZarzadzajZadaniami({
   if (sections.length === 0) {
     return (
       <BaseLayout>
-        <section className="mx-auto p-4 mt-6 max-w-2xl">
-          <h1 className="text-2xl font-bold mb-4">Raport zadań</h1>
-          <p className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/40 rounded text-sm">
+        <section>
+          <PageHeader title="Raport zadań" />
+          <Alert tone="warn">
             Nie masz przypisanej żadnej sekcji, więc nie widzisz niczyich danych. Przypisanie nadaje się
             komendą <code className="font-mono">npm run admin -- sections &lt;e-mail&gt; &lt;sekcje&gt;</code>.
-          </p>
+          </Alert>
         </section>
       </BaseLayout>
     );
@@ -181,8 +190,11 @@ export default function ZarzadzajZadaniami({
 
   return (
     <BaseLayout>
-      <section className="mx-auto p-4 mt-6 mb-10 max-w-6xl">
-        <h1 className="text-2xl font-bold mb-4">Raport zadań</h1>
+      <section>
+        <PageHeader
+          title="Raport zadań"
+          description="Czas zaraportowany przez pracowników twoich sekcji. Stan bieżący jest u góry, reszta idzie za filtrami."
+        />
 
         <LiveBoard initial={live} currentUserID={currentUserID} />
 
@@ -193,26 +205,26 @@ export default function ZarzadzajZadaniami({
               sam co dotąd — pola jedno za drugim, zawijane. */}
           <div className="flex gap-3 flex-col sm:flex-row sm:flex-wrap sm:items-end">
             <Field label="Od">
-              <input
+              <Input
                 type="date"
                 value={form.from}
                 onChange={(e) => setForm({ ...form, from: e.target.value })}
-                className="w-full sm:w-auto p-2 border border-line-strong rounded"
+                className="w-full sm:w-auto"
               />
             </Field>
             <Field label="Do">
-              <input
+              <Input
                 type="date"
                 value={form.to}
                 onChange={(e) => setForm({ ...form, to: e.target.value })}
-                className="w-full sm:w-auto p-2 border border-line-strong rounded"
+                className="w-full sm:w-auto"
               />
             </Field>
             <Field label="Projekt">
-              <select
+              <Select
                 value={form.projectID}
                 onChange={(e) => setForm({ ...form, projectID: e.target.value })}
-                className="w-full sm:w-auto p-2 border border-line-strong rounded"
+                className="w-full sm:w-auto"
               >
                 <option value="">— wszystkie —</option>
                 {projects.map((p) => (
@@ -221,13 +233,13 @@ export default function ZarzadzajZadaniami({
                     {p.isActive ? "" : " (archiwalny)"}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Pracownik">
-              <select
+              <Select
                 value={form.userID}
                 onChange={(e) => setForm({ ...form, userID: e.target.value })}
-                className="w-full sm:w-auto p-2 border border-line-strong rounded"
+                className="w-full sm:w-auto"
               >
                 <option value="">— wszyscy —</option>
                 {users.map((u) => (
@@ -235,32 +247,32 @@ export default function ZarzadzajZadaniami({
                     {u.surname} {u.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Zadanie">
               {/* Fragment opisu, wielkość liter bez znaczenia (także dla polskich
                   znaków — porównanie robi plContains w services/entryStats.js). */}
-              <input
+              <Input
                 type="search"
                 value={form.q}
                 maxLength={TASK_QUERY_MAX}
                 placeholder="fragment opisu"
                 onChange={(e) => setForm({ ...form, q: e.target.value })}
-                className="p-2 border border-line-strong rounded w-full sm:w-48"
+                className="w-full sm:w-48"
               />
             </Field>
             <Field label="Wpisy dłuższe niż">
-              <select
+              <Select
                 value={form.minMinutes}
                 onChange={(e) => setForm({ ...form, minMinutes: e.target.value })}
-                className="w-full sm:w-auto p-2 border border-line-strong rounded"
+                className="w-full sm:w-auto"
               >
                 <option value="">— bez progu —</option>
                 <option value="15">15 min</option>
                 <option value="30">30 min</option>
                 <option value="60">1 h</option>
                 <option value="240">4 h</option>
-              </select>
+              </Select>
             </Field>
 
             {/* Oba przyciski w jednym rzędzie także na telefonie — "Wyczyść" pod
@@ -268,14 +280,14 @@ export default function ZarzadzajZadaniami({
             <span className="flex gap-2 w-full sm:w-auto">
               <button
                 type="submit"
-                className="flex-grow sm:flex-grow-0 text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-6 rounded"
+                className="flex-grow sm:flex-grow-0 inline-flex items-center justify-center rounded font-medium bg-accent text-accent-ink hover:bg-accent/90 py-2 px-6 text-sm"
               >
                 Pokaż
               </button>
               <button
                 type="button"
                 onClick={() => router.push("/zadania/zarzadzaj")}
-                className="py-2 px-4 border border-line-strong rounded"
+                className="py-2 px-4 text-sm rounded border border-line-strong bg-surface hover:bg-raised"
               >
                 Wyczyść
               </button>
@@ -295,24 +307,24 @@ export default function ZarzadzajZadaniami({
           />
         </div>
 
-        <h2 className="font-bold mb-2">Wg projektów</h2>
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-signage">Wg projektów</h2>
         {byProject.length === 0 ? (
-          <p className="text-sm text-muted mb-8">Brak wpisów w tym zakresie.</p>
+          <p className="mb-8 text-sm text-muted">Brak wpisów w tym zakresie.</p>
         ) : (
           // Sześć kolumn z liczbami nie zmieści się na telefonie, a bez tego
           // kontenera tabela rozpychała cały dokument szerzej niż ekran i strona
           // przewijała się w poziomie (wzorzec z pages/nadgodziny/zarzadzaj.js).
           // min-w jest konieczne: w samym overflow-x-auto tabela `w-full` zwęża się
           // do kontenera i ściska nazwy projektów zamiast pozwolić się przewinąć.
-          <div className="overflow-x-auto mb-8">
-          <table className="w-full min-w-[32rem] text-sm">
+          <TableWrap className="mb-8">
+          <UiTable className="min-w-[32rem]">
             <thead>
-              <tr className="text-left border-b border-line">
+              <tr>
                 <Th>Projekt</Th>
                 <Th>Klient</Th>
-                <Th className="text-right">Osób</Th>
-                <Th className="text-right">Wpisów</Th>
-                <Th className="text-right">Czas</Th>
+                <Th align="right">Osób</Th>
+                <Th align="right">Wpisów</Th>
+                <Th align="right">Czas</Th>
                 <Th className="w-1/3">Udział</Th>
               </tr>
             </thead>
@@ -321,14 +333,14 @@ export default function ZarzadzajZadaniami({
                 <tr key={p.id} className="border-b border-line-subtle">
                   <Td>
                     <span className="flex items-center">
-                      <span className={`w-2.5 h-2.5 rounded-full mr-2 shrink-0 ${projectColor(p.color).dot}`} />
+                      <ProjectMark color={p.color} className="mr-2" />
                       {p.name}
                     </span>
                   </Td>
                   <Td className="text-muted">{p.client || "—"}</Td>
-                  <Td className="text-right tabular-nums">{p.people}</Td>
-                  <Td className="text-right tabular-nums">{p.entries}</Td>
-                  <Td className="text-right tabular-nums font-medium whitespace-nowrap">
+                  <Td className="font-mono text-right tabular-nums">{p.people}</Td>
+                  <Td className="font-mono text-right tabular-nums">{p.entries}</Td>
+                  <Td className="font-mono text-right tabular-nums font-medium whitespace-nowrap">
                     {formatDuration(p.seconds)}
                   </Td>
                   <Td>
@@ -341,7 +353,7 @@ export default function ZarzadzajZadaniami({
                           style={{ width: `${Math.max(2, (p.seconds / maxSeconds) * 100)}%` }}
                         />
                       </span>
-                      <span className="text-xs text-muted tabular-nums w-10 text-right">
+                      <span className="font-mono text-xs text-muted tabular-nums w-10 text-right">
                         {Math.round((p.seconds / summary.seconds) * 100)}%
                       </span>
                     </span>
@@ -349,28 +361,28 @@ export default function ZarzadzajZadaniami({
                 </tr>
               ))}
             </tbody>
-          </table>
-          </div>
+          </UiTable>
+          </TableWrap>
         )}
 
-        <h2 className="font-bold mb-1">Wg pracowników</h2>
+        <h2 className="mb-1 text-sm font-bold uppercase tracking-signage">Wg pracowników</h2>
         <p className="text-xs text-muted mb-2">
           „Obecność” pochodzi z kart czasu pracy (odbicia na kiosku), „Zaraportowano” z wpisów zadań. To dwie
           niezależne ewidencje — różnica jest wskazówką, gdzie brakuje raportowania, a nie podstawą rozliczeń.
         </p>
         {byUser.length === 0 ? (
-          <p className="text-sm text-muted mb-8">Brak wpisów w tym zakresie.</p>
+          <p className="mb-8 text-sm text-muted">Brak wpisów w tym zakresie.</p>
         ) : (
-          <div className="overflow-x-auto mb-8">
-          <table className="w-full min-w-[34rem] text-sm">
+          <TableWrap className="mb-8">
+          <UiTable className="min-w-[34rem]">
             <thead>
-              <tr className="text-left border-b border-line">
+              <tr>
                 <Th>Pracownik</Th>
                 <Th>Sekcja</Th>
-                <Th className="text-right">Obecność</Th>
-                <Th className="text-right">Zaraportowano</Th>
-                <Th className="text-right">Różnica</Th>
-                <Th className="text-right">Pokrycie</Th>
+                <Th align="right">Obecność</Th>
+                <Th align="right">Zaraportowano</Th>
+                <Th align="right">Różnica</Th>
+                <Th align="right">Pokrycie</Th>
               </tr>
             </thead>
             <tbody>
@@ -380,30 +392,30 @@ export default function ZarzadzajZadaniami({
                     {u.surname} {u.name}
                   </Td>
                   <Td className="text-muted">{u.section}</Td>
-                  <Td className="text-right tabular-nums whitespace-nowrap">
+                  <Td className="font-mono text-right tabular-nums whitespace-nowrap">
                     {u.present ? formatDuration(u.present) : "—"}
                   </Td>
-                  <Td className="text-right tabular-nums font-medium whitespace-nowrap">
+                  <Td className="font-mono text-right tabular-nums font-medium whitespace-nowrap">
                     {formatDuration(u.reported)}
                   </Td>
                   <Td
                     className={classNames(
                       "text-right tabular-nums whitespace-nowrap",
-                      u.present === 0 ? "text-faint" : u.diff < 0 ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"
+                      u.present === 0 ? "text-faint" : u.diff < 0 ? "text-danger-strong" : "text-ok-strong"
                     )}
                   >
                     {u.present === 0 ? "—" : formatDuration(u.diff, { withSign: true })}
                   </Td>
-                  <Td className="text-right tabular-nums">{u.coverage === null ? "—" : `${u.coverage}%`}</Td>
+                  <Td className="font-mono text-right tabular-nums">{u.coverage === null ? "—" : `${u.coverage}%`}</Td>
                 </tr>
               ))}
             </tbody>
-          </table>
-          </div>
+          </UiTable>
+          </TableWrap>
         )}
 
         <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
-          <h2 className="font-bold">Wpisy</h2>
+          <h2 className="text-sm font-bold uppercase tracking-signage">Wpisy</h2>
           {canExport && (
             <span className="flex gap-2 flex-wrap">
               <ExportButton onClick={() => download("wpisy")}>CSV: wpisy</ExportButton>
@@ -420,33 +432,36 @@ export default function ZarzadzajZadaniami({
         </p>
 
         {detail.total > detail.limit && (
-          <p className="mb-2 p-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/40 rounded text-sm">
+          <Alert tone="warn" className="mb-2">
             Pokazano {detail.limit} z {detail.total} wpisów. Zawęź filtry albo pobierz CSV — eksport obejmuje
             komplet.
-          </p>
+          </Alert>
         )}
 
         {err && (
-          <p className="mb-2 p-2 bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/40 text-red-700 dark:text-red-300 text-sm rounded">{err}</p>
+          <Alert tone="danger" className="mb-2">{err}</Alert>
         )}
 
         {detail.rows.length === 0 ? (
-          <p className="text-sm text-muted">Brak wpisów w tym zakresie.</p>
+          <EmptyState
+            title="Brak wpisów"
+            description="W tym zakresie nikt nie zaraportował czasu. Poszerz zakres dat albo zdejmij filtry."
+          />
         ) : (
           <>
             {/* Siedem kolumn na telefonie nie ma szans — nawet przewijana w poziomie
                 tabela zmuszałaby do wodzenia palcem przy każdym wierszu. Poniżej `sm`
                 te same dane idą więc kartami, jak lista wpisów na /zadania. Oba układy
                 dzielą stan (editingID, saveEntry) i formularz (EntryForm). */}
-            <table className="hidden sm:table w-full text-sm">
+            <UiTable className="hidden sm:table">
               <thead>
-                <tr className="text-left border-b border-line">
+                <tr>
                   <Th>Data</Th>
                   <Th>Pracownik</Th>
                   <Th>Projekt</Th>
                   <Th>Zadanie</Th>
-                  <Th className="text-right">Godziny</Th>
-                  <Th className="text-right">Czas</Th>
+                  <Th align="right">Godziny</Th>
+                  <Th align="right">Czas</Th>
                   <Th />
                 </tr>
               </thead>
@@ -477,7 +492,7 @@ export default function ZarzadzajZadaniami({
                   )
                 )}
               </tbody>
-            </table>
+            </UiTable>
 
             <ul className="sm:hidden flex flex-col gap-2">
               {detail.rows.map((r) => (
@@ -514,29 +529,29 @@ export default function ZarzadzajZadaniami({
 const dayLabel = (data) => dayjs(data).format("DD.MM.YY");
 
 const EntryRow = ({ entry, busy, onEdit }) => (
-  <tr className={classNames("border-b border-line-subtle", entry.autoClosed && "bg-amber-50 dark:bg-amber-500/10")}>
+  <tr className={classNames("border-b border-line-subtle", entry.autoClosed && "bg-signal-soft")}>
     <Td className="whitespace-nowrap">{dayLabel(entry.data)}</Td>
     <Td className="whitespace-nowrap">
       {entry.surname} {entry.name}
     </Td>
     <Td>
       <span className="flex items-center">
-        <span className={`w-2 h-2 rounded-full mr-2 shrink-0 ${projectColor(entry.projectColor).dot}`} />
+        <ProjectMark color={entry.projectColor} size="sm" className="mr-2" />
         {entry.projectName}
       </span>
     </Td>
     <Td>
       {entry.description || <span className="text-faint">(bez opisu)</span>}
-      {entry.autoClosed && <span className="ml-2 text-xs text-amber-800 dark:text-amber-300">auto</span>}
+      {entry.autoClosed && <span className="ml-2 text-xs font-semibold uppercase tracking-signage text-signal-strong">auto</span>}
       {entry.editedByName && <span className="ml-2 text-xs text-muted">popr. {entry.editedByName}</span>}
     </Td>
     <Td
-      className="text-right tabular-nums whitespace-nowrap text-muted"
+      className="font-mono text-right tabular-nums whitespace-nowrap text-muted"
       title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}
     >
       {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
     </Td>
-    <Td className="text-right tabular-nums font-medium whitespace-nowrap">{formatDuration(entry.seconds)}</Td>
+    <Td className="font-mono text-right tabular-nums font-medium whitespace-nowrap">{formatDuration(entry.seconds)}</Td>
     <Td className="text-right">
       <PencilButton busy={busy} onClick={onEdit} />
     </Td>
@@ -548,7 +563,7 @@ const PencilButton = ({ busy, onClick }) => (
     disabled={busy}
     title="Popraw wpis"
     onClick={onClick}
-    className="py-1 px-2 border border-line rounded hover:bg-raised disabled:opacity-30"
+    className="py-1 px-2 border border-line rounded hover:bg-raised disabled:opacity-40"
   >
     ✎
   </button>
@@ -565,7 +580,7 @@ const PencilButton = ({ busy, onClick }) => (
 const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave }) => {
   if (editing) {
     return (
-      <li className="p-3 border border-line rounded bg-indigo-50 dark:bg-indigo-500/10">
+      <li className="p-3 border border-line rounded bg-accent-soft">
         <EntryForm entry={entry} projects={projects} busy={busy} onCancel={onCancel} onSave={onSave} />
       </li>
     );
@@ -575,20 +590,20 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
     <li
       className={classNames(
         "p-3 border border-line rounded",
-        entry.autoClosed && "bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/40"
+        entry.autoClosed && "bg-signal-soft border-signal/40"
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="flex items-baseline min-w-0">
-          <ProjectDot color={entry.projectColor} />
+          <ProjectMark color={entry.projectColor} className="mr-2" />
           <span className="text-sm text-muted truncate">{entry.projectName}</span>
         </span>
-        <span className="text-sm text-muted tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
+        <span className="font-mono text-sm text-muted tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
       </div>
 
-      <p className="mt-1 text-indigo-500 dark:text-indigo-300 break-words">
+      <p className="mt-1 font-medium break-words">
         {entry.description || <span className="text-faint">(bez opisu)</span>}
-        {entry.autoClosed && <span className="ml-2 text-xs text-amber-800 dark:text-amber-300">auto</span>}
+        {entry.autoClosed && <span className="ml-2 text-xs font-semibold uppercase tracking-signage text-signal-strong">auto</span>}
       </p>
 
       <p className="text-sm text-body">
@@ -597,11 +612,11 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
       </p>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="text-sm text-muted tabular-nums" title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}>
+        <span className="font-mono text-sm text-muted tabular-nums" title={`${timePart(entry.startedAt)}–${timePart(entry.endedAt)}`}>
           {hhmm(entry.startedAt)}–{hhmm(entry.endedAt)}
         </span>
         <span className="flex items-center gap-2">
-          <span className="text-sm font-medium tabular-nums">{formatDuration(entry.seconds)}</span>
+          <span className="font-mono text-sm font-medium tabular-nums">{formatDuration(entry.seconds)}</span>
           <PencilButton busy={busy} onClick={onEdit} />
         </span>
       </div>
@@ -630,7 +645,7 @@ const projectOptions = (available, entry) =>
  * służy karcie na telefonie — obwoluta różni się wyłącznie tym, w co go opakować.
  */
 const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => (
-  <tr className="border-b border-line bg-indigo-50 dark:bg-indigo-500/10">
+  <tr className="border-b border-line bg-accent-soft">
     {/* Formularz przez całą szerokość wiersza, a nie pole w każdej komórce:
         sześć wąskich kolumn nie pomieściłoby ani selecta z nazwą projektu,
         ani opisu. */}
@@ -668,10 +683,10 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
       </p>
 
       <div className="flex gap-2 flex-col sm:flex-row mb-2">
-        <select
+        <Select
           value={form.projectID}
           onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
-          className="p-2 border border-line-strong rounded sm:w-56 shrink-0 bg-surface"
+          className="sm:w-56 shrink-0"
         >
           {options.map((p) => (
             <option key={p.id} value={p.id}>
@@ -679,45 +694,45 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
               {p.isActive ? "" : " (archiwalny)"}
             </option>
           ))}
-        </select>
-        <input
+        </Select>
+        <Input
           type="text"
           value={form.description}
           maxLength={200}
           placeholder="Opis zadania"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          className="flex-grow min-w-0 p-2 border border-line-strong rounded"
+          className="flex-grow w-auto min-w-0"
         />
       </div>
 
       <div className="flex gap-2 items-end flex-wrap">
         {/* Bez min/max: kierownik poprawia wpisy z dowolnego okresu. */}
         <Field label="Data">
-          <input
+          <Input
             type="date"
             value={form.data}
             onChange={(e) => setForm({ ...form, data: e.target.value })}
-            className="w-full sm:w-auto p-2 border border-line-strong rounded"
+            className="w-full sm:w-auto"
             required
           />
         </Field>
         {/* Od i Do obok siebie także na telefonie — to jedna informacja, zakres. */}
         <span className="flex gap-2 w-full sm:w-auto">
           <Field label="Od">
-            <input
+            <Input
               type="time"
               value={form.from}
               onChange={(e) => setForm({ ...form, from: e.target.value })}
-              className="w-full sm:w-auto p-2 border border-line-strong rounded"
+              className="w-full sm:w-auto"
               required
             />
           </Field>
           <Field label="Do">
-            <input
+            <Input
               type="time"
               value={form.to}
               onChange={(e) => setForm({ ...form, to: e.target.value })}
-              className="w-full sm:w-auto p-2 border border-line-strong rounded"
+              className="w-full sm:w-auto"
               required
             />
           </Field>
@@ -727,13 +742,13 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
           <button
             type="submit"
             disabled={busy}
-            className="flex-grow sm:flex-grow-0 text-white bg-indigo-500 hover:bg-indigo-600 py-2 px-5 rounded disabled:opacity-50"
+            className="flex-grow sm:flex-grow-0 inline-flex items-center justify-center rounded font-medium bg-accent text-accent-ink hover:bg-accent/90 py-2 px-5 text-sm disabled:opacity-50"
           >
             Zapisz
           </button>
-          <button type="button" onClick={onCancel} className="py-2 px-3 text-muted">
+          <Button variant="ghost" onClick={onCancel}>
             Anuluj
-          </button>
+          </Button>
         </span>
       </div>
     </form>
@@ -744,28 +759,23 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
 // w formularzu filtrów); od `sm` etykieta zwęża się do swojej zawartości.
 const Field = ({ label, children }) => (
   <label className="flex flex-col w-full sm:w-auto">
-    <span className="mb-1 text-xs font-medium text-body">{label}</span>
+    <span className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">{label}</span>
     {children}
   </label>
 );
 
 const Kpi = ({ label, value, warn, hint }) => (
-  <div className={classNames("p-3 rounded border", warn ? "bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/40" : "border-line")}>
-    <p className="text-xs text-muted">{label}</p>
-    <p className="text-xl font-bold tabular-nums">{value}</p>
-    {hint && <p className="text-xs text-amber-800 dark:text-amber-300">{hint}</p>}
-  </div>
+  <Stat label={label} value={value} hint={hint} tone={warn ? "signal" : "default"} />
 );
 
-const Th = ({ children, className }) => <th className={classNames("py-2 pr-3 font-medium", className)}>{children}</th>;
-const Td = ({ children, className, title }) => (
-  <td className={classNames("py-2 pr-3", className)} title={title}>
-    {children}
-  </td>
-);
+// Cienkie opakowania na wspólne komórki: zostają, bo strona woła je w kilkunastu
+// miejscach, a `align` czyta się w tabeli lepiej niż klasa.
+const Th = UiTh;
+const Td = UiTd;
 
 const ExportButton = ({ onClick, children }) => (
-  <button onClick={onClick} className="text-sm py-1.5 px-3 border border-line-strong rounded hover:bg-raised">
+  <Button variant="secondary" size="sm" onClick={onClick}>
+    <DownloadIcon />
     {children}
-  </button>
+  </Button>
 );

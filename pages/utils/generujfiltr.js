@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react";
 // import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import BaseLayout from "../../components/baseLayout";
+import Button from "../../components/ui/button";
+import { Field, Textarea } from "../../components/ui/field";
+import PageHeader from "../../components/ui/pageHeader";
 // import Spinner from "../../components/spinner";
 
 export default function GenerujFiltr() {
@@ -42,45 +45,48 @@ export default function GenerujFiltr() {
   }, [mmka]);
 
   return (
-    <BaseLayout>
-      <section className="mx-auto p-2 mt-3 mb-8 flex flex-col">
-        <div>
-          <textarea
+    <BaseLayout width="narrow">
+      <PageHeader
+        title="Filtr GAM"
+        description="Narzędzie doraźne spoza ewidencji czasu: wkleja się MMkę, wychodzi sklejony filtr z numerami SN."
+      />
+
+      <div className="flex flex-col gap-4">
+        <Field label="MMka" htmlFor="mmka">
+          <Textarea
+            id="mmka"
             value={mmka}
             onChange={(e) => setMmka(e.target.value)}
-            className="h-72 w-full p-2 text-sm font-mono text-indigo-400 border border-indigo-400 rounded"
-            placeholder="tutaj wklej MMke"
-          ></textarea>
-        </div>
-        <div className="m-2 flex">
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              copyToClipboard(filtr);
-            }}
-            className="disabled:opacity-50 flex mx-auto text-white  bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg"
-          >
-            KOPIUJ
-          </button>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
+            className="h-64 font-mono"
+            placeholder="Wklej tutaj całą MMkę"
+          />
+        </Field>
+
+        <div className="flex gap-2">
+          <Button onClick={() => copyToClipboard(filtr)}>Kopiuj filtr</Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
               setMmka("");
               setFiltr("");
             }}
-            className="disabled:opacity-50 flex mx-auto text-white bg-indigo-500 border-0 py-2 px-8 focus:outline-none hover:bg-indigo-600 rounded text-lg"
           >
-            WYCZYŚĆ
-          </button>
+            Wyczyść
+          </Button>
         </div>
-        <div className="mt-4">
-          <textarea
+
+        <Field label="Wynik" htmlFor="filtr">
+          {/* readOnly, bo pole jest wyjściem, nie wejściem — bez tego React
+              zgłasza kontrolowane pole bez obsługi zmiany. */}
+          <Textarea
+            id="filtr"
             value={filtr}
-            className="h-48 w-full p-2 text-sm font-mono text-indigo-400"
-            placeholder="tutaj będzie wyświetlony filtr"
-          ></textarea>
-        </div>
-      </section>
+            readOnly
+            className="h-40 font-mono"
+            placeholder="Tutaj pojawi się filtr"
+          />
+        </Field>
+      </div>
     </BaseLayout>
   );
 }
