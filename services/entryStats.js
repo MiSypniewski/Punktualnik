@@ -115,6 +115,15 @@ export const getSummary = (filters) => {
   ).get(paramsOf(filters));
 };
 
+/**
+ * LEFT JOIN, nie JOIN — i to jest tu istotne, a nie kosmetyczne.
+ *
+ * Wpis wolno wystartować bez projektu (services/db.js: migrateEntryProjectOptional),
+ * a getSummary liczy sumę po samym TaskEntries, bez złączenia. Przy zwykłym JOIN
+ * ten podział zaniżałby się względem sumy ogólnej o czas nieprzypisany i nic by
+ * tego na ekranie nie zdradziło. Wiersz zbiorczy wychodzi z id = NULL — grupują
+ * się w nim wszystkie wpisy bez projektu; front podpisuje go "(bez projektu)".
+ */
 export const getByProject = (filters) => {
   if (noScope(filters)) return [];
 
@@ -127,7 +136,7 @@ export const getByProject = (filters) => {
              COUNT(*)                 AS entries,
              COUNT(DISTINCT e.userID) AS people
         FROM TaskEntries e
-        JOIN Projects p ON p.id = e.projectID${where}
+        LEFT JOIN Projects p ON p.id = e.projectID${where}
        GROUP BY p.id
        ORDER BY seconds DESC`
   ).all(paramsOf(filters));
@@ -244,7 +253,7 @@ export const getEntries = (filters, scope = "view") => {
              p.isActive AS projectIsActive
         FROM TaskEntries e
         JOIN Users u    ON u.id = e.userID
-        JOIN Projects p ON p.id = e.projectID${where}
+        LEFT JOIN Projects p ON p.id = e.projectID${where}
        ORDER BY e.data DESC, e.startedAt DESC${LIMIT_CLAUSE[scope] ?? LIMIT_CLAUSE.view}`
   ).all(paramsOf(filters));
 

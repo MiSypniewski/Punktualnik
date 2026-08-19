@@ -5,17 +5,23 @@ import {
   updateEntry,
   deleteEntry,
   retagRunningEntry,
+  setRunningStart,
 } from "../../../services/taskEntries";
 import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 
-// "retag" to opis i projekt biegnącego timera; "update" — cały zamknięty wpis
-// razem z czasami. Rozdzielone, bo obowiązują je inne reguły: retag wolno tylko
-// właścicielowi i tylko dopóki licznik leci, update także kierownikowi i tylko
-// na wpisie zamkniętym.
-const ALLOWED_ACTIONS = ["stop", "update", "retag"];
+// "retag" to opis i projekt biegnącego timera, "setstart" — jego godzina
+// rozpoczęcia; "update" to cały zamknięty wpis razem z czasami. Rozdzielone, bo
+// obowiązują je inne reguły: trzy pierwsze wolno tylko właścicielowi i tylko
+// dopóki licznik leci, update także kierownikowi i tylko na wpisie zamkniętym.
+const ALLOWED_ACTIONS = ["stop", "update", "retag", "setstart"];
+
+// Akcje na WŁASNYM biegnącym timerze. Kierownik ich nie dostaje: nie wie, kiedy
+// pracownik faktycznie zaczął ani skończył, a zgadnięty czas to zafałszowany
+// wpis. Jego narzędziem jest "update" na wpisie już zamkniętym — z podpisem.
+const OWNER_ONLY = ["stop", "setstart"];
 const CONFLICT_CODES = ["overlap", "already_running", "edit_window_closed"];
 
 /**
@@ -100,34 +106,54 @@ export default async (req, res) => {
     return res.status(400).json({ error: "bad_action" });
   }
 
-  if (action === "stop") {
-    // Zatrzymać timer może wyłącznie jego właściciel: kierownik nie wie,
-    // kiedy tamten faktycznie skończył, a zły koniec to zafałszowany wpis.
+  const { projectID, description, data, from, to } = req.body ?? {};
+
+  if (OWNER_ONLY.includes(action)) {
     if (Number(entry.userID) !== Number(token.userID)) {
       return res.status(403).json({ error: "permission_denied" });
     }
-    const stopped = stopEntry({ id, userID: token.userID });
-    return stopped
-      ? res.status(200).json({ status: "stopped", entry: stopped })
-      : res.status(409).json({ error: "not_running" });
+
+    try {
+      if (action === "stop") {
+        // stopEntry odrzuca wpis bez opisu albo bez projektu (assertComplete),
+        // więc od tej zmiany potrafi rzucić — stąd try wokół obu akcji.
+        const stopped = stopEntry({ id, userID: token.userID });
+        return stopped
+          ? res.status(200).json({ status: "stopped", entry: stopped })
+          : res.status(409).json({ error: "not_running" });
+      }
+
+      const moved = setRunningStart({ id, userID: token.userID, from });
+      return moved
+        ? res.status(200).json({ status: "moved", entry: moved })
+        : res.status(409).json({ error: "not_running" });
+    } catch (error) {
+      const status = CONFLICT_CODES.includes(error.code) ? 409 : 422;
+      return res
+        .status(status)
+        .json({ status: "not_updated", error: error.code || "invalid", message: error.message });
+    }
   }
 
   // Wybór projektu sprawdzamy raz, dla obu pozostałych akcji — jedna i druga
   // potrafi przenieść wpis na inny projekt i obie muszą to zrobić na tych samych
-  // zasadach.
-  const { projectID, description, data, from, to } = req.body ?? {};
-  if (!/^\d+$/.test(String(projectID ?? ""))) {
+  // zasadach. Różnią się jedną rzeczą: retag dotyczy wpisu BIEGNĄCEGO, a taki
+  // wolno zostawić (i cofnąć) bez projektu; update zamyka temat na dobre.
+  const hasProject = /^\d+$/.test(String(projectID ?? ""));
+  if (!hasProject && action !== "retag") {
     return res.status(400).json({ error: "bad_project" });
   }
 
-  const project = getProject(projectID);
-  if (!project) {
-    return res.status(404).json({ error: "project_not_found" });
-  }
-  // Projekt archiwalny wolno ZOSTAWIĆ, ale nie wolno na niego przenieść.
-  const keepsProject = Number(projectID) === Number(entry.projectID);
-  if (!canUseProject(access.scopeToken, project, { allowArchived: keepsProject })) {
-    return res.status(403).json({ error: "project_out_of_scope" });
+  if (hasProject) {
+    const project = getProject(projectID);
+    if (!project) {
+      return res.status(404).json({ error: "project_not_found" });
+    }
+    // Projekt archiwalny wolno ZOSTAWIĆ, ale nie wolno na niego przenieść.
+    const keepsProject = Number(projectID) === Number(entry.projectID);
+    if (!canUseProject(access.scopeToken, project, { allowArchived: keepsProject })) {
+      return res.status(403).json({ error: "project_out_of_scope" });
+    }
   }
 
   if (action === "retag") {

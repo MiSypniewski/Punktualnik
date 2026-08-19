@@ -30,6 +30,11 @@ dayjs.locale("pl");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Wpis, który wystartował bez projektu i nikt go jeszcze nie przypisał. Panel
+// kierownika jest miejscem, w którym takie wpisy da się posprzątać — poprawka
+// wymusza wybór projektu, bo zamknięty wpis musi go mieć.
+const NO_PROJECT = "(bez projektu)";
+
 export async function getServerSideProps(ctx) {
   const token = await getToken({ req: ctx.req });
 
@@ -330,11 +335,13 @@ export default function ZarzadzajZadaniami({
             </thead>
             <tbody>
               {byProject.map((p) => (
-                <tr key={p.id} className="border-b border-line-subtle">
+                // Wiersz bez id to zbiorczy "(bez projektu)" z LEFT JOIN-a
+                // w services/entryStats.js — klucz Reacta musi go przeżyć.
+                <tr key={p.id ?? "none"} className="border-b border-line-subtle">
                   <Td>
                     <span className="flex items-center">
                       <ProjectMark color={p.color} className="mr-2" />
-                      {p.name}
+                      {p.name || NO_PROJECT}
                     </span>
                   </Td>
                   <Td className="text-muted">{p.client || "—"}</Td>
@@ -537,7 +544,7 @@ const EntryRow = ({ entry, busy, onEdit }) => (
     <Td>
       <span className="flex items-center">
         <ProjectMark color={entry.projectColor} size="sm" className="mr-2" />
-        {entry.projectName}
+        {entry.projectName || NO_PROJECT}
       </span>
     </Td>
     <Td>
@@ -596,7 +603,7 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
       <div className="flex items-baseline justify-between gap-2">
         <span className="flex items-baseline min-w-0">
           <ProjectMark color={entry.projectColor} className="mr-2" />
-          <span className="text-sm text-muted truncate">{entry.projectName}</span>
+          <span className="text-sm text-muted truncate">{entry.projectName || NO_PROJECT}</span>
         </span>
         <span className="font-mono text-sm text-muted tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
       </div>
@@ -633,7 +640,9 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
  * z brzegu i zapis po cichu przeniósłby cudzą pracę na inny projekt.
  */
 const projectOptions = (available, entry) =>
-  available.some((p) => p.id === entry.projectID)
+  // Wpis bez projektu nie ma czego dokładać do listy — dostaje pustą pozycję
+  // w samym <select> i musi zostać przypisany, żeby dało się go zapisać.
+  !entry.projectID || available.some((p) => p.id === entry.projectID)
     ? available
     : [
         { id: entry.projectID, name: entry.projectName, isActive: entry.projectIsActive },
@@ -684,10 +693,14 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
 
       <div className="flex gap-2 flex-col sm:flex-row mb-2">
         <Select
-          value={form.projectID}
-          onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
+          value={form.projectID ?? ""}
+          required
+          onChange={(e) =>
+            setForm({ ...form, projectID: e.target.value ? Number(e.target.value) : "" })
+          }
           className="sm:w-56 shrink-0"
         >
+          <option value="">— wybierz projekt —</option>
           {options.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -700,6 +713,7 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
           value={form.description}
           maxLength={200}
           placeholder="Opis zadania"
+          required
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className="flex-grow w-auto min-w-0"
         />

@@ -62,6 +62,92 @@ const migrateEntrySeconds = (db) => {
   }
 };
 
+// DDL indeksów TaskEntries wyciągnięte z głównego db.exec, bo potrzebują go DWA
+// miejsca: zakładanie bazy i migracja migrateEntryProjectOptional. Ta druga
+// przebudowuje tabelę, a DROP TABLE zabiera indeksy ze sobą — i akurat tutaj
+// dwie odręczne kopie tej listy byłyby groźne, bo brak idx_entries_running nie
+// objawiłby się niczym poza dwoma równoległymi timerami u jednej osoby.
+const ENTRY_INDEXES = `
+    CREATE INDEX IF NOT EXISTS idx_entries_user_data     ON TaskEntries(userID, data);
+    CREATE INDEX IF NOT EXISTS idx_entries_project_data  ON TaskEntries(projectID, data);
+    CREATE INDEX IF NOT EXISTS idx_entries_section_data  ON TaskEntries(section, data);
+
+    -- "Najwyżej jeden biegnący timer na osobę" pilnowane przez BAZĘ, a nie przez
+    -- kod: dwie otwarte zakładki nie wystartują dwóch liczników, bo drugi INSERT
+    -- odbije się o ten indeks (SQLITE_CONSTRAINT → 409 already_running).
+    -- Indeks częściowy, więc kosztuje tyle, ile jest aktualnie biegnących wpisów.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_running
+      ON TaskEntries(userID) WHERE endedAt IS NULL;
+`;
+
+// Kolumny TaskEntries wymienione z nazwy — przepisanie tabeli nie może zależeć
+// od ich kolejności w schemacie.
+const ENTRY_COLUMNS = `id, userID, projectID, description, data, startedAt, endedAt,
+       seconds, section, autoClosed, createdAt, editedAt, editedBy, editedByName`;
+
+/**
+ * TaskEntries.projectID przestaje być NOT NULL.
+ *
+ * Timer wolno teraz uruchomić jednym kliknięciem, bez wskazywania projektu —
+ * projekt i opis uzupełnia się w trakcie, a zamknięcie wpisu wymaga obu
+ * (services/taskEntries.js: assertComplete). Wcześniej <select> podstawiał
+ * pierwszy projekt z brzegu, więc kto nie spojrzał w pole, ten po cichu
+ * raportował czas na cudzy projekt.
+ *
+ * SQLite nie ma ALTER COLUMN, więc zdjęcie NOT NULL to przepisanie całej tabeli
+ * — procedura z dokumentacji ("Making Other Kinds Of Table Schema Changes").
+ * Klucz obcy zostaje: w SQLite NULL nigdy nie łamie FK.
+ *
+ * Idempotentna i sterowana STANEM SCHEMATU, nie numerem wersji — jak
+ * migrateEntrySeconds wyżej. Musi lecieć PO niej, bo tamta dokłada kolumnę
+ * seconds i usuwa minutes, a ta przepisuje listę kolumn dosłownie.
+ */
+const migrateEntryProjectOptional = (db) => {
+  const projectID = db.prepare(`PRAGMA table_info(TaskEntries)`).all().find((c) => c.name === "projectID");
+  if (!projectID || projectID.notnull === 0) return;
+
+  // PRAGMA foreign_keys jest w transakcji ignorowana, więc musi paść przed nią.
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE TaskEntries_new (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          userID       INTEGER NOT NULL,
+          projectID    INTEGER,
+          description  TEXT    NOT NULL DEFAULT '',
+          data         TEXT    NOT NULL,
+          startedAt    TEXT    NOT NULL,
+          endedAt      TEXT,
+          seconds      INTEGER,
+          section      TEXT    NOT NULL,
+          autoClosed   INTEGER NOT NULL DEFAULT 0,
+          createdAt    TEXT    NOT NULL,
+          editedAt     TEXT,
+          editedBy     INTEGER,
+          editedByName TEXT,
+          FOREIGN KEY (userID)    REFERENCES Users(id),
+          FOREIGN KEY (projectID) REFERENCES Projects(id)
+        );
+
+        INSERT INTO TaskEntries_new (${ENTRY_COLUMNS})
+             SELECT ${ENTRY_COLUMNS} FROM TaskEntries;
+
+        DROP TABLE TaskEntries;
+        ALTER TABLE TaskEntries_new RENAME TO TaskEntries;
+        ${ENTRY_INDEXES}
+      `);
+    })();
+
+    const broken = db.pragma("foreign_key_check");
+    if (broken.length > 0) {
+      throw new Error(`TaskEntries: przebudowa zostawiła ${broken.length} osieroconych wierszy.`);
+    }
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+};
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -204,7 +290,11 @@ const createDb = () => {
     CREATE TABLE IF NOT EXISTS TaskEntries (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       userID       INTEGER NOT NULL,
-      projectID    INTEGER NOT NULL,
+      -- projectID BEZ NOT NULL: timer wolno odpalić jednym kliknięciem, jeszcze
+      -- nie wiedząc, na co czas pójdzie. Kompletu (projekt + opis) pilnuje
+      -- dopiero zamknięcie wpisu — services/taskEntries.js: assertComplete.
+      -- Bazy sprzed tej zmiany przerabia migrateEntryProjectOptional.
+      projectID    INTEGER,
       description  TEXT    NOT NULL DEFAULT '',
       data         TEXT    NOT NULL,
       startedAt    TEXT    NOT NULL,
@@ -227,20 +317,12 @@ const createDb = () => {
     CREATE INDEX IF NOT EXISTS idx_overtime_status    ON Overtime(status);
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_name  ON Projects(name COLLATE NOCASE);
-    CREATE INDEX IF NOT EXISTS idx_entries_user_data     ON TaskEntries(userID, data);
-    CREATE INDEX IF NOT EXISTS idx_entries_project_data  ON TaskEntries(projectID, data);
-    CREATE INDEX IF NOT EXISTS idx_entries_section_data  ON TaskEntries(section, data);
-
-    -- "Najwyżej jeden biegnący timer na osobę" pilnowane przez BAZĘ, a nie przez
-    -- kod: dwie otwarte zakładki nie wystartują dwóch liczników, bo drugi INSERT
-    -- odbije się o ten indeks (SQLITE_CONSTRAINT → 409 already_running).
-    -- Indeks częściowy, więc kosztuje tyle, ile jest aktualnie biegnących wpisów.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_running
-      ON TaskEntries(userID) WHERE endedAt IS NULL;
+    ${ENTRY_INDEXES}
   `);
 
   backfillSections(db);
   migrateEntrySeconds(db);
+  migrateEntryProjectOptional(db);
 
   return db;
 };

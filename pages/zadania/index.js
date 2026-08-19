@@ -73,7 +73,13 @@ const ERRORS = {
   project_not_found: "Wybranego projektu już nie ma.",
   bad_project: "Wybierz projekt.",
   not_found: "Tego wpisu już nie ma — odśwież stronę.",
+  incomplete: "Uzupełnij projekt i opis, zanim zamkniesz zadanie.",
 };
+
+// Napis dla wpisu, który jeszcze nie ma przypisanego projektu. Ten sam zabieg
+// co "(bez opisu)" niżej: brak informacji ma być widoczny jako brak, a nie jako
+// pusty odstęp, którego nikt nie zauważy.
+const NO_PROJECT = "(bez projektu)";
 
 const errorText = (body, fallback) => body.message || ERRORS[body.error] || fallback;
 
@@ -287,6 +293,17 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
   const [saved, setSaved] = useState(false);
   const [elapsed, setElapsed] = useState("");
 
+  // Godzina rozpoczęcia otwierana do poprawki na życzenie, nie na stałe: pole
+  // stojące zawsze otworem kusiłoby do ruszenia jej przez przypadek, a na
+  // tablecie to jedno nieostrożne dotknięcie.
+  const [editingStart, setEditingStart] = useState(false);
+  const [startDraft, setStartDraft] = useState(hhmm(running.startedAt));
+
+  // Kursor ma wylądować w polu, którego brakuje — sam komunikat nad paskiem
+  // zostawiałby szukanie użytkownikowi.
+  const descInput = useRef(null);
+  const projectSelect = useRef(null);
+
   const stored = useRef(draft); // ostatnia wartość potwierdzona przez serwer
   const latest = useRef(draft); // to, co widzi użytkownik — dla flushów spoza Reacta
   const pending = useRef(null); // uchwyt debounce'u
@@ -392,16 +409,61 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
     };
   }, [save]);
 
+  // Poprawiona godzina przychodzi propsem, więc szkic i zamknięcie edytora
+  // wieszamy na startedAt, nie na id: po udanym zapisie wpis jest ten sam,
+  // zmienia się wyłącznie jego początek. Nieudany zapis nie odświeża propsów,
+  // więc pole zostaje otwarte razem z komunikatem.
+  useEffect(() => {
+    setStartDraft(hhmm(running.startedAt));
+    setEditingStart(false);
+  }, [running.startedAt]);
+
   const stop = async () => {
+    // Ten sam warunek co assertComplete na serwerze. Tutaj nie po to, żeby
+    // chronić dane — od tego jest serwer — tylko żeby nie płacić za odmowę
+    // żądaniem i żeby kursor od razu stanął w brakującym polu.
+    if (!draft.projectID) {
+      onError("Wybierz projekt, zanim zamkniesz zadanie.");
+      projectSelect.current?.focus();
+      return;
+    }
+    if (!String(draft.description ?? "").trim()) {
+      onError("Opisz zadanie, zanim je zamkniesz.");
+      descInput.current?.focus();
+      return;
+    }
+
     await flush();
     call(`/api/entries/${running.id}`, { method: "PUT", body: JSON.stringify({ action: "stop" }) });
   };
 
+  /**
+   * Zapis poprawionej godziny startu.
+   *
+   * flush() PRZED call(): ten drugi kończy się router.replace, czyli
+   * przemontowaniem paska, a niezflushowany debounce opisu (AUTOSAVE_MS)
+   * przepadłby razem z nim. Dokładnie ta sama kolejność co w stop().
+   */
+  const saveStart = async () => {
+    await flush();
+    call(`/api/entries/${running.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ action: "setstart", from: startDraft }),
+    });
+  };
+
+  const cancelStart = () => {
+    setStartDraft(hhmm(running.startedAt));
+    setEditingStart(false);
+  };
+
   // Projekt zarchiwizowany w trakcie pracy wypadłby z listy, a <select> wskazałby
   // wtedy pierwszą pozycję z brzegu i cicho przeniósł czas na cudzy projekt.
-  const options = projects.some((p) => p.id === draft.projectID)
-    ? projects
-    : [{ id: draft.projectID, name: "— projekt poza listą —" }, ...projects];
+  // Warunek na draft.projectID, bo wpis bez projektu nie ma czego szukać w liście.
+  const options =
+    !draft.projectID || projects.some((p) => p.id === draft.projectID)
+      ? projects
+      : [{ id: draft.projectID, name: "— projekt poza listą —" }, ...projects];
 
   const project = options.find((p) => p.id === draft.projectID);
 
@@ -412,6 +474,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
         {/* Te same pola co przed startem, w tym samym układzie — pasek nie zmienia
             kształtu po naciśnięciu Start, zmienia się tylko przycisk po prawej. */}
         <Input
+          ref={descInput}
           type="text"
           value={draft.description}
           list={`opisy-${draft.projectID}`}
@@ -425,10 +488,14 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
         <DescriptionOptions descByProject={descByProject} />
 
         <Select
-          value={draft.projectID}
-          onChange={(e) => edit({ projectID: Number(e.target.value) }, { now: true })}
+          ref={projectSelect}
+          value={draft.projectID ?? ""}
+          onChange={(e) =>
+            edit({ projectID: e.target.value ? Number(e.target.value) : null }, { now: true })
+          }
           className="w-full sm:w-56 shrink-0"
         >
+          <option value="">— wybierz projekt —</option>
           {options.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -441,16 +508,54 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
           Stop
         </Button>
       </div>
-      <p className="mt-1 text-xs text-muted">
-        od {hhmm(running.startedAt)} · opis i projekt zapisują się same
-        {saved && <span className="ml-2 font-medium text-ok-strong">zapisano ✓</span>}
-      </p>
+
+      {/* Godzina rozpoczęcia do poprawienia w miejscu. Powód jest codzienny:
+          spotkanie zaczyna się o 9:00, a timer wchodzi o 9:10, kiedy ktoś sobie
+          o nim przypomni. Bez tego jedynym wyjściem był Stop, edycja zamkniętego
+          wpisu i Start od nowa — czyli rozcięcie jednej pracy na dwa kawałki. */}
+      {editingStart ? (
+        <div className="mt-1 flex items-center gap-2 flex-wrap text-xs text-muted">
+          <span>od</span>
+          <Input
+            autoFocus
+            type="time"
+            aria-label="Godzina rozpoczęcia"
+            value={startDraft}
+            onChange={(e) => setStartDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveStart()}
+            className="!w-28 py-1"
+          />
+          <Button size="sm" disabled={busy} onClick={saveStart}>
+            Zapisz
+          </Button>
+          <Button size="sm" variant="ghost" onClick={cancelStart}>
+            Anuluj
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-muted">
+          <button
+            type="button"
+            title="Popraw godzinę rozpoczęcia"
+            onClick={() => setEditingStart(true)}
+            className="inline-flex items-center gap-1 font-medium text-accent-strong hover:underline"
+          >
+            od {hhmm(running.startedAt)}
+            <PencilIcon className="w-3 h-3" />
+          </button>{" "}
+          · opis i projekt zapisują się same
+          {saved && <span className="ml-2 font-medium text-ok-strong">zapisano ✓</span>}
+        </p>
+      )}
     </Bar>
   );
 };
 
 const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => {
-  const [projectID, setProjectID] = useState(projects[0]?.id ?? "");
+  // Pusto, a NIE projects[0]. Podstawiony pierwszy projekt alfabetycznie znaczył,
+  // że kto nie spojrzy w to pole, ten po cichu raportuje czas na cudzy projekt —
+  // a wpis wygląda wtedy tak samo dobrze jak prawdziwy.
+  const [projectID, setProjectID] = useState("");
   const [description, setDescription] = useState("");
 
   if (running) {
@@ -466,11 +571,14 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
     );
   }
 
+  // Start bez projektu i bez opisu jest DOZWOLONY: licznik ma ruszyć w sekundę,
+  // w której zaczyna się praca, a nie w tej, w której ktoś skończy się nad nią
+  // zastanawiać. Kompletu pilnuje dopiero Stop (services/taskEntries.js:
+  // assertComplete), a jedno i drugie da się dopisać w biegu.
   const start = () => {
-    if (!projectID) return;
     call("/api/entries", {
       method: "POST",
-      body: JSON.stringify({ action: "start", projectID, description }),
+      body: JSON.stringify({ action: "start", projectID: projectID || null, description }),
     }).then((ok) => ok && setDescription(""));
   };
 
@@ -497,10 +605,12 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
             na krawędzi. */}
         <Select
           value={projectID}
-          onChange={(e) => setProjectID(Number(e.target.value))}
+          onChange={(e) => setProjectID(e.target.value ? Number(e.target.value) : "")}
           className="w-full sm:w-56 shrink-0"
         >
-          {projects.length === 0 && <option value="">— brak projektów —</option>}
+          <option value="">
+            {projects.length === 0 ? "— brak projektów —" : "— wybierz projekt —"}
+          </option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -508,7 +618,9 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
           ))}
         </Select>
 
-        <Button size="lg" disabled={busy || projects.length === 0} onClick={start}>
+        {/* Bez `projects.length === 0` w disabled: brak projektów nie blokuje już
+            startu, bo timer poradzi sobie bez nich, a praca i tak trwa. */}
+        <Button size="lg" disabled={busy} onClick={start}>
           Start
         </Button>
       </div>
@@ -547,16 +659,27 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
     </h2>
     <div className="flex gap-2 flex-wrap">
       {suggestions.map((s) => (
+        // Nazwa projektu pod opisem, a nie sam kolorowy kwadracik. Kolorów jest
+        // siedem (components/projectColors.js) i nic nie pilnuje ich unikalności,
+        // więc ta sama czynność w dwóch projektach ("wystawia zlecenia" w ESL
+        // i w Namiotach) dawała dwa kafelki nie do odróżnienia. Dwie linie,
+        // a nie "opis · projekt" w jednej: kafelek zostaje wąski, a przy sześciu
+        // podpowiedziach szerokie kafelki zawijały rząd na trzy linie.
         <button
           key={`${s.projectID}-${s.description}`}
           disabled={busy}
-          title={running ? "Zamknij bieżące zadanie i zacznij to" : "Zacznij to zadanie"}
+          title={`${s.description} · ${s.projectName} — ${
+            running ? "zamknij bieżące zadanie i zacznij to" : "zacznij to zadanie"
+          }`}
           onClick={() => onResume(s)}
-          className="flex items-center gap-2 max-w-full py-1.5 px-3 border border-line rounded bg-surface text-sm hover:bg-raised disabled:opacity-50"
+          className="flex items-start gap-2 max-w-[16rem] py-1.5 px-3 border border-line rounded bg-surface text-sm text-left hover:bg-raised disabled:opacity-50"
         >
-          <ProjectMark color={s.projectColor} size="sm" />
-          <span className="truncate">{s.description}</span>
-          <PlayIcon className="w-3.5 h-3.5 shrink-0 text-muted" />
+          <ProjectMark color={s.projectColor} size="sm" className="mt-1.5" />
+          <span className="min-w-0">
+            <span className="block truncate">{s.description}</span>
+            <span className="block truncate text-xs text-muted">{s.projectName}</span>
+          </span>
+          <PlayIcon className="w-3.5 h-3.5 shrink-0 mt-1 text-muted" />
         </button>
       ))}
     </div>
@@ -568,8 +691,11 @@ const Resume = ({ suggestions, running, busy, onResume }) => (
 const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
   const [open, setOpen] = useState(false);
   const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
+  // Projekt pusty, jak w pasku timera — z tego samego powodu. Tu jednak wybór
+  // jest OBOWIĄZKOWY (`required` niżej): wpis ręczny powstaje od razu zamknięty,
+  // więc nie ma późniejszego momentu na uzupełnienie.
   const [form, setForm] = useState({
-    projectID: projects[0]?.id ?? "",
+    projectID: "",
     description: "",
     data: today,
     from: "",
@@ -603,14 +729,17 @@ const ManualForm = ({ projects, descByProject, busy, call, today, anyDay }) => {
           list={`opisy-${form.projectID}`}
           maxLength={200}
           placeholder="Opis zadania"
+          required
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className="flex-grow w-auto min-w-0"
         />
         <Select
           value={form.projectID}
-          onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
+          required
+          onChange={(e) => setForm({ ...form, projectID: e.target.value ? Number(e.target.value) : "" })}
           className="sm:w-56 shrink-0"
         >
+          <option value="">— wybierz projekt —</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -751,14 +880,22 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             value={form.description}
             list={`opisy-${form.projectID}`}
             maxLength={200}
+            required
+            placeholder="Opis zadania"
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             className="flex-grow w-auto min-w-[8rem] py-1.5"
           />
+          {/* Pusta pozycja obsługuje wpis, który wystartował bez projektu i został
+              domknięty automatycznie na koniec doby — zapis wymusi jego wybór. */}
           <Select
-            value={form.projectID}
-            onChange={(e) => setForm({ ...form, projectID: Number(e.target.value) })}
+            value={form.projectID ?? ""}
+            required
+            onChange={(e) =>
+              setForm({ ...form, projectID: e.target.value ? Number(e.target.value) : "" })
+            }
             className="py-1.5 w-auto"
           >
+            <option value="">— wybierz projekt —</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -842,8 +979,10 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
             >
               {entry.description || "(bez opisu)"}
             </span>
-            <span className="block text-xs text-muted">
-              {entry.projectName}
+            <span
+              className={classNames("block text-xs", entry.projectName ? "text-muted" : "text-faint")}
+            >
+              {entry.projectName || NO_PROJECT}
               {entry.editedByName && ` · popr. ${entry.editedByName}`}
             </span>
           </span>
