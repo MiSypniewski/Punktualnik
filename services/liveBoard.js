@@ -45,7 +45,7 @@ const stmtRunning = (count) => {
                p.name AS projectName, p.client AS projectClient, p.color AS projectColor
           FROM TaskEntries e
           JOIN Users u    ON u.id = e.userID
-          JOIN Projects p ON p.id = e.projectID
+          LEFT JOIN Projects p ON p.id = e.projectID
          WHERE e.endedAt IS NULL
            AND u.section IN (${placeholders(count)})
          ORDER BY e.startedAt, u.surname COLLATE NOCASE`)

@@ -11,6 +11,12 @@ import { now as appNow } from "./workday";
 // rutyna ("odprawa celna") ma wypaść wyżej niż coś, co pracownik zrobił raz
 // wczoraj po południu. Bez tego lista wznowień zmieniałaby się każdego dnia
 // i przestałaby być przewidywalna.
+//
+// Zwykły JOIN, a nie LEFT JOIN — świadomie, w odróżnieniu od pozostałych
+// zapytań tego modułu (services/entryStats.js, liveBoard.js, taskEntries.js),
+// które po dopuszczeniu wpisów bez projektu musiały przejść na LEFT. Tutaj wpis
+// bez projektu ma WYPAŚĆ: kafelek "wznów" pokazuje właśnie parę projekt + opis,
+// a wznowienie czegoś nieprzypisanego zakładałoby kolejny taki wpis.
 
 const HORIZON_DAYS = 90;
 const LIMIT = 50;

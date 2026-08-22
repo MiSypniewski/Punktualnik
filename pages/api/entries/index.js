@@ -35,7 +35,13 @@ export default async (req, res) => {
   if (!ALLOWED_ACTIONS.includes(action)) {
     return res.status(400).json({ error: "bad_action" });
   }
-  if (!/^\d+$/.test(String(projectID ?? ""))) {
+
+  // Projekt jest OBOWIĄZKOWY tylko dla wpisu ręcznego — ten powstaje od razu
+  // zamknięty, więc obowiązuje go to samo co zatrzymanie timera. Start wolno
+  // kliknąć bez projektu i dopisać go w trakcie; kompletu pilnuje dopiero Stop
+  // (services/taskEntries.js: assertComplete).
+  const hasProject = /^\d+$/.test(String(projectID ?? ""));
+  if (!hasProject && action !== "start") {
     return res.status(400).json({ error: "bad_project" });
   }
 
@@ -70,12 +76,16 @@ export default async (req, res) => {
     };
   }
 
-  const project = getProject(projectID);
-  if (!project) {
-    return res.status(404).json({ error: "project_not_found" });
-  }
-  if (!canUseProject(owner.scopeToken, project)) {
-    return res.status(403).json({ error: "project_out_of_scope" });
+  // Zasięg sprawdzamy tylko wtedy, gdy jest co sprawdzać. Wpis bez projektu
+  // nikomu nie przypisuje czasu, więc nie ma jak wyjść poza sekcję.
+  if (hasProject) {
+    const project = getProject(projectID);
+    if (!project) {
+      return res.status(404).json({ error: "project_not_found" });
+    }
+    if (!canUseProject(owner.scopeToken, project)) {
+      return res.status(403).json({ error: "project_out_of_scope" });
+    }
   }
 
   closeStaleEntries();

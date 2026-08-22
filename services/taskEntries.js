@@ -84,7 +84,7 @@ export const getRunningEntry = (userID) => toRow(stmtRunning.get(Number(userID))
 const stmtRunningDetail = db.prepare(`
   SELECT ${COLS}, p.name AS projectName, p.color AS projectColor
     FROM TaskEntries e
-    JOIN Projects p ON p.id = e.projectID
+    LEFT JOIN Projects p ON p.id = e.projectID
    WHERE e.userID = ? AND e.endedAt IS NULL`);
 
 /** Własny biegnący wpis razem z nazwą projektu — dla timera w tytule karty. */
@@ -102,7 +102,7 @@ export const runningSeconds = (entry, now = appNow()) => secondsBetween(entry.st
 const stmtForUser = db.prepare(`
   SELECT ${COLS}, p.name AS projectName, p.color AS projectColor, p.client AS projectClient
     FROM TaskEntries e
-    JOIN Projects p ON p.id = e.projectID
+    LEFT JOIN Projects p ON p.id = e.projectID
    WHERE e.userID = @userID AND e.data BETWEEN @from AND @to
    ORDER BY e.data DESC, e.startedAt DESC`);
 
@@ -153,6 +153,24 @@ const assertInWindow = (data, now) => {
   }
 };
 
+/**
+ * Wpis wolno ZAMKNĄĆ dopiero opisany i przypisany do projektu.
+ *
+ * Timer startuje jednym kliknięciem — o to chodzi, bo licznik ma nie uciekać,
+ * kiedy praca już trwa. Ale to, co z niego zostaje, jest sumowane w raportach
+ * i czytane po miesiącach, więc "(bez opisu)" na nieznanym projekcie jest
+ * wpisem bezużytecznym.
+ *
+ * To odwrotna decyzja niż przy kolizji w stopEntry (komentarz niżej) i jest
+ * świadoma: kolizji z ręcznym wpisem pracownik nie naprawi w tej sekundzie,
+ * a brakującego opisu — tak, pole stoi tuż obok przycisku Stop. Licznik przy
+ * odrzuconym zatrzymaniu leci dalej, więc nic się nie gubi.
+ */
+const assertComplete = (entry) => {
+  if (!entry.projectID) fail("incomplete", "Wybierz projekt, zanim zamkniesz zadanie.");
+  if (!String(entry.description ?? "").trim()) fail("incomplete", "Opisz zadanie, zanim je zamkniesz.");
+};
+
 // --- zapis ------------------------------------------------------------------
 
 const stmtInsert = db.prepare(`
@@ -178,7 +196,9 @@ export const startEntry = ({ userID, projectID, description, section }, now = ap
   try {
     const info = stmtInsert.run({
       userID: Number(userID),
-      projectID: Number(projectID),
+      // Pusty projekt jest dozwolony WYŁĄCZNIE tutaj i w retagRunningEntry —
+      // czyli dopóki wpis biegnie. Zamknięcie wymaga kompletu (assertComplete).
+      projectID: projectID ? Number(projectID) : null,
       description: desc,
       data: workDay(now),
       startedAt,
@@ -209,6 +229,8 @@ const stmtStop = db.prepare(`
 export const stopEntry = ({ id, userID }, now = appNow()) => {
   const entry = getEntry(id);
   if (!entry || Number(entry.userID) !== Number(userID)) return undefined;
+
+  assertComplete(entry);
 
   const endedAt = toStamp(now);
   const info = stmtStop.run({
@@ -244,11 +266,76 @@ export const retagRunningEntry = ({ id, userID, projectID, description }) => {
   const info = stmtRetag.run({
     id: Number(id),
     userID: Number(userID),
-    projectID: Number(projectID),
+    // Wolno też ZDJĄĆ projekt: skoro da się wystartować bez niego, to da się
+    // również cofnąć omyłkowy wybór, dopóki wpis biegnie.
+    projectID: projectID ? Number(projectID) : null,
     description: Joi.attempt(description ?? "", descSchema),
   });
 
   return info.changes > 0 ? getEntry(id) : undefined;
+};
+
+const stmtSetStart = db.prepare(`
+  UPDATE TaskEntries SET startedAt = @startedAt
+   WHERE id = @id AND userID = @userID AND endedAt IS NULL`);
+
+const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
+
+/**
+ * Przesunięcie godziny startu BIEGNĄCEGO timera.
+ *
+ * Sytuacja jest codzienna: spotkanie zaczyna się o 9:00, a timer wchodzi o 9:10,
+ * kiedy ktoś sobie o nim przypomni. Dotąd jedynym wyjściem było zatrzymanie
+ * licznika, poprawienie zamkniętego wpisu i start od nowa — czyli rozcięcie
+ * jednej pracy na dwa kawałki tylko po to, żeby poprawić kwadrans.
+ *
+ * Osobna funkcja obok retagRunningEntry, a nie jej rozszerzenie: tamta jedzie
+ * autozapisem co 800 ms z pola tekstowego, a godzina jest zatwierdzana jawnie.
+ * Wpuszczenie czasu do tamtej ścieżki znaczyłoby, że spóźniony debounce opisu
+ * potrafi cofnąć świeżo poprawiony start.
+ *
+ * Warunki "mój wpis" i "wciąż biegnie" siedzą w SAMYM SQL, jak w retagu:
+ * równoczesny Stop z drugiej zakładki nie da się nadpisać.
+ */
+export const setRunningStart = ({ id, userID, from }, now = appNow()) => {
+  const entry = getEntry(id);
+  if (!entry || Number(entry.userID) !== Number(userID)) return undefined;
+
+  if (!TIME_RE.test(String(from ?? ""))) fail("bad_time", "Podaj godzinę w formacie GG:MM.");
+
+  // Data KALENDARZOWA obecnego startu, a nie kolumna `data`: doba robocza sięga
+  // do 3:00, więc wpis z data = 2026-08-19 potrafi mieć startedAt 2026-08-20 00:30.
+  const candidate = dayjs(`${String(entry.startedAt).slice(0, 10)} ${withSeconds(from)}`);
+  const nowStamp = toStamp(now);
+
+  // Poza dobę roboczą wpisu wyjść nie wolno: kolumna `data` zostaje bez zmian,
+  // więc start przesunięty przed jej granicę rozjechałby wpis z własnym dniem,
+  // a za nim raporty i auto-domykanie.
+  const dayStart = `${entry.data} ${String(WORKDAY_START_HOUR).padStart(2, "0")}:00:00`;
+
+  let startedAt = candidate.format(TS_FORMAT);
+
+  // Godzina wypadająca w przyszłość może znaczyć "wczoraj wieczorem" — tak jest
+  // między północą a 3:00, kiedy doba robocza wpisu obejmuje dwie daty
+  // kalendarzowe. Cofamy o dobę TYLKO wtedy, gdy wynik nadal do niej należy;
+  // inaczej godzina po prostu jest z przyszłości i tak trzeba to nazwać.
+  if (startedAt > nowStamp) {
+    const earlier = candidate.subtract(1, "day").format(TS_FORMAT);
+    if (earlier >= dayStart) startedAt = earlier;
+  }
+
+  if (startedAt > nowStamp) fail("bad_range", "Początek nie może być w przyszłości.");
+  if (startedAt < dayStart) {
+    fail("bad_range", "Początek musi zostać w dobie roboczej, w której zadanie wystartowało.");
+  }
+
+  return db.transaction(() => {
+    // Wpis biegnący nie ma końca, więc na potrzeby kolizji traktujemy jako koniec
+    // chwilę bieżącą — czyli dokładnie ten odcinek, który zadanie już zajmuje.
+    assertNoOverlap({ userID: entry.userID, startedAt, endedAt: nowStamp, id: entry.id });
+    const info = stmtSetStart.run({ id: Number(id), userID: Number(userID), startedAt });
+    return info.changes > 0 ? getEntry(id) : undefined;
+  })();
 };
 
 // Przełączenie zadania tuż po starcie to korekta pomyłki ("nie ten projekt"),
@@ -268,6 +355,12 @@ const MIN_KEEP_SECONDS = 10;
  * uruchomiony timer" — czyli zrzucało na pracownika robotę, którą aplikacja umie
  * wykonać sama: zatrzymać jedno, wystartować drugie.
  *
+ * O odrzuceniu wpisu-pomyłki decydujemy PRZED jego zamknięciem, a nie po —
+ * inaczej assertComplete odbiłby nieopisany wpis sprzed dziesięciu sekund
+ * i zablokował jedyne wyjście z sytuacji "kliknąłem nie ten kafelek". Pracy
+ * trwającej dłużej ta furtka już nie obejmuje: żeby przejść na inne zadanie,
+ * trzeba najpierw opisać bieżące.
+ *
  * @returns {{entry: object, stopped: object|null, discarded: boolean}}
  *   `stopped` to zamknięty wpis (null, gdy nic nie biegło albo wpis odrzucono),
  *   `discarded` mówi, że poprzedni wpis był krótszy niż MIN_KEEP_SECONDS.
@@ -275,13 +368,16 @@ const MIN_KEEP_SECONDS = 10;
 export const switchEntry = ({ userID, projectID, description, section }, now = appNow()) =>
   db.transaction(() => {
     const current = getRunningEntry(userID);
-    let stopped = current ? stopEntry({ id: current.id, userID }, now) : null;
+    const tooShort = current && secondsBetween(current.startedAt, toStamp(now)) < MIN_KEEP_SECONDS;
+
+    let stopped = null;
     let discarded = false;
 
-    if (stopped && stopped.seconds < MIN_KEEP_SECONDS) {
-      deleteEntry({ id: stopped.id, userID, enforceWindow: false });
-      stopped = null;
+    if (tooShort) {
+      deleteEntry({ id: current.id, userID, enforceWindow: false });
       discarded = true;
+    } else if (current) {
+      stopped = stopEntry({ id: current.id, userID }, now);
     }
 
     return {
@@ -291,9 +387,21 @@ export const switchEntry = ({ userID, projectID, description, section }, now = a
     };
   })();
 
+// Opis WYMAGANY, w odróżnieniu od descSchema wyżej. Podział przebiega dokładnie
+// tam, gdzie przebiega reguła: descSchema obsługuje wpis BIEGNĄCY (start, retag),
+// gdzie pusty opis jest normalnym stanem przejściowym, a descRequiredSchema —
+// wpis ZAMKNIĘTY, czyli formularz ręczny i edycję istniejącego wpisu. Ta sama
+// zasada, której po stronie timera pilnuje assertComplete.
+const descRequiredSchema = Joi.string().trim().min(1).max(200).required().messages({
+  "string.empty": "Opisz zadanie — puste wpisy są nie do odczytania w raportach.",
+  "any.required": "Opisz zadanie — puste wpisy są nie do odczytania w raportach.",
+});
+
 const manualSchema = Joi.object({
+  // Tu projekt zostaje WYMAGANY: ta ścieżka tworzy wpis od razu zamknięty,
+  // więc obowiązuje ją to samo, co zatrzymanie timera.
   projectID: Joi.number().integer().positive().required(),
-  description: descSchema,
+  description: descRequiredSchema,
   data: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
   // Sekundy OPCJONALNE: formularz ręczny wysyła "HH:mm" (nikt nie wpisuje sekund
   // z pamięci), a edycja istniejącego wpisu "HH:mm:ss" — inaczej poprawienie

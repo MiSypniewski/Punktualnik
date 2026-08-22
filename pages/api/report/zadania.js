@@ -153,7 +153,7 @@ export default async (req, res) => {
       r.surname,
       r.name,
       r.section,
-      r.projectName,
+      r.projectName || "(bez projektu)",
       r.projectClient || "",
       r.description,
       timePart(r.startedAt),

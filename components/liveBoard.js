@@ -116,7 +116,7 @@ export default function LiveBoard({ initial, currentUserID }) {
                     )}
                   </p>
                   <p className="text-sm text-muted truncate">
-                    {r.projectName} ·{" "}
+                    {r.projectName || "(bez projektu)"} ·{" "}
                     {/* Opis najmocniejszym kolorem tekstu — to jedyna rzecz
                         w wierszu, której kierownik naprawdę szuka wzrokiem;
                         projekt i godzina są kontekstem i zostają przygaszone. */}

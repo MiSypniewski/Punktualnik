@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import classNames from "classnames";
 
 // Jeden styl pola formularza zamiast trzech równoległych: ciągu „tailblocks”
@@ -14,15 +15,21 @@ import classNames from "classnames";
 const control =
   "w-full rounded border border-line-strong bg-surface text-body px-3 py-2 text-sm placeholder:text-faint focus:ring-0 focus:border-accent-strong disabled:opacity-50";
 
-export const Input = ({ className, ...rest }) => (
-  <input className={classNames(control, className)} {...rest} />
-);
+// forwardRef, bo wołający musi umieć postawić kursor w konkretnym polu — pasek
+// timera w pages/zadania/index.js odmawia zamknięcia zadania bez opisu i wtedy
+// sam prowadzi do brakującego pola. Bez przepuszczenia ref-a `ref` na komponencie
+// funkcyjnym po cichu zostaje pusty.
+export const Input = forwardRef(({ className, ...rest }, ref) => (
+  <input ref={ref} className={classNames(control, className)} {...rest} />
+));
+Input.displayName = "Input";
 
-export const Select = ({ className, children, ...rest }) => (
-  <select className={classNames(control, "pr-8", className)} {...rest}>
+export const Select = forwardRef(({ className, children, ...rest }, ref) => (
+  <select ref={ref} className={classNames(control, "pr-8", className)} {...rest}>
     {children}
   </select>
-);
+));
+Select.displayName = "Select";
 
 export const Textarea = ({ className, ...rest }) => (
   <textarea className={classNames(control, "leading-6", className)} {...rest} />

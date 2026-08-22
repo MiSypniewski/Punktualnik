@@ -35,12 +35,23 @@ export const COLOR_KEYS = Object.keys(PALETTE);
 
 const SIZES = { sm: "w-2 h-2", md: "w-2.5 h-2.5", lg: "w-3.5 h-3.5" };
 
+// Wpis bez projektu (timer wystartowany jednym kliknięciem) dostaje kwadrat
+// PUSTY, a nie szary. Bez tego wyglądałby identycznie jak projekt w kolorze
+// `slate`, bo projectColor() zwraca dla nieznanego klucza FALLBACK — czyli
+// właśnie slate. Kontur czyta się jako „miejsce jeszcze niewypełnione”.
+const EMPTY_MARK = "border border-dashed border-line-strong bg-transparent";
+
 /** Kwadratowy znacznik koloru projektu — w listach wpisów, tabelach raportów
- *  i przy wyborze projektu. */
+ *  i przy wyborze projektu. `color` puste znaczy „bez projektu”. */
 export const ProjectMark = ({ color, size = "md", className }) => (
   <span
     aria-hidden="true"
-    className={classNames("inline-block rounded-sm shrink-0", SIZES[size] || SIZES.md, projectColor(color).mark, className)}
+    className={classNames(
+      "inline-block rounded-sm shrink-0",
+      SIZES[size] || SIZES.md,
+      color ? projectColor(color).mark : EMPTY_MARK,
+      className
+    )}
   />
 );
 
