@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
 import { installRuntimeGuards } from "./runtime";
+import { logInfo } from "./log";
 
 // Lokalna baza SQLite. Ścieżkę można nadpisać zmienną SQLITE_PATH
 // (przydatne na Mikrusie, np. na wolumenie trwałym poza katalogiem aplikacji).
@@ -10,16 +11,27 @@ const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), "data", "punk
 // Jedno połączenie na proces — trzymane na `globalThis`, NIE w zmiennej modułu.
 //
 // To nie jest tylko wygoda dla trybu dev (gdzie Next przeładowuje moduły). Next 12
-// buduje osobny bundle serwerowy dla KAŻDEJ trasy i nie tworzy współdzielonych chunków,
-// więc ten plik trafia w całości do kilkunastu niezależnych rejestrów modułów webpacka.
-// Zmienna modułowa jest w każdym z nich osobna — bez `globalThis` dostalibyśmy tyle
-// połączeń `better-sqlite3` do jednego pliku, ile tras ktoś odwiedzi.
+// buduje DWA niezależne runtime'y webpacka: jeden dla stron (`webpack-runtime.js`),
+// drugi dla tras API (`webpack-api-runtime.js`). Mają rozłączne rejestry modułów,
+// więc ten plik wykonuje się w procesie dwa razy — sprawdzone: `grep -l __punktualnikDb
+// .next/server/chunks` daje dwa chunki, a `lsof` na działającym procesie pokazywał
+// dwa uchwyty do pliku bazy. Zmienna modułowa jest w każdym z nich osobna.
 //
-// A `better-sqlite3` jest synchroniczne: kolizja o blokadę zapisu między dwoma takimi
-// połączeniami zamraża CAŁY proces na `busy_timeout`. Tak właśnie 21.08.2026 aplikacja
-// przestała odbierać połączenia (Cloudflare 522), mimo że proces żył — pm2 nie
-// odnotował ani jednego restartu.
+// Dwa połączenia wystarczą: `better-sqlite3` jest synchroniczne, więc kolizja o blokadę
+// zapisu między nimi zamraża CAŁY proces na `busy_timeout` — i to nie tylko dla
+// piszącego, ale dla wszystkich, także dla czystych odczytów. Zmierzone na gałęzi
+// sprzed poprawki: cudza blokada trzymana 6 s wydłużyła KAŻDE żądanie do 5,7 s,
+// łącznie z /api/entries/timer, który niczego nie zapisuje.
+//
+// Tak właśnie 21.08.2026 aplikacja przestała odbierać połączenia (Cloudflare 522),
+// mimo że proces żył — pm2 nie odnotował ani jednego restartu.
 const globalForDb = globalThis;
+
+// Ile czekamy na cudzą blokadę zapisu. Wartość jest EKSPORTOWANA, bo
+// services/taskEntries.js skraca ją na czas sprzątania i musi mieć do czego wrócić.
+// To górny próg zamrożenia całego procesu na jedną kolizję — patrz komentarz przy
+// pragmie w createDb.
+export const DEFAULT_BUSY_MS = 3000;
 
 // Jednorazowe przeniesienie sekcji, które przed powstaniem tabeli Sections żyły
 // wyłącznie jako tekst w Users.section i ManagerSections.section (przypisanie
@@ -172,7 +184,7 @@ const createDb = () => {
   // całego serwera HTTP na jedną kolizję. Realnym konkurentem jest już tylko
   // `scripts/admin.js` odpalany ręcznie obok aplikacji (w procesie mamy jedno
   // połączenie), a jego zapisy trwają milisekundy — 3 s to i tak gruby zapas.
-  db.pragma("busy_timeout = 3000");
+  db.pragma(`busy_timeout = ${DEFAULT_BUSY_MS}`);
   db.pragma("journal_mode = WAL");
   // W trybie WAL NORMAL jest bezpieczne: przetrwa pad aplikacji i zabicie procesu,
   // traci najwyżej ostatnie transakcje przy nagłej utracie zasilania maszyny.
@@ -358,6 +370,11 @@ const createDb = () => {
   backfillSections(db);
   migrateEntrySeconds(db);
   migrateEntryProjectOptional(db);
+
+  // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
+  // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do
+  // stanu, który 21.08.2026 położył aplikację — patrz komentarz przy globalForDb.
+  logInfo("db", "połączenie otwarte", { path: dbPath });
 
   return db;
 };

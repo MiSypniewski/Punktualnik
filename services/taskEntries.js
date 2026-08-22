@@ -1,6 +1,6 @@
 import Joi from "joi";
 import dayjs from "dayjs";
-import db from "./db";
+import db, { DEFAULT_BUSY_MS } from "./db";
 import {
   TS_FORMAT,
   toStamp,
@@ -10,6 +10,7 @@ import {
   WORKDAY_START_HOUR,
   now as appNow,
 } from "./workday";
+import { logWarn } from "./log";
 
 // Wpisy czasu: "ile czasu i na czym zeszło".
 //
@@ -67,16 +68,38 @@ export const closeStaleEntries = (now = appNow()) =>
 // licznik: dwa niezależne dławiki po 60 s to nadal dwa zapisy na minutę.
 //
 // Licznik trzymamy na `globalThis` z tego samego powodu, co uchwyt bazy w db.js:
-// Next 12 wkleja ten moduł do bundla każdej trasy osobno, więc zmienna modułowa
-// dałaby tyle dławików, ile tras — czyli dokładnie to, czemu dławik ma zapobiegać.
+// Next 12 buduje osobne rejestry modułów dla stron i dla API, więc zmienna
+// modułowa dałaby dwa niezależne dławiki zamiast jednego.
 const SWEEP_EVERY_MS = 60_000;
 const globalForSweep = globalThis;
+
+// Sprzątanie jest NIEPILNE i nie ma prawa nikomu przeszkodzić.
+//
+// Na czas tej jednej operacji skracamy oczekiwanie na blokadę do 250 ms.
+// Domyślne 3 s dotyczy zapisów, na które ktoś czeka (start timera, odbicie
+// karty) — ale to jedyny zapis wykonywany przy zwykłym ODCZYCIE strony, a
+// better-sqlite3 czeka synchronicznie, więc każda taka sekunda to sekunda,
+// w której serwer nie odpowiada NIKOMU. Granica domykania to 3:00 w nocy;
+// jeśli baza jest akurat zajęta, spokojnie poczeka do następnej próby.
+const SWEEP_BUSY_MS = 250;
 
 export const sweepStaleEntries = () => {
   const nowMs = Date.now();
   if (nowMs - (globalForSweep.__punktualnikLastSweep ?? 0) < SWEEP_EVERY_MS) return;
   globalForSweep.__punktualnikLastSweep = nowMs;
-  closeStaleEntries();
+
+  db.pragma(`busy_timeout = ${SWEEP_BUSY_MS}`);
+  try {
+    closeStaleEntries();
+  } catch (error) {
+    // SQLITE_BUSY przy sprzątaniu to nie awaria — ktoś inny akurat pisze.
+    // Kluczowe, żeby NIE rzucać dalej: to wywołanie siedzi w getServerSideProps
+    // strony /zadania, więc wyjątek zamieniłby chwilową kolizję w błąd 500
+    // u użytkownika, który chciał tylko zobaczyć swoje zadania.
+    logWarn("taskEntries", "auto-domykanie pominięte (baza zajęta)", { code: error.code });
+  } finally {
+    db.pragma(`busy_timeout = ${DEFAULT_BUSY_MS}`);
+  }
 };
 
 // --- odczyt -----------------------------------------------------------------

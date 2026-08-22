@@ -188,10 +188,16 @@ synchroniczne jest każde zapytanie do bazy (`better-sqlite3` nie ma innego tryb
 
 **Dlaczego to ma znaczenie:** 21.08.2026 aplikacja przestała odpowiadać przy
 dwunastu jednoczesnych użytkownikach (Cloudflare 522), mimo że proces żył i pm2 nie
-odnotował restartu. Przyczyną było kilkanaście połączeń SQLite otwartych w jednym
-procesie (Next 12 buduje osobny bundle na trasę, a singleton połączenia był wyłączony
-w produkcji) i kolizje o blokadę zapisu, które przy synchronicznym API zamrażały
-cały serwer. Od tej pory połączenie jest jedno, a pętla zdarzeń jest mierzona.
+odnotował restartu. Przyczyną były dwa równoległe połączenia SQLite w jednym procesie
+(Next 12 ma osobne runtime'y dla stron i dla API, a singleton połączenia był wyłączony
+w produkcji) plus zapis wykonywany przy każdym wejściu na stronę. `better-sqlite3` jest
+synchroniczne, więc kolizja o blokadę zapisu zamraża **cały** serwer — także żądania,
+które niczego nie zapisują.
+
+Zmierzone na gałęzi sprzed poprawki: cudza blokada trzymana 6 s wydłużyła każde
+żądanie do 5,7 s. Po poprawce (jedno połączenie, `busy_timeout` 3 s, sprzątanie
+z limitem 250 ms i bez rzucania wyjątkiem) ta sama blokada daje 0,4 s i wpis
+`[warn] auto-domykanie pominięte` w logu.
 
 ## Zarządzanie użytkownikami (panel admina z CLI)
 
