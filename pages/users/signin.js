@@ -10,7 +10,9 @@ import Alert from "../../components/ui/alert";
 // w pages/api/auth/[...nextauth].js). Wcześniej użytkownik widział je na surowej
 // stronie /api/auth/error jako jedno angielskie słowo "Error".
 const ERROR_MESSAGES = {
-  CredentialsSignin: "Niepoprawny e-mail lub hasło.",
+  // CredentialsSignin celowo NIE ma tu własnego wpisu — authorize() zwraca null
+  // tak samo przy złym haśle, jak i przy koncie czekającym na aktywację, więc
+  // komunikat musi wspominać o obu (patrz DEFAULT_FAILURE niżej).
   SessionRequired: "Ta strona wymaga zalogowania.",
   // Configuration to najczęściej rozjechany NEXTAUTH_URL albo brak NEXTAUTH_SECRET
   // na serwerze — użytkownik nie ma jak tego naprawić, ale musi wiedzieć, że to
