@@ -14,6 +14,9 @@ const ERROR_MESSAGES = {
   // tak samo przy złym haśle, jak i przy koncie czekającym na aktywację, więc
   // komunikat musi wspominać o obu (patrz DEFAULT_FAILURE niżej).
   SessionRequired: "Ta strona wymaga zalogowania.",
+  // Rzucane przez services/authorizeUser.js, gdy nie udało się odczytać konta
+  // z bazy. Hasło użytkownika może być poprawne — problem jest po naszej stronie.
+  server_error: "Serwer chwilowo nie odpowiada. Odczekaj chwilę i spróbuj ponownie.",
   // Configuration to najczęściej rozjechany NEXTAUTH_URL albo brak NEXTAUTH_SECRET
   // na serwerze — użytkownik nie ma jak tego naprawić, ale musi wiedzieć, że to
   // nie jego wina i że warto to komuś zgłosić.
