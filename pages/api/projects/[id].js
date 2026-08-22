@@ -1,6 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { getProject, updateProject, setProjectActive, projectScope } from "../../../services/projects";
 import { canManageProjects } from "../../../services/roles";
+import { logApiError } from "../../../services/log";
 
 // Lista, nie obiekt — `in` przepuściłby własności odziedziczone z prototypu
 // (ten sam zabieg co w pages/api/overtime/[id].js).
@@ -63,6 +64,7 @@ export default async (req, res) => {
     const updated = updateProject(id, { name, client, color, sections: requested });
     return res.status(200).json({ status: "ok", project: updated });
   } catch (error) {
+    logApiError("api/projects/[id]", error, 422, { id, userID: token.userID });
     return res.status(422).json({ status: "not_updated", error: error.message });
   }
 };

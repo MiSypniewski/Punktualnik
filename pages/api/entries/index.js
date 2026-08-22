@@ -9,6 +9,7 @@ import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
+import { logApiError } from "../../../services/log";
 
 const ALLOWED_ACTIONS = ["start", "manual"];
 
@@ -130,6 +131,7 @@ export default async (req, res) => {
     return res.status(201).json({ status: "created", entry });
   } catch (error) {
     const status = CONFLICT_CODES.includes(error.code) ? 409 : 422;
+    logApiError("api/entries", error, status, { action, userID: token.userID });
     return res.status(status).json({ status: "not_created", error: error.code || "invalid", message: error.message });
   }
 };

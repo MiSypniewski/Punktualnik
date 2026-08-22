@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
+import { installRuntimeGuards } from "./runtime";
 
 // Lokalna baza SQLite. Ścieżkę można nadpisać zmienną SQLITE_PATH
 // (przydatne na Mikrusie, np. na wolumenie trwałym poza katalogiem aplikacji).
@@ -354,6 +355,10 @@ const createDb = () => {
 // Zapis na globalu bezwarunkowo — także w produkcji. Wcześniej stał tu warunek
 // `NODE_ENV !== "production"`, przez który na serwerze singleton w ogóle nie działał
 // i każda trasa otwierała własne połączenie. Patrz komentarz przy `globalForDb`.
+// Dozór nad procesem podpinamy tutaj, bo ten moduł wchodzi do każdego bundla
+// serwerowego i nigdy do klienta. Rejestracja jest idempotentna.
+installRuntimeGuards();
+
 const db = globalForDb.__punktualnikDb || createDb();
 globalForDb.__punktualnikDb = db;
 

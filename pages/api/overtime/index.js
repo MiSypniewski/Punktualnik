@@ -8,6 +8,7 @@ import { STATUS_KEYS } from "../../../services/overtimeKinds";
 import getUserData from "../../../services/getUserData";
 import { notifyNewOvertimeRequest } from "../../../services/notifyGChat";
 import { visibleSections } from "../../../services/scope";
+import { logApiError } from "../../../services/log";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -83,6 +84,7 @@ export default async (req, res) => {
 
       return res.status(201).json({ status: "created", request });
     } catch (error) {
+      logApiError("api/overtime", error, 422, { userID: token.userID });
       return res.status(422).json({ status: "not_created", error: error.message });
     }
   }
