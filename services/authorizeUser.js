@@ -1,13 +1,18 @@
 import db from "./db";
 import Joi from "joi";
-import crypto from "crypto";
+import { hashPassword, hashesEqual } from "./password";
 
 const schema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required(),
 });
 
-const findByEmail = db.prepare(`SELECT * FROM Users WHERE email = ?`);
+// Kolumny jawnie: `SELECT *` ciągnęło tu komplet danych konta przy każdej próbie
+// logowania. Hash i sól są potrzebne — reszta wraca do next-auth jako treść tokenu.
+const findByEmail = db.prepare(
+  `SELECT id, email, name, role, section, location, isActive, passwordHash, passwordSalt
+     FROM Users WHERE email = ?`
+);
 
 const authorizeUser = async (payload) => {
   const { email, password } = await schema.validateAsync(payload);
@@ -18,9 +23,9 @@ const authorizeUser = async (payload) => {
     return null;
   }
 
-  const passwordHash = crypto.pbkdf2Sync(password, user.passwordSalt, 2137, 256, `sha512`).toString(`hex`);
+  const passwordHash = await hashPassword(password, user.passwordSalt);
 
-  if (passwordHash !== user.passwordHash) {
+  if (!hashesEqual(passwordHash, user.passwordHash)) {
     return null;
   }
 

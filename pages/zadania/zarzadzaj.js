@@ -19,7 +19,7 @@ import { PencilIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
-import { closeStaleEntries } from "../../services/taskEntries";
+import { sweepStaleEntries } from "../../services/taskEntries";
 import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
@@ -45,8 +45,9 @@ export async function getServerSideProps(ctx) {
     return { notFound: true };
   }
 
-  // Żeby raport nie pomijał czasu wiszącego w zapomnianym timerze.
-  closeStaleEntries();
+  // Żeby raport nie pomijał czasu wiszącego w zapomnianym timerze. Dławione —
+  // ten widok odświeża się po każdej edycji wpisu (router.replace niżej).
+  sweepStaleEntries();
 
   // Filtry żyją w query stringu, więc widok da się odświeżyć i zalinkować —
   // ten sam wzorzec co w panelu nadgodzin.

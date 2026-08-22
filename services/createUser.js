@@ -1,7 +1,7 @@
 import db from "./db";
-import crypto from "crypto";
 import Joi from "joi";
 import { getSection } from "./sections";
+import { hashPassword, makeSalt } from "./password";
 
 const schema = Joi.object({
   email: Joi.string().email().required(),
@@ -43,8 +43,8 @@ const createUser = async (payload) => {
   }
   const sectionSlug = found.slug;
 
-  const passwordSalt = crypto.randomBytes(256).toString("hex");
-  const passwordHash = crypto.pbkdf2Sync(password, passwordSalt, 2137, 256, "sha512").toString("hex");
+  const passwordSalt = makeSalt();
+  const passwordHash = await hashPassword(password, passwordSalt);
 
   const info = insertUser.run({
     name,

@@ -3,7 +3,7 @@ import {
   startEntry,
   switchEntry,
   createManualEntry,
-  closeStaleEntries,
+  sweepStaleEntries,
 } from "../../../services/taskEntries";
 import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
@@ -88,7 +88,7 @@ export default async (req, res) => {
     }
   }
 
-  closeStaleEntries();
+  sweepStaleEntries();
 
   try {
     if (action === "start") {

@@ -1,7 +1,6 @@
 import getTime from "../../../services/getTime";
 import saveTimes from "../../../services/saveTime";
 import updateTime from "../../../services/updateTime";
-import { getSession } from "next-auth/react";
 import { getToken } from "next-auth/jwt";
 import getUserData from "../../../services/getUserData";
 import { canSeeUser } from "../../../services/scope";
@@ -11,12 +10,6 @@ dayjs.locale("pl");
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  // const session = await getSession({ req });
-  // console.log(`req :`, req);
-  // console.log(`res :`, res);
-  // if (!session) {
-  //   return res.status(401).json({ error: "not_authotized" });
-  // }
   const token = await getToken({ req });
   if (!token) {
     return res.status(401).json({ error: "not_authotized" });
@@ -71,7 +64,12 @@ export default async (req, res) => {
 
       break;
     }
-    default:
-      res.status(400);
+    default: {
+      // Wcześniej ta gałąź ustawiała sam status i nie kończyła odpowiedzi —
+      // żądanie wisiało otwarte do timeoutu klienta. Ten sam błąd poprawiono
+      // już w pages/api/users/index.js.
+      res.setHeader("Allow", "GET, POST, PUT");
+      return res.status(405).json({ error: "method_not_allowed" });
+    }
   }
 };

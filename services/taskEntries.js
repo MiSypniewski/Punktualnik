@@ -65,13 +65,17 @@ export const closeStaleEntries = (now = appNow()) =>
 //
 // Dławik siedzi TUTAJ, a nie w endpointach, żeby wszyscy wołający dzielili jeden
 // licznik: dwa niezależne dławiki po 60 s to nadal dwa zapisy na minutę.
+//
+// Licznik trzymamy na `globalThis` z tego samego powodu, co uchwyt bazy w db.js:
+// Next 12 wkleja ten moduł do bundla każdej trasy osobno, więc zmienna modułowa
+// dałaby tyle dławików, ile tras — czyli dokładnie to, czemu dławik ma zapobiegać.
 const SWEEP_EVERY_MS = 60_000;
-let lastSweep = 0;
+const globalForSweep = globalThis;
 
 export const sweepStaleEntries = () => {
   const nowMs = Date.now();
-  if (nowMs - lastSweep < SWEEP_EVERY_MS) return;
-  lastSweep = nowMs;
+  if (nowMs - (globalForSweep.__punktualnikLastSweep ?? 0) < SWEEP_EVERY_MS) return;
+  globalForSweep.__punktualnikLastSweep = nowMs;
   closeStaleEntries();
 };
 

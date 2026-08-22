@@ -1,7 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import dayjs from "dayjs";
 import { getByProject, getByUser, getEntries, getSummary } from "../../../services/entryStats";
-import { closeStaleEntries } from "../../../services/taskEntries";
+import { sweepStaleEntries } from "../../../services/taskEntries";
 import { canExportTasks } from "../../../services/roles";
 import { buildCsv, sendCsv, plNumber } from "../../../utils/csv";
 import { formatDuration, timePart, TASK_QUERY_MAX } from "../../../utils";
@@ -61,7 +61,7 @@ export default async (req, res) => {
     }
   }
 
-  closeStaleEntries();
+  sweepStaleEntries();
 
   // Zasięg sekcyjny bierzemy z tokenu, nigdy z zapytania: kierownik dostanie
   // swoje sekcje nawet wtedy, gdy jawnie poda userID kogoś spoza zasięgu.

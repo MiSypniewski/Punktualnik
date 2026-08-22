@@ -6,7 +6,18 @@ import Database from "better-sqlite3";
 // (przydatne na Mikrusie, np. na wolumenie trwałym poza katalogiem aplikacji).
 const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), "data", "punktualnik.sqlite");
 
-// W trybie dev Next.js przeładowuje moduły — trzymamy jedno połączenie na proces.
+// Jedno połączenie na proces — trzymane na `globalThis`, NIE w zmiennej modułu.
+//
+// To nie jest tylko wygoda dla trybu dev (gdzie Next przeładowuje moduły). Next 12
+// buduje osobny bundle serwerowy dla KAŻDEJ trasy i nie tworzy współdzielonych chunków,
+// więc ten plik trafia w całości do kilkunastu niezależnych rejestrów modułów webpacka.
+// Zmienna modułowa jest w każdym z nich osobna — bez `globalThis` dostalibyśmy tyle
+// połączeń `better-sqlite3` do jednego pliku, ile tras ktoś odwiedzi.
+//
+// A `better-sqlite3` jest synchroniczne: kolizja o blokadę zapisu między dwoma takimi
+// połączeniami zamraża CAŁY proces na `busy_timeout`. Tak właśnie 21.08.2026 aplikacja
+// przestała odbierać połączenia (Cloudflare 522), mimo że proces żył — pm2 nie
+// odnotował ani jednego restartu.
 const globalForDb = globalThis;
 
 // Jednorazowe przeniesienie sekcji, które przed powstaniem tabeli Sections żyły
@@ -155,8 +166,21 @@ const createDb = () => {
   // MUSI być pierwsze: gdy bazę otwiera kilka procesów naraz (workery `next build`,
   // build obok działającej aplikacji), inne połączenia czekają na zwolnienie locka
   // zamiast od razu rzucać SQLITE_BUSY na PRAGMA journal_mode/CREATE TABLE.
-  db.pragma("busy_timeout = 10000");
+  //
+  // 3 s, nie 10: czekanie jest SYNCHRONICZNE, więc ta liczba to górny próg zamrożenia
+  // całego serwera HTTP na jedną kolizję. Realnym konkurentem jest już tylko
+  // `scripts/admin.js` odpalany ręcznie obok aplikacji (w procesie mamy jedno
+  // połączenie), a jego zapisy trwają milisekundy — 3 s to i tak gruby zapas.
+  db.pragma("busy_timeout = 3000");
   db.pragma("journal_mode = WAL");
+  // W trybie WAL NORMAL jest bezpieczne: przetrwa pad aplikacji i zabicie procesu,
+  // traci najwyżej ostatnie transakcje przy nagłej utracie zasilania maszyny.
+  // W zamian znika fsync przy każdym commicie — na współdzielonym dysku Mikrusa
+  // to najdroższa część zwykłego odbicia karty.
+  db.pragma("synchronous = NORMAL");
+  // Bez tego WAL rósł w nieskończoność (436 KB przy bazie 114 KB): domyślny próg
+  // 1000 stron jest dla tak małej bazy nieosiągalny, więc checkpoint nigdy nie ruszał.
+  db.pragma("wal_autocheckpoint = 400");
   db.pragma("foreign_keys = ON");
 
   db.exec(`
@@ -327,9 +351,10 @@ const createDb = () => {
   return db;
 };
 
+// Zapis na globalu bezwarunkowo — także w produkcji. Wcześniej stał tu warunek
+// `NODE_ENV !== "production"`, przez który na serwerze singleton w ogóle nie działał
+// i każda trasa otwierała własne połączenie. Patrz komentarz przy `globalForDb`.
 const db = globalForDb.__punktualnikDb || createDb();
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__punktualnikDb = db;
-}
+globalForDb.__punktualnikDb = db;
 
 export default db;
