@@ -1,9 +1,9 @@
 import { getToken } from "next-auth/jwt";
 import dayjs from "dayjs";
-import { getByProject, getByUser, getEntries, getSummary } from "../../../services/entryStats";
+import { getByProject, getByUser, getSummary, iterateAllEntries } from "../../../services/entryStats";
 import { sweepStaleEntries } from "../../../services/taskEntries";
 import { canExportTasks } from "../../../services/roles";
-import { buildCsv, sendCsv, plNumber } from "../../../utils/csv";
+import { buildCsv, sendCsv, streamCsv, plNumber } from "../../../utils/csv";
 import { formatDuration, timePart, TASK_QUERY_MAX } from "../../../utils";
 import { visibleSections } from "../../../services/scope";
 
@@ -129,39 +129,44 @@ export default async (req, res) => {
     return sendCsv(res, `zadania_porownanie_${stamp}.csv`, csv);
   }
 
-  // "all", nie domyślne "view": eksport ma dać komplet, nie pierwsze 500 wierszy.
-  const { rows } = getEntries(filters, "all");
+  // Eksport szczegółowy jest jedynym bez górnego ograniczenia liczby wierszy
+  // (obiecuje komplet), więc idzie STRUMIENIOWO: wiersze czytane leniwie prosto
+  // z bazy i wypychane porcjami, zamiast sklejania całego pliku w pamięci.
+  // Przy 1 GB bez swapu to różnica między działającym eksportem a cichym OOM.
+  const toCells = (r) => [
+    dayjs(r.data).format("YYYY-MM-DD"),
+    r.surname,
+    r.name,
+    r.section,
+    r.projectName || "(bez projektu)",
+    r.projectClient || "",
+    r.description,
+    timePart(r.startedAt),
+    timePart(r.endedAt),
+    ...hoursPair(r.seconds),
+    r.autoClosed ? "tak" : "nie",
+    r.editedByName || "",
+  ];
 
-  const csv = buildCsv(
-    [
-      "Data",
-      "Nazwisko",
-      "Imię",
-      "Sekcja",
-      "Projekt",
-      "Klient",
-      "Zadanie",
-      "Start",
-      "Koniec",
-      "Czas [h]",
-      "Czas",
-      "Domknięty automatycznie",
-      "Poprawił",
-    ],
-    rows.map((r) => [
-      dayjs(r.data).format("YYYY-MM-DD"),
-      r.surname,
-      r.name,
-      r.section,
-      r.projectName || "(bez projektu)",
-      r.projectClient || "",
-      r.description,
-      timePart(r.startedAt),
-      timePart(r.endedAt),
-      ...hoursPair(r.seconds),
-      r.autoClosed ? "tak" : "nie",
-      r.editedByName || "",
-    ])
-  );
-  return sendCsv(res, `zadania_${stamp}.csv`, csv);
+  const header = [
+    "Data",
+    "Nazwisko",
+    "Imię",
+    "Sekcja",
+    "Projekt",
+    "Klient",
+    "Zadanie",
+    "Start",
+    "Koniec",
+    "Czas [h]",
+    "Czas",
+    "Domknięty automatycznie",
+    "Poprawił",
+  ];
+
+  function* cells() {
+    for (const row of iterateAllEntries(filters)) yield toCells(row);
+  }
+
+  return streamCsv(res, `zadania_${stamp}.csv`, header, cells());
 };

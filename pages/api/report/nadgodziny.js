@@ -71,13 +71,18 @@ export default async (req, res) => {
 
   // Pracownik pobiera wyłącznie własną historię (zawężenie po userID powyżej),
   // więc zasięg sekcyjny stosujemy tylko kierownikowi.
-  const rows = getOvertimeRequests({
-    userID: effectiveUserID,
-    status,
-    from,
-    to,
-    ...(canSeeAll ? { sections: visibleSections(token) } : {}),
-  });
+  // limit: null — eksport obiecuje komplet, w odróżnieniu od widoków, które
+  // przycinają listę do OVERTIME_LIST_LIMIT.
+  const rows = getOvertimeRequests(
+    {
+      userID: effectiveUserID,
+      status,
+      from,
+      to,
+      ...(canSeeAll ? { sections: visibleSections(token) } : {}),
+    },
+    { limit: null }
+  );
 
   const header = [
     "Data",

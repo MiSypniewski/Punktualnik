@@ -337,6 +337,16 @@ const createDb = () => {
 
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
+
+    -- Indeks NA WYRAŻENIU, nie na kolumnie — i to jest tu sedno.
+    --
+    -- Times.data trzyma pełne ISO ze strefą (2026-05-18T03:00:00+02:00), więc
+    -- raporty filtrują po substr(data,1,10). Wywołanie funkcji na kolumnie
+    -- unieważnia zwykły indeks: SQLite nie ma jak porównać zakresu i czyta całą
+    -- tabelę. Ten indeks przechowuje dokładnie to wyrażenie, którego szuka
+    -- services/getTimesReport.js i services/entryStats.js, więc oba wracają
+    -- na wyszukiwanie po zakresie.
+    CREATE INDEX IF NOT EXISTS idx_times_datepart ON Times(substr(data,1,10));
     CREATE INDEX IF NOT EXISTS idx_users_section      ON Users(section);
     CREATE INDEX IF NOT EXISTS idx_overtime_user      ON Overtime(userID, data);
     CREATE INDEX IF NOT EXISTS idx_overtime_status    ON Overtime(status);
