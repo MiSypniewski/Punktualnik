@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { promisify } from "util";
 
 // Jedno miejsce na parametry hasła. Wcześniej te same cztery liczby były

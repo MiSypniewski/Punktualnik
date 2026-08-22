@@ -63,6 +63,7 @@ Szczegóły: [Sekcje (działy)](#sekcje-działy).
 | `npm run build` | build produkcyjny — **wymagany po każdej zmianie kodu** |
 | `npm run start` | uruchamia zbudowaną aplikację |
 | `npm run lint` | ESLint |
+| `node scripts/loadtest.js` | test obciążeniowy uruchomionej aplikacji (patrz niżej) |
 | `npm run migrate:airtable -- --dry-run` | jednorazowa migracja kont z Airtable (podgląd) |
 
 Aplikację prowadzi `pm2`. Pełna sekwencja: [Wdrożenie na Mikrus](#wdrożenie-na-mikrus).
@@ -107,6 +108,7 @@ Produkcja stoi na **Mikrusie 2.1** (1 GB RAM, 10 GB dysku).
    żeby baza przeżyła redeploy/rebuild.
 2. `pm2 stop` → `npm run build` → `pm2 restart` → `pm2 save`.
    `npm ci` tylko wtedy, gdy zmienił się `package.json`/lock.
+   Konfigurację procesu opisuje `ecosystem.config.js` — patrz [pm2](#pm2--konfiguracja-i-logi).
 3. **Kontener nie ma swapu**, więc OOM ubija proces bez ostrzeżenia. Stąd `pm2 stop`
    przed buildem — żeby build nie konkurował o pamięć z działającą aplikacją.
    W 1 GB `next build` mieści się bez „amfetaminy” (ta była konieczna na Mikrusie 1.0
@@ -120,6 +122,76 @@ Produkcja stoi na **Mikrusie 2.1** (1 GB RAM, 10 GB dysku).
 Nowe tabele powstają same przy pierwszym starcie — nie ma osobnego kroku
 migracyjnego. Po zmianie ról pamiętaj, że **rola siedzi w JWT**: użytkownik musi
 się wylogować i zalogować, żeby zobaczyć nowe pozycje w menu.
+
+### pm2 — konfiguracja i logi
+
+Proces opisuje `ecosystem.config.js` w katalogu aplikacji. **Pierwsze uruchomienie
+po wdrożeniu tego pliku wymaga usunięcia starego wpisu**, inaczej pm2 zrobi drugi
+proces obok istniejącego:
+
+```bash
+pm2 delete Punktualnik
+pm2 start ecosystem.config.js
+pm2 save
+```
+
+Potem wystarcza `pm2 restart Punktualnik`.
+
+Konfiguracja pilnuje trzech rzeczy, których wcześniej nie było: znaczników czasu
+w logach, jednej instancji (klaster oznaczałby kilka procesów piszących do tego
+samego pliku SQLite — patrz niżej) i restartu przy 700 MB, żeby OOM-killer nie
+ubił procesu bez śladu.
+
+Logi rosną bez końca, a dysk ma 10 GB — **rotację włącz raz**:
+
+```bash
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 14
+```
+
+### Test obciążeniowy
+
+`scripts/loadtest.js` symuluje N równoległych przeglądarek chodzących po
+najcięższych stronach i mierzy p50/p95/max czasu odpowiedzi. Bez zależności,
+działa na uruchomionej aplikacji (dev lub produkcyjnej):
+
+```bash
+npm run build && npm run start          # w jednym terminalu
+node scripts/loadtest.js --users 12     # w drugim
+```
+
+Domyślnie bije bez sesji, więc mierzy koszt SSR do momentu odmowy. Żeby zmierzyć
+realne strony, podaj ciastko zalogowanej sesji (DevTools → Application → Cookies):
+
+```bash
+node scripts/loadtest.js --users 12 --cookie "next-auth.session-token=..."
+```
+
+Liczy się **max i p95**, nie średnia: przy jednym procesie z synchroniczną bazą
+średnia potrafi wyglądać świetnie, podczas gdy co dwudziesty użytkownik czeka
+kilka sekund. Wszystko powyżej sekundy warto zestawić z `/api/health`.
+
+### Kiedy „aplikacja muli” — co sprawdzić
+
+| Komenda | Czego szukać |
+|---|---|
+| `pm2 describe Punktualnik` | `restarts` (powinno stać w miejscu) i zużycie pamięci |
+| `pm2 logs Punktualnik --lines 200 --nostream` | wpisy `[error]` i `[warn]` |
+| `pm2 logs Punktualnik \| grep eventloop` | ostrzeżenia o zablokowanej pętli zdarzeń |
+| `/api/health` w przeglądarce (po zalogowaniu) | `eventLoop.maxLagMs` i `db.probeMs` |
+
+`eventLoop.maxLagMs` to najdłuższa chwila od startu procesu, w której serwer nie
+odpowiadał **nikomu**. Kilkanaście milisekund to norma. Wartości rzędu sekund
+znaczą, że coś synchronicznego blokuje wszystkich — a przy tej aplikacji
+synchroniczne jest każde zapytanie do bazy (`better-sqlite3` nie ma innego trybu).
+
+**Dlaczego to ma znaczenie:** 21.08.2026 aplikacja przestała odpowiadać przy
+dwunastu jednoczesnych użytkownikach (Cloudflare 522), mimo że proces żył i pm2 nie
+odnotował restartu. Przyczyną było kilkanaście połączeń SQLite otwartych w jednym
+procesie (Next 12 buduje osobny bundle na trasę, a singleton połączenia był wyłączony
+w produkcji) i kolizje o blokadę zapisu, które przy synchronicznym API zamrażały
+cały serwer. Od tej pory połączenie jest jedno, a pętla zdarzeń jest mierzona.
 
 ## Zarządzanie użytkownikami (panel admina z CLI)
 
