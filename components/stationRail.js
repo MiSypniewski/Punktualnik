@@ -13,6 +13,7 @@ import {
   canTrackTasks,
   canManageProjects,
   canSeeTeamTasks,
+  canApproveLeave,
 } from "../services/roles";
 
 // Pasek stacyjny — jedyny element nawigacyjny aplikacji.
@@ -34,12 +35,19 @@ const navItems = (user) => {
 
   items.push({ href: "/nadgodziny", match: "/nadgodziny", label: "Nadgodziny" });
 
+  // Kiosk dostaje tę pozycję razem z resztą: konto jest wprawdzie współdzielone,
+  // ale strona pokazuje wyłącznie własne wnioski, a tych kiosk po prostu nie ma
+  // — zobaczy pustą historię, nie cudze dane.
+  items.push({ href: "/urlopy", match: "/urlopy", label: "Urlopy" });
+
   if (canSeeTeamTasks(role))
     items.push({ href: "/zadania/zarzadzaj", match: "/zadania/zarzadzaj", label: "Raport zadań" });
   if (canManageProjects(role))
     items.push({ href: "/zadania/projekty", match: "/zadania/projekty", label: "Projekty" });
   if (canApproveOvertime(role))
     items.push({ href: "/nadgodziny/zarzadzaj", match: "/nadgodziny/zarzadzaj", label: "Wnioski" });
+  if (canApproveLeave(role))
+    items.push({ href: "/urlopy/zarzadzaj", match: "/urlopy/zarzadzaj", label: "Nieobecności" });
   if (canExportTimes(role))
     items.push({ href: "/utils/eksport", match: "/utils/eksport", label: "Eksport" });
 
