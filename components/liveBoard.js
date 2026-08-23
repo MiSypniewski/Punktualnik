@@ -5,6 +5,7 @@ import { ProjectMark } from "./projectColors";
 import LiveDot from "./liveDot";
 import Plate, { PlateHeader } from "./ui/plate";
 import { formatDuration, hhmm } from "../utils";
+import { absenceKindShort } from "../services/absenceKinds";
 
 // Sekcja "Teraz w toku" na górze raportu kierownika.
 //
@@ -156,18 +157,25 @@ export default function LiveBoard({ initial, currentUserID }) {
                 {fullName(u)}
                 {Number(u.id) === Number(currentUserID) && " (Ty)"}
                 <span className="text-faint">
-                  {u.lastEndedAt
+                  {/* Nieobecność bierze górę nad "brak wpisów": to jest ODPOWIEDŹ
+                      na pytanie, czemu ktoś nic dziś nie zaraportował. */}
+                  {/* Skrót zostaje taki, jak w słowniku — "L4" pisane małą
+                      literą ("l4") czyta się jak literówka. */}
+                  {u.absenceKind
+                    ? ` — ${absenceKindShort(u.absenceKind)}`
+                    : u.lastEndedAt
                     ? ` — ostatni wpis ${hhmm(u.lastEndedAt)}, dziś ${formatDuration(u.seconds)}`
                     : " — brak wpisów dzisiaj"}
                 </span>
               </span>
             ))}
           </p>
-          {/* Aplikacja nie wie nic o urlopach ani zwolnieniach — bez tego zdania
-              lista czyta się jak spis obiboków, a zwykle jest spisem nieobecnych. */}
+          {/* Bez tego zdania lista czyta się jak spis obiboków. Zatwierdzone
+              urlopy i zwolnienia aplikacja już zna i podpisuje wprost przy
+              nazwisku — zostaje to, czego nadal nie wie. */}
           <p className="mt-1 text-xs text-muted">
-            Brak timera nie znaczy braku pracy — aplikacja nie zna urlopów, zwolnień ani zadań
-            raportowanych ręcznie po fakcie.
+            Brak timera nie znaczy braku pracy — zadania raportowane ręcznie po fakcie pojawią się
+            tu później.
           </p>
         </div>
       )}
