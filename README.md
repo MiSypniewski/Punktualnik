@@ -466,6 +466,38 @@ Wpis dostaje flagę „domknięty automatycznie" i żółty pasek; edycja jest
 potwierdzeniem i flagę zdejmuje. Nie ma tu crona — domykanie dzieje się przy okazji
 wejścia na stronę, więc działa też na Mikrusie.
 
+**Powtórzenia da się zwinąć — „Grupuj takie same zadania”.** Checkbox nad listą
+dni skleja wpisy o **tym samym opisie i tym samym projekcie** w jeden wiersz
+z licznikiem („3”), łącznym wymiarem i rozpiętością godzin; kliknięcie rozwija
+składowe, każdą z pełnym kompletem przycisków. Ludzie wracają w ciągu dnia do tej
+samej czynności po kilka razy, a dzień z kilkunastoma wpisami jest ścianą tekstu,
+w której nie widać, ile łącznie na czym zeszło. Domyślnie **wyłączone** — to
+dodatek do widoku, nie nowy widok.
+
+Trzy rzeczy warte zapamiętania:
+
+- **Godziny na wierszu grupy to ROZPIĘTOŚĆ, nie ciągła praca.** „16:51–17:46”
+  przy wymiarze 12 minut znaczy, że między wpisami było coś innego. Wymiar zawsze
+  jest sumą składowych, nigdy różnicą krańców — wyjaśnia to podpowiedź pod kursorem.
+- **Suma dnia w nagłówku się nie zmienia.** Liczy się ją z płaskiej listy, przed
+  grupowaniem — checkbox nie ma prawa ruszyć liczby, którą ktoś przepisuje do
+  zestawienia.
+- **Wpisy domknięte automatycznie zostają osobno**, także przy włączonym
+  grupowaniu. Mają własne ostrzeżenie i bursztynowy pasek, a zwinięcie schowałoby
+  właśnie ten sygnał; to zarazem jedyne wpisy, które bywają bez projektu i opisu.
+
+Na wierszu grupy jest **wyłącznie „wznów”**. Poprawka i kasowanie dotyczą
+konkretnych godzin, więc żyją przy wpisach, po rozwinięciu — kosz na grupie
+kasowałby jednym kliknięciem pół dnia pracy, bez cofnięcia.
+
+Ustawienie siedzi w `localStorage` (klucz `zadania:grupuj`), jak motyw — jest
+ustawieniem widoku, nie daną pracownika, więc nie ma go w bazie ani w raportach.
+Płynie z tego jedno: **żyje w jednej przeglądarce** (na tablecie trzeba je włączyć
+osobno), a po wejściu na stronę pierwsza klatka jest niepogrupowana, bo serwer nie
+zna tej wartości w chwili renderu. Sama logika zwijania to czysta funkcja
+w `utils/groupEntries.js` — grupuje po tej samej parze (projekt, opis), po której
+`services/entrySuggestions.js` buduje kafelki „wznów”.
+
 **Wiersz wpisu ma stałą prawą krawędź.** Godziny, wymiar i przyciski
 ▶ / ✎ / 🗑 stoją w jednej kolumnie niezależnie od długości opisu — długi opis
 zawija się na kolejne linie, zamiast wypychać resztę wiersza niżej. Wcześniej
