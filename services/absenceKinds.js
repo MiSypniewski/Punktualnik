@@ -29,6 +29,19 @@ export const POOL_KINDS = ABSENCE_KIND_KEYS.filter((k) => ABSENCE_KINDS[k].usesP
 
 export const absenceKindLabel = (kind) => ABSENCE_KINDS[kind]?.label ?? kind;
 
+// Skróty na kafelek kiosku — tam na "Opieka nad dzieckiem lub członkiem rodziny"
+// nie ma miejsca, a kafelek ma się czytać z drugiego końca hali.
+const SHORT = {
+  vacation: "Urlop",
+  on_demand: "Na żądanie",
+  sick_leave: "L4",
+  unpaid: "Bezpłatny",
+  care: "Opieka",
+  occasional: "Okolicznościowy",
+};
+
+export const absenceKindShort = (kind) => SHORT[kind] ?? absenceKindLabel(kind);
+
 export const usesPool = (kind) => Boolean(ABSENCE_KINDS[kind]?.usesPool);
 
 export const isSelfService = (kind) => Boolean(ABSENCE_KINDS[kind]?.selfService);

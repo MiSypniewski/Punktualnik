@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
+import { absenceKindShort } from "../services/absenceKinds";
 import { DifferenceTime, Timer } from "../utils";
 import LiveDot from "./liveDot";
 
@@ -48,6 +49,21 @@ const STATES = {
     label: "Niepełna dniówka",
     plate: "bg-danger-soft border-danger/60 text-danger-strong",
     caption: { punch: "Przepracowano", watch: "Przepracowano" },
+  },
+  // Nieobecność zatwierdzona na dziś — urlop, L4, opieka.
+  //
+  // Paleta NEUTRALNA, świadomie. Bursztyn w tym systemie znaczy wyłącznie
+  // „teraz”, zieleń „przepracowane”, czerwień „za krótko” — nieobecność nie jest
+  // żadnym z tych trzech. Od „Nie odbito” odróżnia ją ramka ciągła zamiast
+  // kreskowanej: kreska znaczy „miejsce jeszcze puste”, a tu nie ma na co czekać.
+  //
+  // Odbicie zostaje MOŻLIWE: ktoś wraca z L4 dzień wcześniej albo wpada na dwie
+  // godziny w środku urlopu. Kafelek informuje, nie blokuje — od pilnowania
+  // zgodności jest kierownik, nie ekran na ścianie.
+  absence: {
+    label: "Nieobecność",
+    plate: "bg-raised border-line-strong text-muted",
+    caption: { punch: "Dotknij, jeśli mimo to jesteś w pracy", watch: "Nieobecny" },
   },
 };
 
@@ -200,9 +216,33 @@ const Card = ({ data }) => {
     skipInitialSave.current = false;
   }, [status, overTime]);
 
-  const stateKey = status === "finishWork" ? (overTime ? "finishFull" : "finishShort") : status;
-  const state = STATES[stateKey] || STATES.wait;
   const punched = status !== "wait";
+
+  // Nieobecność bierze górę TYLKO dopóki karta nie została odbita. Kto przyszedł
+  // mimo urlopu, ten jest w pracy i kafelek ma pokazywać jego czas — sam
+  // znacznik urlopu zostaje wtedy w rogu, jako informacja.
+  const absence = data.absence;
+  const stateKey =
+    absence && !punched
+      ? "absence"
+      : status === "finishWork"
+      ? overTime
+        ? "finishFull"
+        : "finishShort"
+      : status;
+  const state = STATES[stateKey] || STATES.wait;
+
+  // Nagłówek nieobecnego mówi WPROST, co to za nieobecność: "Nieobecność" jest
+  // prawdziwe, ale bezużyteczne — kierownik przy tablicy chce wiedzieć, czy to
+  // urlop, czy zwolnienie.
+  const label = stateKey === "absence" ? absenceKindShort(absence.kind) : state.label;
+
+  // Do kiedy — żeby nie trzeba było sprawdzać w panelu, czy ktoś wraca jutro,
+  // czy za dwa tygodnie.
+  const caption =
+    stateKey === "absence"
+      ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${dayjs(absence.dateTo).format("DD.MM")}`
+      : state.caption[canPunch ? "punch" : "watch"];
 
   return (
     <div
@@ -228,11 +268,20 @@ const Card = ({ data }) => {
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-signage">
           {state.live && <LiveDot tone="current" />}
-          {state.label}
+          {label}
         </span>
-        {punched && (
-          <span className="font-mono text-xs tabular-nums opacity-80">od {dayjs(startTime).format("HH:mm")}</span>
-        )}
+        <span className="flex items-center gap-2">
+          {/* Znacznik zostaje także po odbiciu karty: „w pracy, choć miał być na
+              urlopie” to dokładnie ta sytuacja, o której kierownik ma wiedzieć. */}
+          {absence && punched && (
+            <span className="rounded-sm border border-current px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-signage opacity-80">
+              {absenceKindShort(absence.kind)}
+            </span>
+          )}
+          {punched && (
+            <span className="font-mono text-xs tabular-nums opacity-80">od {dayjs(startTime).format("HH:mm")}</span>
+          )}
+        </span>
       </div>
 
       <div className="mt-3">
@@ -246,7 +295,7 @@ const Card = ({ data }) => {
         <p className="font-mono text-3xl sm:text-4xl font-medium tabular-nums leading-none">
           {displayTime || "--:--:--"}
         </p>
-        <p className="mt-1.5 text-xs opacity-80">{canPunch ? state.caption.punch : state.caption.watch}</p>
+        <p className="mt-1.5 text-xs opacity-80">{caption}</p>
       </div>
     </div>
   );

@@ -6,6 +6,8 @@ import getSectionTime from "../../services/getSectionTime";
 import { canSeeSection } from "../../services/scope";
 import getUsers from "../../services/getUsers";
 import { getSection } from "../../services/sections";
+import getAbsencesForDay from "../../services/getAbsencesForDay";
+import { workDay } from "../../services/workday";
 import useSWR from "swr";
 import BaseLayout from "../../components/baseLayout";
 import Card from "../../components/card";
@@ -102,6 +104,21 @@ export const getServerSideProps = async (context) => {
   // Etykieta działu do nagłówka tablicy — slug (`spedycja`) jest kluczem
   // technicznym, a na ścianie ma stać nazwa dla ludzi.
   const sectionRow = getSection(context.params.id);
+
+  // Kto jest dziś nieobecny. workDay() z services/workday.js, a NIE `toDay`
+  // wyżej: daty nieobecności to gołe 'YYYY-MM-DD' (jak w Overtime), podczas gdy
+  // Times.data trzyma pełne ISO z offsetem przypięte do 03:00. Dwa różne formaty
+  // w jednej funkcji są mylące, ale zamiana ich tutaj oznaczałaby ruszenie
+  // dopasowania kart — a to najstarsza i najmniej pilnowana część aplikacji.
+  const absences = getAbsencesForDay(context.params.id, workDay());
+
+  // Nieobecność dokładamy do gotowych kart, zamiast wplatać ją w scalanie wyżej:
+  // dotyczy zarówno tych, którzy nie odbili karty, jak i tych, którzy odbili
+  // (ktoś wraca z L4 wcześniej albo wpada na dwie godziny).
+  newCardData.forEach((card) => {
+    const absence = absences[card.userID];
+    if (absence) card.absence = absence;
+  });
 
   return {
     props: {
