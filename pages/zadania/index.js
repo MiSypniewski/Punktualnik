@@ -16,7 +16,7 @@ import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { listProjects, projectScope } from "../../services/projects";
-import { getEntriesForUser, getRunningEntry, closeStaleEntries } from "../../services/taskEntries";
+import { getEntriesForUser, getRunningEntry, sweepStaleEntries } from "../../services/taskEntries";
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
 import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
@@ -38,7 +38,9 @@ export async function getServerSideProps(ctx) {
   }
 
   // Zapomniany timer domykamy przy wejściu na stronę — crona na Mikrusie nie ma.
-  closeStaleEntries();
+  // Wersja dławiona (raz na minutę na proces): granica domykania to 3:00, więc
+  // branie blokady zapisu przy KAŻDYM wejściu było czystą stratą.
+  sweepStaleEntries();
 
   const today = workDay();
   const suggestions = getSuggestions(token.userID);

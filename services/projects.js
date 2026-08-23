@@ -38,10 +38,48 @@ const stmtAddSection = db.prepare(
 );
 const stmtNameTaken = db.prepare(`SELECT id FROM Projects WHERE name = ? COLLATE NOCASE AND id <> ?`);
 
+// Pojedynczy projekt — jedno dodatkowe zapytanie o jego sekcje.
 const toRow = (row) =>
   row
     ? { ...row, isActive: Boolean(row.isActive), sections: stmtSectionsOf.all(row.id).map((r) => r.section) }
     : undefined;
+
+// Lista projektów — sekcje dla WSZYSTKICH naraz, jednym zapytaniem.
+//
+// Wcześniej listy też szły przez toRow(), czyli osobne zapytanie o sekcje dla
+// każdego projektu (klasyczne N+1). Bolało to podwójnie, bo panel kierownika
+// woła listProjects raz na siebie i raz na KAŻDĄ swoją sekcję — przy pięciu
+// sekcjach i dwudziestu projektach robiło się z tego ponad sto zapytań na jedno
+// wejście na stronę, a każde z nich blokuje pętlę zdarzeń (better-sqlite3 jest
+// synchroniczne).
+const stmtSectionsOfMany = new Map();
+const sectionsForAll = (ids) => {
+  const grouped = new Map(ids.map((id) => [id, []]));
+  if (ids.length === 0) return grouped;
+
+  if (!stmtSectionsOfMany.has(ids.length)) {
+    const holes = Array.from({ length: ids.length }, () => "?").join(", ");
+    stmtSectionsOfMany.set(
+      ids.length,
+      db.prepare(`SELECT projectID, section FROM ProjectSections
+                   WHERE projectID IN (${holes}) ORDER BY section`)
+    );
+  }
+
+  for (const r of stmtSectionsOfMany.get(ids.length).all(...ids)) {
+    grouped.get(r.projectID)?.push(r.section);
+  }
+  return grouped;
+};
+
+const toRows = (rows) => {
+  const sections = sectionsForAll(rows.map((r) => r.id));
+  return rows.map((row) => ({
+    ...row,
+    isActive: Boolean(row.isActive),
+    sections: sections.get(row.id) ?? [],
+  }));
+};
 
 /**
  * Sekcje, których projekty wolno temu użytkownikowi WYBIERAĆ.
@@ -103,7 +141,7 @@ export const listProjects = ({ sections, includeArchived = false } = {}) => {
           ORDER BY p.name COLLATE NOCASE`
       )
       .all();
-    return all.map(toRow);
+    return toRows(all);
   }
 
   const params = {};
@@ -111,7 +149,7 @@ export const listProjects = ({ sections, includeArchived = false } = {}) => {
     params[`sec${i}`] = String(s);
   });
 
-  return getListStatement(sections.length, includeArchived).all(params).map(toRow);
+  return toRows(getListStatement(sections.length, includeArchived).all(params));
 };
 
 export const getProject = (id) => toRow(stmtGet.get(Number(id)));

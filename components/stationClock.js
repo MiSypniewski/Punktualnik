@@ -15,6 +15,12 @@ dayjs.locale("pl");
 // zaczyna się o 3:00 (services/workday.js), a kiosk potrafi stać otwarty tydzień
 // i pokazywałby wczorajszą tablicę. Poprzednia wersja trzymała ten interwał
 // w komponencie nawigacji BEZ sprzątania — wisiał po odmontowaniu.
+// Rozrzut przeładowania o 03:30. Bez niego KAŻDA otwarta przeglądarka trafia
+// w tę samą sekundę i wszystkie naraz proszą serwer o pełny render SSR — a to
+// jeden proces Node z synchroniczną bazą. Kilka minut rozrzutu nikomu nie robi
+// różnicy (tablica i tak jest wtedy pusta), a serwerowi oszczędza szczytu.
+const RELOAD_SPREAD_MS = 120_000;
+
 const StationClock = () => {
   const [now, setNow] = useState(null);
   const router = useRouter();
@@ -22,13 +28,23 @@ const StationClock = () => {
   useEffect(() => {
     setNow(dayjs());
 
+    // Losowane raz na zamontowanie: każda karta dostaje własne opóźnienie.
+    let reloadTimer = null;
+    const scheduleReload = () => {
+      if (reloadTimer) return;
+      reloadTimer = setTimeout(() => router.reload(), Math.random() * RELOAD_SPREAD_MS);
+    };
+
     const handle = setInterval(() => {
       const tick = dayjs();
-      if (tick.format("HH:mm:ss") === "03:30:00") router.reload();
+      if (tick.format("HH:mm:ss") === "03:30:00") scheduleReload();
       setNow(tick);
     }, 1000);
 
-    return () => clearInterval(handle);
+    return () => {
+      clearInterval(handle);
+      if (reloadTimer) clearTimeout(reloadTimer);
+    };
   }, [router]);
 
   if (now === null) {

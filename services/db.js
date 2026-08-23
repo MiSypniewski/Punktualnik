@@ -1,13 +1,37 @@
 import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
+import { installRuntimeGuards } from "./runtime";
+import { logInfo } from "./log";
 
 // Lokalna baza SQLite. Ścieżkę można nadpisać zmienną SQLITE_PATH
 // (przydatne na Mikrusie, np. na wolumenie trwałym poza katalogiem aplikacji).
 const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), "data", "punktualnik.sqlite");
 
-// W trybie dev Next.js przeładowuje moduły — trzymamy jedno połączenie na proces.
+// Jedno połączenie na proces — trzymane na `globalThis`, NIE w zmiennej modułu.
+//
+// To nie jest tylko wygoda dla trybu dev (gdzie Next przeładowuje moduły). Next 12
+// buduje DWA niezależne runtime'y webpacka: jeden dla stron (`webpack-runtime.js`),
+// drugi dla tras API (`webpack-api-runtime.js`). Mają rozłączne rejestry modułów,
+// więc ten plik wykonuje się w procesie dwa razy — sprawdzone: `grep -l __punktualnikDb
+// .next/server/chunks` daje dwa chunki, a `lsof` na działającym procesie pokazywał
+// dwa uchwyty do pliku bazy. Zmienna modułowa jest w każdym z nich osobna.
+//
+// Dwa połączenia wystarczą: `better-sqlite3` jest synchroniczne, więc kolizja o blokadę
+// zapisu między nimi zamraża CAŁY proces na `busy_timeout` — i to nie tylko dla
+// piszącego, ale dla wszystkich, także dla czystych odczytów. Zmierzone na gałęzi
+// sprzed poprawki: cudza blokada trzymana 6 s wydłużyła KAŻDE żądanie do 5,7 s,
+// łącznie z /api/entries/timer, który niczego nie zapisuje.
+//
+// Tak właśnie 21.08.2026 aplikacja przestała odbierać połączenia (Cloudflare 522),
+// mimo że proces żył — pm2 nie odnotował ani jednego restartu.
 const globalForDb = globalThis;
+
+// Ile czekamy na cudzą blokadę zapisu. Wartość jest EKSPORTOWANA, bo
+// services/taskEntries.js skraca ją na czas sprzątania i musi mieć do czego wrócić.
+// To górny próg zamrożenia całego procesu na jedną kolizję — patrz komentarz przy
+// pragmie w createDb.
+export const DEFAULT_BUSY_MS = 3000;
 
 // Jednorazowe przeniesienie sekcji, które przed powstaniem tabeli Sections żyły
 // wyłącznie jako tekst w Users.section i ManagerSections.section (przypisanie
@@ -155,8 +179,21 @@ const createDb = () => {
   // MUSI być pierwsze: gdy bazę otwiera kilka procesów naraz (workery `next build`,
   // build obok działającej aplikacji), inne połączenia czekają na zwolnienie locka
   // zamiast od razu rzucać SQLITE_BUSY na PRAGMA journal_mode/CREATE TABLE.
-  db.pragma("busy_timeout = 10000");
+  //
+  // 3 s, nie 10: czekanie jest SYNCHRONICZNE, więc ta liczba to górny próg zamrożenia
+  // całego serwera HTTP na jedną kolizję. Realnym konkurentem jest już tylko
+  // `scripts/admin.js` odpalany ręcznie obok aplikacji (w procesie mamy jedno
+  // połączenie), a jego zapisy trwają milisekundy — 3 s to i tak gruby zapas.
+  db.pragma(`busy_timeout = ${DEFAULT_BUSY_MS}`);
   db.pragma("journal_mode = WAL");
+  // W trybie WAL NORMAL jest bezpieczne: przetrwa pad aplikacji i zabicie procesu,
+  // traci najwyżej ostatnie transakcje przy nagłej utracie zasilania maszyny.
+  // W zamian znika fsync przy każdym commicie — na współdzielonym dysku Mikrusa
+  // to najdroższa część zwykłego odbicia karty.
+  db.pragma("synchronous = NORMAL");
+  // Bez tego WAL rósł w nieskończoność (436 KB przy bazie 114 KB): domyślny próg
+  // 1000 stron jest dla tak małej bazy nieosiągalny, więc checkpoint nigdy nie ruszał.
+  db.pragma("wal_autocheckpoint = 400");
   db.pragma("foreign_keys = ON");
 
   db.exec(`
@@ -312,6 +349,16 @@ const createDb = () => {
 
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
+
+    -- Indeks NA WYRAŻENIU, nie na kolumnie — i to jest tu sedno.
+    --
+    -- Times.data trzyma pełne ISO ze strefą (2026-05-18T03:00:00+02:00), więc
+    -- raporty filtrują po substr(data,1,10). Wywołanie funkcji na kolumnie
+    -- unieważnia zwykły indeks: SQLite nie ma jak porównać zakresu i czyta całą
+    -- tabelę. Ten indeks przechowuje dokładnie to wyrażenie, którego szuka
+    -- services/getTimesReport.js i services/entryStats.js, więc oba wracają
+    -- na wyszukiwanie po zakresie.
+    CREATE INDEX IF NOT EXISTS idx_times_datepart ON Times(substr(data,1,10));
     CREATE INDEX IF NOT EXISTS idx_users_section      ON Users(section);
     CREATE INDEX IF NOT EXISTS idx_overtime_user      ON Overtime(userID, data);
     CREATE INDEX IF NOT EXISTS idx_overtime_status    ON Overtime(status);
@@ -324,12 +371,22 @@ const createDb = () => {
   migrateEntrySeconds(db);
   migrateEntryProjectOptional(db);
 
+  // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
+  // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do
+  // stanu, który 21.08.2026 położył aplikację — patrz komentarz przy globalForDb.
+  logInfo("db", "połączenie otwarte", { path: dbPath });
+
   return db;
 };
 
+// Zapis na globalu bezwarunkowo — także w produkcji. Wcześniej stał tu warunek
+// `NODE_ENV !== "production"`, przez który na serwerze singleton w ogóle nie działał
+// i każda trasa otwierała własne połączenie. Patrz komentarz przy `globalForDb`.
+// Dozór nad procesem podpinamy tutaj, bo ten moduł wchodzi do każdego bundla
+// serwerowego i nigdy do klienta. Rejestracja jest idempotentna.
+installRuntimeGuards();
+
 const db = globalForDb.__punktualnikDb || createDb();
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__punktualnikDb = db;
-}
+globalForDb.__punktualnikDb = db;
 
 export default db;

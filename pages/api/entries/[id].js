@@ -11,6 +11,7 @@ import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
+import { logApiError } from "../../../services/log";
 
 // "retag" to opis i projekt biegnącego timera, "setstart" — jego godzina
 // rozpoczęcia; "update" to cały zamknięty wpis razem z czasami. Rozdzielone, bo
@@ -129,6 +130,7 @@ export default async (req, res) => {
         : res.status(409).json({ error: "not_running" });
     } catch (error) {
       const status = CONFLICT_CODES.includes(error.code) ? 409 : 422;
+      logApiError("api/entries/[id]", error, status, { action, id, userID: token.userID });
       return res
         .status(status)
         .json({ status: "not_updated", error: error.code || "invalid", message: error.message });
@@ -184,6 +186,7 @@ export default async (req, res) => {
       : res.status(404).json({ error: "not_found" });
   } catch (error) {
     const status = CONFLICT_CODES.includes(error.code) ? 409 : 422;
+    logApiError("api/entries/[id]", error, status, { action, id, userID: token.userID });
     return res.status(status).json({ status: "not_updated", error: error.code || "invalid", message: error.message });
   }
 };

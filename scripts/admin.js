@@ -329,7 +329,10 @@ switch (cmd) {
   case "passwd": {
     const u = findUser(selector);
     if (!extra) die("podaj nowe hasło.");
-    // Te same parametry co w services/authorizeUser.js — inaczej logowanie nie zadziała.
+    // Te same parametry co w services/password.js — inaczej logowanie nie zadziała.
+    // Ten skrypt jest CommonJS-em odpalanym ręcznie, więc nie zaimportuje tamtego
+    // modułu ESM i wariant `Sync` niczemu tu nie przeszkadza (żaden serwer nie czeka).
+    // Przy zmianie parametrów po TAMTEJ stronie trzeba poprawić i tutaj.
     const passwordSalt = crypto.randomBytes(256).toString("hex");
     const passwordHash = crypto.pbkdf2Sync(extra, passwordSalt, 2137, 256, "sha512").toString("hex");
     db.prepare("UPDATE Users SET passwordHash = ?, passwordSalt = ? WHERE id = ?").run(

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
@@ -61,6 +61,16 @@ const Card = ({ data }) => {
   const [displayTime, setDisplayTime] = useState("");
   const [overTime, setOverTime] = useState(false);
   const [intervalID, setIntervalID] = useState(null);
+
+  // Pierwszy przebieg efektu poniżej NIE zapisuje do bazy.
+  //
+  // Stan początkowy karty pochodzi wprost z bazy, a zapisywana wartość
+  // (DifferenceTime(startTime, endTime)) jest funkcją tych samych pól — czyli
+  // zapis przy montowaniu odsyłał do bazy dokładnie to, co przed chwilą z niej
+  // przyszło. Przy tablicy kiosku z kilkunastoma odbitymi kartami każde wejście
+  // na stronę i każde przeładowanie o 3:30 wysyłało serię PUT-ów bez żadnego
+  // skutku poza obciążeniem serwera.
+  const skipInitialSave = useRef(true);
 
   // Kliknąć kartę może wyłącznie stanowisko kiosku. Reszta (kierownik, sam
   // pracownik) ogląda ją jak tablicę — stąd brak podświetlenia pod kursorem
@@ -151,6 +161,13 @@ const Card = ({ data }) => {
   };
 
   useEffect(() => {
+    // Zapisujemy tylko zmiany dokonane TUTAJ, w przeglądarce — czyli od drugiego
+    // przebiegu w górę. Licznik (checker) startuje normalnie, bo on nic nie zapisuje.
+    const persist = (...args) => {
+      if (skipInitialSave.current) return;
+      saveToDB(...args);
+    };
+
     switch (status) {
       case "wait": {
         setDisplayTime("");
@@ -160,7 +177,7 @@ const Card = ({ data }) => {
         if (intervalID === null) checker(endTime);
         if (overTime) setStatus("overTime");
         const res = DifferenceTime(startTime, endTime);
-        saveToDB(startTime, endTime, res.time, status, res.overTime);
+        persist(startTime, endTime, res.time, status, res.overTime);
         break;
       }
       case "overTime": {
@@ -173,12 +190,14 @@ const Card = ({ data }) => {
         setTotalWorkTime(res.time);
         setOverTime(res.overtime);
         setDisplayTime(res.time);
-        saveToDB(startTime, endTime, res.time, status, res.overtime);
+        persist(startTime, endTime, res.time, status, res.overtime);
         break;
       }
       default:
         setDisplayTime("");
     }
+
+    skipInitialSave.current = false;
   }, [status, overTime]);
 
   const stateKey = status === "finishWork" ? (overTime ? "finishFull" : "finishShort") : status;

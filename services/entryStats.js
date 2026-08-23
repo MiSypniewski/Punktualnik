@@ -228,16 +228,10 @@ export const getByUser = (filters) => {
   });
 };
 
-/**
- * @param {"view"|"all"} scope "view" tnie do DETAIL_LIMIT (ekran),
- *                             "all" zwraca komplet (eksport CSV).
- */
-export const getEntries = (filters, scope = "view") => {
-  if (noScope(filters)) return { rows: [], total: 0, limit: DETAIL_LIMIT };
-
-  const total = getSummary(filters).entries;
-
-  const rows = prepared(
+// Zapytanie o szczegółową listę wpisów. Jedno miejsce dla obu wołających:
+// getEntries (materializuje tablicę) i iterateAllEntries (czyta leniwie).
+const detailStatement = (filters, scope) =>
+  prepared(
     `list-${scope}`,
     shapeOf(filters),
     (where) => `
@@ -255,7 +249,24 @@ export const getEntries = (filters, scope = "view") => {
         JOIN Users u    ON u.id = e.userID
         LEFT JOIN Projects p ON p.id = e.projectID${where}
        ORDER BY e.data DESC, e.startedAt DESC${LIMIT_CLAUSE[scope] ?? LIMIT_CLAUSE.view}`
-  ).all(paramsOf(filters));
+  );
+
+/**
+ * @param {"view"|"all"} scope "view" tnie do DETAIL_LIMIT (ekran),
+ *                             "all" zwraca komplet (eksport CSV).
+ * @param {{summary?: {entries: number}}} opts summary — gotowy wynik getSummary
+ *   dla TYCH SAMYCH filtrów, jeśli wołający już go ma.
+ *
+ * Panel kierownika (pages/zadania/zarzadzaj.js) liczy podsumowanie osobno, do
+ * własnego propsa, a potem wołał getEntries, które liczyło je po raz drugi —
+ * to samo zapytanie agregujące dwa razy na jedno wejście na stronę.
+ */
+export const getEntries = (filters, scope = "view", { summary } = {}) => {
+  if (noScope(filters)) return { rows: [], total: 0, limit: DETAIL_LIMIT };
+
+  const total = (summary ?? getSummary(filters)).entries;
+
+  const rows = detailStatement(filters, scope).all(paramsOf(filters));
 
   return {
     rows: rows.map((r) => ({
@@ -267,3 +278,25 @@ export const getEntries = (filters, scope = "view") => {
     limit: DETAIL_LIMIT,
   };
 };
+
+/**
+ * To samo co getEntries(filters, "all"), ale LENIWIE — wiersz po wierszu.
+ *
+ * Do eksportu CSV, który nie ma górnego ograniczenia liczby wpisów. Wariant
+ * tablicowy materializuje w pamięci komplet wierszy PLUS gotowy string pliku;
+ * przy szerokim zakresie dat to najgrubsza alokacja w aplikacji, a kontener ma
+ * 1 GB bez swapu. `stmt.iterate()` czyta z bazy tyle, ile akurat konsumuje
+ * wołający (utils/csv.js: streamCsv).
+ *
+ * UWAGA: iterator trzyma otwarty kursor na bazie, więc trzeba go przejść do
+ * końca (pętla for..of to robi). Zapytanie jest identyczne jak w getEntries —
+ * ten sam cache przygotowanych statementów, ten sam ORDER BY.
+ */
+export function* iterateAllEntries(filters) {
+  if (noScope(filters)) return;
+
+  const stmt = detailStatement(filters, "all");
+  for (const r of stmt.iterate(paramsOf(filters))) {
+    yield { ...r, autoClosed: Boolean(r.autoClosed), projectIsActive: Boolean(r.projectIsActive) };
+  }
+}

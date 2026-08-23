@@ -22,6 +22,12 @@ const CONDITIONS = {
   to: `o.data <= @to`,
 };
 
+// Domyślne przycięcie listy. Wnioski nie kasują się nigdy, więc bez limitu ten
+// sam SELECT po roku zwracałby komplet historii sekcji — do propsów SSR, czyli
+// prosto do HTML-a wysyłanego przeglądarce. Eksport CSV świadomie podaje
+// { limit: null }, bo obiecuje komplet.
+export const OVERTIME_LIST_LIMIT = 500;
+
 const cache = new Map();
 
 // Lista sekcji ma zmienną długość, więc nie mieści się w słowniku stałych
@@ -29,13 +35,14 @@ const cache = new Map();
 const sectionsCondition = (count) =>
   `u.section IN (${Array.from({ length: count }, (_, i) => `@sec${i}`).join(", ")})`;
 
-const getStatement = (keys, sectionCount) => {
-  const cacheKey = `${keys.join("|")}#${sectionCount}`;
+const getStatement = (keys, sectionCount, limited) => {
+  const cacheKey = `${keys.join("|")}#${sectionCount}#${limited ? "lim" : "all"}`;
   if (!cache.has(cacheKey)) {
     const parts = keys.map((k) => CONDITIONS[k]);
     if (sectionCount > 0) parts.push(sectionsCondition(sectionCount));
     const where = parts.length ? `\n  WHERE ${parts.join(" AND ")}` : "";
-    cache.set(cacheKey, db.prepare(`${BASE}${where}${ORDER}`));
+    const limit = limited ? `\n  LIMIT @limit` : "";
+    cache.set(cacheKey, db.prepare(`${BASE}${where}${ORDER}${limit}`));
   }
   return cache.get(cacheKey);
 };
@@ -47,8 +54,10 @@ const isSet = (v) => v !== undefined && v !== null && v !== "";
  *          sections?: string[]}} filters
  *   `sections` zawęża wynik do podanych sekcji. Pominięcie pola = bez zawężania
  *   (wołający odpowiada za uprawnienia); pusta tablica = świadomie nic nie widać.
+ * @param {{limit?: number|null}} opts limit — ile wierszy najwyżej.
+ *   null = komplet (eksport CSV). Domyślnie OVERTIME_LIST_LIMIT.
  */
-const getOvertimeRequests = (filters = {}) => {
+const getOvertimeRequests = (filters = {}, { limit = OVERTIME_LIST_LIMIT } = {}) => {
   const { sections } = filters;
   if (Array.isArray(sections) && sections.length === 0) return [];
 
@@ -65,7 +74,10 @@ const getOvertimeRequests = (filters = {}) => {
     params[`sec${i}`] = String(s);
   });
 
-  return getStatement(keys, list.length).all(params);
+  const limited = Number.isFinite(limit) && limit > 0;
+  if (limited) params.limit = limit;
+
+  return getStatement(keys, list.length, limited).all(params);
 };
 
 export default getOvertimeRequests;

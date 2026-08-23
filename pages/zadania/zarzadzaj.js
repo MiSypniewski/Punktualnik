@@ -19,7 +19,7 @@ import { PencilIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
-import { closeStaleEntries } from "../../services/taskEntries";
+import { sweepStaleEntries } from "../../services/taskEntries";
 import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
@@ -45,8 +45,9 @@ export async function getServerSideProps(ctx) {
     return { notFound: true };
   }
 
-  // Żeby raport nie pomijał czasu wiszącego w zapomnianym timerze.
-  closeStaleEntries();
+  // Żeby raport nie pomijał czasu wiszącego w zapomnianym timerze. Dławione —
+  // ten widok odświeża się po każdej edycji wpisu (router.replace niżej).
+  sweepStaleEntries();
 
   // Filtry żyją w query stringu, więc widok da się odświeżyć i zalinkować —
   // ten sam wzorzec co w panelu nadgodzin.
@@ -68,6 +69,17 @@ export async function getServerSideProps(ctx) {
   const sections = visibleSections(token);
   const query = { ...filters, sections };
 
+  // Komplet projektów w zasięgu kierownika — pobierany RAZ i używany dwa razy.
+  // Wcześniej `projectsBySection` wołało listProjects osobno dla każdej sekcji,
+  // co przy zapytaniu z podzapytaniami na ProjectSections dawało kilkanaście
+  // dodatkowych odczytów na jedno wejście na stronę. Wynik jest identyczny:
+  // lista dla sekcji `s` to projekty ogólnofirmowe plus przypisane do `s`,
+  // a to widać w polu `sections` każdego wiersza.
+  const summary = getSummary(query);
+  const allProjects = listProjects({ sections: projectScope(token), includeArchived: true });
+  const visibleIn = (section) =>
+    allProjects.filter((p) => p.isActive && (p.sections.length === 0 || p.sections.includes(section)));
+
   return {
     props: {
       filters,
@@ -79,19 +91,19 @@ export async function getServerSideProps(ctx) {
       // /api/entries/running, ten props służy pierwszemu renderowi.
       live: getLiveBoard(sections),
       currentUserID: Number(token.userID),
-      summary: getSummary(query),
+      summary,
       byProject: getByProject(query),
       byUser: getByUser(query),
-      detail: getEntries(query),
-      projects: listProjects({ sections: projectScope(token), includeArchived: true }),
+      // Podsumowanie podane z zewnątrz — getEntries potrzebuje z niego tylko
+      // liczby wpisów i bez tego policzyłoby ten sam agregat drugi raz.
+      detail: getEntries(query, "view", { summary }),
+      projects: allProjects,
       // Do EDYCJI wpisu potrzebne są projekty widziane oczami PRACOWNIKA, a nie
       // kierownika: API sprawdza wybór jego zasięgiem (pages/api/entries/[id].js),
       // więc lista z sekcji kierownika podsuwałaby pozycje kończące się odmową.
       // Sekcji są jednostki, więc trzymanie osobnej listy dla każdej jest tańsze
       // niż liczenie tego per wiersz.
-      projectsBySection: Object.fromEntries(
-        sections.map((s) => [s, listProjects({ sections: [s] })])
-      ),
+      projectsBySection: Object.fromEntries(sections.map((s) => [s, visibleIn(s)])),
       users: getAllUsers(sections),
     },
   };

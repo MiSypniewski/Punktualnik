@@ -6,6 +6,16 @@ import authorizeUser from "../../../services/authorizeUser";
 // import EmailProvider from "next-auth/providers/email";
 
 export default NextAuth({
+  // Własne ekrany zamiast wbudowanych stron next-auth.
+  //
+  // Bez tego każdy problem z logowaniem kończył się na /api/auth/error — surowej,
+  // angielskiej stronie z jednym słowem "Error" i nazwą domeny. Użytkownik nie
+  // dostawał żadnej wskazówki i nie miał nawet jak wrócić do formularza.
+  // Teraz ląduje na własnym ekranie logowania, który tłumaczy kod błędu na polski.
+  pages: {
+    signIn: "/users/signin",
+    error: "/users/signin",
+  },
   // Configure one or more authentication providers
   providers: [
     CredentialsProvider({

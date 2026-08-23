@@ -22,8 +22,54 @@ export const buildCsv = (header, rows) => {
 /** Liczba po polsku — przecinek dziesiętny, inaczej Excel potraktuje ją jak tekst. */
 export const plNumber = (n, decimals = 2) => Number(n).toFixed(decimals).replace(".", ",");
 
-export const sendCsv = (res, filename, csv) => {
+const csvHeaders = (res, filename) => {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  // Eksport zawiera dane osobowe i zawsze dotyczy "teraz" — nie ma czego
+  // trzymać w cache przeglądarki ani pośrednika.
+  res.setHeader("Cache-Control", "no-store");
+};
+
+export const sendCsv = (res, filename, csv) => {
+  csvHeaders(res, filename);
   return res.status(200).send(csv);
+};
+
+// Ile wierszy sklejamy przed wypchnięciem do gniazda. Kompromis: mniejsze porcje
+// to więcej wywołań write(), większe — więcej pamięci naraz.
+const CHUNK_ROWS = 200;
+
+/**
+ * CSV pisany PORCJAMI, dla eksportów bez górnego ograniczenia liczby wierszy.
+ *
+ * buildCsv skleja cały plik w jeden string w pamięci, co przy eksporcie szerokiego
+ * zakresu dat jest największą pojedynczą alokacją w całej aplikacji — a kontener
+ * ma 1 GB i zero swapu, więc OOM-killer ubiłby proces bez śladu w logu.
+ * Tutaj do pamięci trafia najwyżej CHUNK_ROWS wierszy naraz.
+ *
+ * @param {import("http").ServerResponse} res
+ * @param {string} filename
+ * @param {string[]} header
+ * @param {Iterable<Array<string|number>>} rows leniwe źródło wierszy
+ *   (np. better-sqlite3 stmt.iterate() przepuszczone przez mapowanie)
+ */
+export const streamCsv = (res, filename, header, rows) => {
+  csvHeaders(res, filename);
+  res.status(200);
+
+  // BOM + separator ";" — tak samo jak w buildCsv, plik ma być nie do odróżnienia.
+  let buffer = "﻿" + header.map(csvCell).join(";") + "\r\n";
+  let pending = 0;
+
+  for (const cells of rows) {
+    buffer += cells.map(csvCell).join(";") + "\r\n";
+    if (++pending >= CHUNK_ROWS) {
+      res.write(buffer);
+      buffer = "";
+      pending = 0;
+    }
+  }
+
+  res.write(buffer);
+  return res.end();
 };

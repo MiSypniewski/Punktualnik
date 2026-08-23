@@ -13,7 +13,7 @@ import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { DownloadIcon } from "../../components/ui/icons";
-import getOvertimeRequests from "../../services/getOvertimeRequests";
+import getOvertimeRequests, { OVERTIME_LIST_LIMIT } from "../../services/getOvertimeRequests";
 import getOvertimeBalances from "../../services/getOvertimeBalances";
 import getAllUsers from "../../services/getAllUsers";
 import { kindLabel, signedMinutes, OVERTIME_STATUSES, STATUS_KEYS } from "../../services/overtimeKinds";
@@ -52,7 +52,10 @@ export async function getServerSideProps(ctx) {
     props: {
       pending: getOvertimeRequests({ status: "pending", sections }),
       balances: getOvertimeBalances(sections),
+      // Historia przycięta do OVERTIME_LIST_LIMIT — te wiersze jadą do HTML-a
+      // jako props SSR, więc nie może ich być dowolnie wiele. Komplet daje eksport.
       history: getOvertimeRequests({ ...filters, sections }),
+      historyLimit: OVERTIME_LIST_LIMIT,
       users: getAllUsers(sections),
       filters,
       sections,
@@ -60,7 +63,7 @@ export async function getServerSideProps(ctx) {
   };
 }
 
-export default function ZarzadzajNadgodzinami({ pending, balances, history, users, filters, sections }) {
+export default function ZarzadzajNadgodzinami({ pending, balances, history, historyLimit, users, filters, sections }) {
   const router = useRouter();
 
   const [note, setNote] = useState({}); // id wniosku → notatka do decyzji
@@ -320,6 +323,13 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, user
             Pobierz CSV
           </Button>
         </form>
+
+        {history.length >= historyLimit && (
+          <Alert tone="warn" className="mb-4">
+            Lista jest przycięta do {historyLimit} najnowszych wniosków. Zawęź zakres dat
+            albo pobierz CSV — eksport obejmuje komplet.
+          </Alert>
+        )}
 
         <p className="mb-4 text-xs text-muted">
           „Pobierz CSV” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
