@@ -32,7 +32,7 @@ zmiany widać od razu po odświeżeniu strony.
 |---|---|
 | `npm run admin -- role <email\|id> user` | pracownik: własne karty, nadgodziny i zadania |
 | `npm run admin -- role <email\|id> editor` | wspólny kiosk: obsługa kart czasu sekcji (zadań nie raportuje) |
-| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, projekty, raport zadań, eksporty |
+| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, urlopy, projekty, raport zadań, eksporty |
 | `npm run admin -- sections <email\|id>` | pokazuje, które sekcje obsługuje kierownik |
 | `npm run admin -- sections <email\|id> <a,b,c>` | ustawia je (podmienia całą listę) |
 | `npm run admin -- sections <email\|id> -` | czyści przypisania |
@@ -93,8 +93,9 @@ npm run admin -- section-off stary_dzial       # historia i eksporty zostają ni
 
 Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
 bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`, `Overtime`,
-`Sections`, `ManagerSections`, `Projects`, `ProjectSections`, `TaskEntries`) tworzony
-jest automatycznie przy pierwszym uruchomieniu.
+`Sections`, `ManagerSections`, `Projects`, `ProjectSections`, `TaskEntries`,
+`Absences`, `LeaveAllowance`) tworzony jest automatycznie przy pierwszym
+uruchomieniu.
 
 - Domyślna ścieżka: `./data/punktualnik.sqlite` (katalog `data/` jest w `.gitignore`).
 - Ścieżkę można nadpisać zmienną `SQLITE_PATH` (zob. `.env.local`).
@@ -367,6 +368,115 @@ npm run admin -- role michal@example.pl manager
 
 Rola jest zapisana w tokenie JWT, więc **po jej zmianie trzeba się wylogować
 i zalogować ponownie**, żeby zaczęła obowiązywać.
+
+## Urlopy i nieobecności
+
+Drugi obieg akceptacji obok nadgodzin, na tej samej zasadzie: pracownik składa
+wniosek, kierownik go zatwierdza albo odrzuca, a zatwierdzone wnioski schodzą
+z puli dni. Różnica jest jedna, ale istotna — wniosek dotyczy **zakresu dni**,
+nie pojedynczego dnia, więc jego wymiar trzeba policzyć.
+
+**Pracownik** — `/urlopy`: pula na bieżący rok (przydzielone / wykorzystane /
+pozostało), formularz wniosku i historia z możliwością anulowania, dopóki wniosek
+czeka na decyzję.
+
+**Kierownik** — `/urlopy/zarzadzaj`: wnioski do rozpatrzenia, wpisywanie
+nieobecności za pracownika, przydzielanie dni i historia z filtrami. Widzi
+wyłącznie swoje sekcje (`ManagerSections`, jak przy nadgodzinach).
+
+### Rodzaje
+
+| Rodzaj | Zdejmuje dni z puli | Zgłasza pracownik |
+|---|---|---|
+| Urlop wypoczynkowy | tak | tak |
+| Urlop na żądanie | tak | nie — wpisuje kierownik |
+| Zwolnienie lekarskie (L4) | **nie** | nie — wpisuje kierownik |
+| Urlop bezpłatny | nie | tak |
+| Opieka | nie | tak |
+| Urlop okolicznościowy | nie | tak |
+
+Rodzaje, których pracownik nie zgłasza sam, wpisuje kierownik po fakcie —
+telefon rano albo zwolnienie na biurku. **Taki wpis zapisuje się od razu jako
+zatwierdzony**: nie ma czego akceptować, skoro zakłada go osoba, która i tak by
+go akceptowała. W historii widać wtedy „Wpisał: …”.
+
+Słownik siedzi w `services/absenceKinds.js` i to jedyne miejsce, gdzie żyje
+wiedza „czy rodzaj rusza pulę” — SQL sald składa z niego warunek sam.
+
+### Ile dni schodzi z puli
+
+Liczą się **dni robocze**: bez sobót, niedziel i świąt ustawowo wolnych. Wniosek
+piątek–poniedziałek kosztuje dwa dni, nie cztery. Formularz pokazuje wymiar
+jeszcze przed wysłaniem, tą samą funkcją, którą serwer liczy przy zapisie
+(`services/workingDays.js`).
+
+Świąt nie ma na liście wpisanej ręcznie — część z nich jest ruchoma, więc
+Wielkanoc liczy algorytm, a Poniedziałek Wielkanocny, Zielone Świątki i Boże
+Ciało wynikają z niej przesunięciem. Lista wpisana z palca zestarzałaby się po
+cichu i pierwszy źle policzony urlop zauważyłby dopiero ktoś, komu zniknął dzień.
+
+### Pula dni
+
+Pula rozlicza się **na rok kalendarzowy** i powstaje z przydziałów dopisywanych
+przez kierownika. Przydziału się nie nadpisuje — dokłada się kolejny:
+
+```
+26 dni  — wymiar podstawowy
+ 4 dni  — zaległe z poprzedniego roku
+-2 dni  — korekta po zmianie wymiaru etatu
+```
+
+Dzięki temu po roku widać, skąd wzięła się liczba, a nie tylko jaka jest.
+Liczba ujemna to jedyny sposób na pomniejszenie puli i jest dozwolona.
+
+**Saldo może zejść poniżej zera.** Przy zatwierdzaniu kierownik widzi ostrzeżenie
+„po zatwierdzeniu zostanie −3 dni”, ale przycisk działa: zgoda na urlop na poczet
+przyszłego przydziału jest jego decyzją, nie pomyłką systemu.
+
+### Reguły, których pilnuje serwer
+
+| Reguła | Zachowanie |
+|---|---|
+| Wniosek nie przechodzi przez koniec roku | `422 year_boundary` — podziel na dwa wnioski |
+| Zakres bez dnia roboczego (sam weekend, samo święto) | `422 no_working_days` |
+| Nieobecności jednej osoby nie mogą na siebie nachodzić | `422 overlap` (liczą się `pending` i `approved`) |
+| Rodzaj spoza listy pracownika, zgłoszony przez pracownika | `403 kind_not_self_service` |
+| Wpis za kogoś bez uprawnień kierownika | `403 permission_denied` |
+| Dwie karty kierownika rozpatrujące ten sam wniosek | `409 already_decided` |
+
+Rok rozliczeniowy bierze się z daty początkowej i dlatego wniosek nie może
+przechodzić przez sylwestra — inaczej jeden wpis musiałby dzielić dni między dwa
+salda i mieć dwa wymiary naraz. Raz na rok trzeba złożyć dwa wnioski i to jest
+tańsze niż tłumaczenie, czemu pula się nie zgadza.
+
+### Kiosk
+
+Kafelek osoby nieobecnej pokazuje rodzaj (L4, Urlop, Opieka) i termin powrotu,
+zamiast wyglądać identycznie jak kafelek spóźnialskiego. Kolor neutralny —
+w tym systemie bursztyn znaczy „teraz”, a nieobecność nie jest stanem „teraz”.
+
+**Odbicie karty pozostaje możliwe.** Ktoś wraca z L4 dzień wcześniej albo wpada
+na dwie godziny w środku urlopu; kafelek wtedy liczy jego czas normalnie,
+a znacznik nieobecności przenosi się do rogu — bo „w pracy, choć miał być na
+urlopie” to dokładnie ta sytuacja, o której kierownik ma wiedzieć.
+
+Zatwierdzone nieobecności podpisują się też w „Teraz w toku” na
+`/zadania/zarzadzaj`, przy nazwiskach w sekcji „bez timera”.
+
+### Eksport CSV
+
+`/api/report/urlopy` w dwóch trybach: `nieobecnosci` (domyślny) i `salda`.
+Salda to cudze dane, więc wyłącznie dla kierownika; nieobecności pracownik
+pobiera w wersji własnej, niezależnie od tego, co poda w `userID`. Eksport
+zawsze zwraca komplet, także gdy widok przyciął listę do 500 pozycji.
+
+### Czego moduł NIE robi
+
+- Nie dotyka tabeli `Times` ani eksportu kart czasu — urlop nie tworzy wpisu
+  obecności.
+- Nie zna kalendarza zespołu ani limitu „ilu naraz może być na urlopie”.
+- Nie przenosi zaległego urlopu na nowy rok sam z siebie — kierownik dopisuje
+  go jako zwykły przydział.
 
 ## Zadania i projekty
 
