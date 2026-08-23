@@ -21,6 +21,7 @@ import { getSuggestions, suggestionsByProject } from "../../services/entrySugges
 import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
 import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
+import { groupEntries } from "../../utils/groupEntries";
 
 dayjs.locale("pl");
 
@@ -100,6 +101,43 @@ const switchMessage = ({ stopped, discarded }) => {
   return "";
 };
 
+// Wybór "grupuj takie same zadania" siedzi w localStorage, nie w bazie — jak
+// motyw (components/themeToggle.js). To ustawienie WIDOKU, nie dana pracownika:
+// nie ma czego raportować, nie ma czego eksportować i nikt poza właścicielem
+// przeglądarki go nie zobaczy. W zamian nie trzeba ani kolumny w Users (a więc
+// i lustra DDL w scripts/admin.js), ani endpointu, ani odświeżania JWT.
+//
+// Cena jest jedna i widoczna: serwer nie zna tej wartości w chwili renderu, więc
+// pierwsza klatka po wejściu na stronę pokazuje listę niepogrupowaną i przestawia
+// ją po hydratacji. Sztuczka z blokującym skryptem, którą stosuje motyw
+// (pages/_document.js), tu nie zadziała — tam chodzi o jedną klasę na <html>,
+// tutaj o strukturę drzewa Reacta.
+const GROUP_KEY = "zadania:grupuj";
+
+/**
+ * @returns {[boolean, (next: boolean) => void]}
+ */
+const useGrouping = () => {
+  // Start od `false`, odczyt dopiero w useEffect: render serwera i pierwszy
+  // render klienta MUSZĄ być identyczne, inaczej React zgłasza niezgodność
+  // hydratacji. Ten sam zabieg co w themeToggle.
+  const [grouped, setGrouped] = useState(false);
+
+  useEffect(() => {
+    setGrouped(localStorage.getItem(GROUP_KEY) === "1");
+  }, []);
+
+  const choose = (next) => {
+    setGrouped(next);
+    // Wyłączone to BRAK wpisu, nie wpis "0" — grupowanie jest dodatkiem, więc
+    // czysty localStorage ma znaczyć dokładnie to, co widok sprzed tej zmiany.
+    if (next) localStorage.setItem(GROUP_KEY, "1");
+    else localStorage.removeItem(GROUP_KEY);
+  };
+
+  return [grouped, choose];
+};
+
 /** Etykieta dnia: "dziś", "wczoraj", inaczej data słownie. */
 const dayLabel = (data, today) => {
   if (data === today) return "Dziś";
@@ -123,6 +161,7 @@ export default function Zadania({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+  const [grouped, setGrouped] = useGrouping();
 
   /** @returns {object|false} odpowiedź serwera albo false, gdy żądanie się nie udało */
   const call = async (url, options) => {
@@ -231,7 +270,26 @@ export default function Zadania({
           />
         )}
 
-        {days.map(([data, list]) => (
+        {/* Przełącznik stoi TUŻ NAD listą, a nie w profilu jak w Clockify:
+            profil w tej aplikacji zajmuje się wyłącznie hasłem, a ustawienie,
+            po które trzeba iść na inną stronę, jest ustawieniem, o którym nikt
+            się nie dowie. Chowa się razem z listą — nie ma czego grupować,
+            kiedy nie ma wpisów. */}
+        {days.length > 0 && (
+          <div className="mt-8 flex justify-end">
+            <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+              <input
+                type="checkbox"
+                checked={grouped}
+                onChange={(e) => setGrouped(e.target.checked)}
+                className="rounded-sm border-line-strong text-accent focus:ring-0"
+              />
+              Grupuj takie same zadania
+            </label>
+          </div>
+        )}
+
+        {days.map(([data, list], index) => (
           <DaySection
             key={data}
             data={data}
@@ -244,6 +302,8 @@ export default function Zadania({
             call={call}
             running={running}
             onResume={resume}
+            grouped={grouped}
+            first={index === 0}
           />
         ))}
       </div>
@@ -828,13 +888,24 @@ const DaySection = ({
   call,
   running,
   onResume,
+  grouped,
+  first,
 }) => {
+  // Suma dnia liczona z PŁASKIEJ listy, przed grupowaniem. Nagłówek dnia nie ma
+  // prawa zmienić wartości tylko dlatego, że ktoś zaznaczył checkbox — a licząc
+  // ją z grup, łatwo o to przy najdrobniejszej pomyłce w grupowaniu.
   const total = list.reduce((sum, e) => sum + (e.seconds || 0), 0);
+
+  const groups = useMemo(() => (grouped ? groupEntries(list) : null), [grouped, list]);
+
+  const rowProps = { editable, projects, descByProject, busy, call, running, onResume };
 
   return (
     // mt-10, bo przy kilkunastu wpisach dziennie odstęp równy odstępowi między
-    // wierszami sprawiał, że "Dziś" i "Wczoraj" ginęły w ścianie tekstu.
-    <div className="mt-10">
+    // wierszami sprawiał, że "Dziś" i "Wczoraj" ginęły w ścianie tekstu. Pierwszy
+    // dzień dostaje mniej, bo nad nim stoi już przełącznik grupowania i pełne
+    // mt-10 odcinałoby go od własnego sterowania.
+    <div className={first ? "mt-4" : "mt-10"}>
       <div className="flex items-baseline justify-between border-b border-line pb-2 mb-2">
         {/* first-letter, nie `capitalize`: ten drugi podniósłby też nazwę
             miesiąca ("Środa, 12 Sierpnia"), a po polsku miesiąc piszemy małą. */}
@@ -842,21 +913,156 @@ const DaySection = ({
         <span className="font-mono text-sm tabular-nums text-muted">{formatDuration(total)}</span>
       </div>
       <ul>
-        {list.map((e) => (
-          <EntryRow
-            key={e.id}
-            entry={e}
-            editable={editable}
-            projects={projects}
-            descByProject={descByProject}
-            busy={busy}
-            call={call}
-            running={running}
-            onResume={onResume}
-          />
-        ))}
+        {groups
+          ? groups.map((group) =>
+              // Jeden wpis to nie grupa — rysujemy go zwykłym wierszem, z pełnym
+              // kompletem przycisków. Inaczej połowa listy straciłaby ołówek
+              // i kosz w zamian za licznik "1", który niczego nie mówi.
+              group.entries.length > 1 ? (
+                <GroupRow key={group.key} group={group} {...rowProps} />
+              ) : (
+                <EntryRow key={group.entries[0].id} entry={group.entries[0]} {...rowProps} />
+              )
+            )
+          : list.map((e) => <EntryRow key={e.id} entry={e} {...rowProps} />)}
       </ul>
     </div>
+  );
+};
+
+// Szerokość kolumny przycisków w wierszu wpisu: trzy IconButtony (w-8) z gap-1.
+// Wiersz grupy ma tylko jeden przycisk, ale musi zarezerwować tyle samo, inaczej
+// kolumna czasu przestaje stać w jednej linii pionowej. Ta sama sztuczka co
+// z placeholderem w components/themeToggle.js.
+const ACTIONS_WIDTH = "w-[6.5rem]";
+
+/**
+ * "2 wpisy", ale "5 wpisów" — polski liczebnik ma trzy formy, a grupa bez odmiany
+ * mówiłaby "5 wpisy". Formy pojedynczej nie ma na liście, bo grupa zaczyna się
+ * od dwóch; zostaje jako zabezpieczenie na wypadek innego użycia.
+ *
+ * Reguła: końcówka 2–4 bierze formę mnogą lekką ("22 wpisy"), z wyjątkiem
+ * nastolatków 12–14, które idą z dopełniaczem ("13 wpisów").
+ */
+const entryWord = (n) => {
+  const last = n % 10;
+  const teens = n % 100;
+  if (n === 1) return "wpis";
+  if (last >= 2 && last <= 4 && (teens < 12 || teens > 14)) return "wpisy";
+  return "wpisów";
+};
+
+/**
+ * Zwinięte powtórzenia jednego zadania — nagłówek grupy.
+ *
+ * Na nagłówku jest WYŁĄCZNIE "wznów". Ołówek i kosz zostają przy konkretnych
+ * wpisach, po rozwinięciu: poprawka dotyczy jednych godzin, a nie wszystkich
+ * naraz, a kosz na grupie kasowałby jednym kliknięciem pół dnia pracy — bez
+ * możliwości cofnięcia.
+ */
+const GroupRow = ({ group, editable, projects, descByProject, busy, call, running, onResume }) => {
+  const [open, setOpen] = useState(false);
+  const first = group.entries[0];
+  const count = group.entries.length;
+
+  return (
+    <li className="border-b border-line-subtle">
+      {/* Układ powielony z EntryRow co do klasy — wiersz grupy ma stać w tym
+          samym rastrze co wiersze wokół niego, inaczej włączenie grupowania
+          wygląda jak podmiana listy na inną. */}
+      <div className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
+        {/* Klikalna jest CAŁA lewa kolumna, nie sam licznik: na tablecie kwadracik
+            2 na 5 mm to cel nie do trafienia, a tak rozwija się grupę, dotykając
+            jej opisu. Jeden element w kolejności tabulacji, aria-expanded mówi
+            czytnikowi ekranu, co się stanie. */}
+        <button
+          type="button"
+          aria-expanded={open}
+          title={open ? "Zwiń wpisy" : `Pokaż ${count} ${entryWord(count)} tego zadania`}
+          onClick={() => setOpen((o) => !o)}
+          className="flex gap-2 flex-grow min-w-0 text-left"
+        >
+          <ProjectMark color={first.projectColor} className="mt-1.5" />
+          <span className="min-w-0">
+            <span className="block break-words font-medium">
+              {/* Licznik przed opisem, jak w Clockify. tabular-nums, żeby "3"
+                  i "12" zajmowały tyle samo i kolumna opisów nie drgała. */}
+              <span
+                className={classNames(
+                  "inline-flex items-center justify-center align-middle mr-2 min-w-[1.5rem] h-5 px-1 rounded-sm border font-mono text-xs tabular-nums",
+                  open
+                    ? "border-accent-strong bg-accent-soft text-accent-strong"
+                    : "border-line bg-raised text-muted"
+                )}
+              >
+                {count}
+              </span>
+              {first.description}
+            </span>
+            <span
+              className={classNames("block text-xs", first.projectName ? "text-muted" : "text-faint")}
+            >
+              {first.projectName || NO_PROJECT}
+            </span>
+          </span>
+        </button>
+
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
+          {/* To ROZPIĘTOŚĆ, nie ciągła praca: między 13:30 a 14:10 pracownik
+              robił coś innego. Wymiar obok jest sumą wpisów i bywa wyraźnie
+              krótszy niż ten zakres — stąd wyjaśnienie w podpowiedzi, bo sama
+              para godzin sugerowałaby jeden nieprzerwany blok. */}
+          <span
+            className="font-mono text-sm text-muted tabular-nums"
+            title={`Od pierwszego rozpoczęcia (${timePart(group.startedAt)}) do ostatniego zakończenia (${timePart(
+              group.endedAt
+            )}) — z przerwami na inne zadania`}
+          >
+            {hhmm(group.startedAt)}–{hhmm(group.endedAt)}
+          </span>
+          {/* Po "suma" idzie dopełniacz niezależnie od liczby — "suma 2 wpisów",
+              "suma 5 wpisów" — więc akurat tu odmiana nie jest potrzebna. */}
+          <span
+            className="font-mono text-sm font-medium tabular-nums w-28 text-right"
+            title={`Suma ${count} wpisów`}
+          >
+            {formatDuration(group.seconds)}
+          </span>
+
+          <span className={classNames("flex justify-end gap-1", ACTIONS_WIDTH)}>
+            <IconButton
+              disabled={busy}
+              label={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
+              onClick={() => onResume(first)}
+            >
+              <PlayIcon />
+            </IconButton>
+          </span>
+        </div>
+      </div>
+
+      {/* Wcięcie i linia z lewej zamiast samego tła: wpisy składowe mają być
+          czytelne jako "należą do wiersza nad nimi", także wtedy, gdy grupa
+          wypada na styku dwóch dni albo obok wpisu domkniętego automatycznie
+          (ten ma własne, bursztynowe tło i wygrałby z każdym delikatnym). */}
+      {open && (
+        <ul className="mb-2 ml-1 pl-4 border-l-2 border-line">
+          {group.entries.map((e) => (
+            <EntryRow
+              key={e.id}
+              entry={e}
+              editable={editable}
+              projects={projects}
+              descByProject={descByProject}
+              busy={busy}
+              call={call}
+              running={running}
+              onResume={onResume}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 };
 
