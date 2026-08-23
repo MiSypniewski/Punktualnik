@@ -10,7 +10,7 @@ import { ProjectMark } from "../../components/projectColors";
 import LiveDot from "../../components/liveDot";
 import Button, { IconButton } from "../../components/ui/button";
 import { PlayIcon, PencilIcon, TrashIcon } from "../../components/ui/icons";
-import { Input, Select } from "../../components/ui/field";
+import { Input, Select, Checkbox } from "../../components/ui/field";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
@@ -277,15 +277,12 @@ export default function Zadania({
             kiedy nie ma wpisów. */}
         {days.length > 0 && (
           <div className="mt-8 flex justify-end">
-            <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
-              <input
-                type="checkbox"
-                checked={grouped}
-                onChange={(e) => setGrouped(e.target.checked)}
-                className="rounded-sm border-line-strong text-accent focus:ring-0"
-              />
-              Grupuj takie same zadania
-            </label>
+            <Checkbox
+              label="Grupuj takie same zadania"
+              labelClassName="text-muted"
+              checked={grouped}
+              onChange={(e) => setGrouped(e.target.checked)}
+            />
           </div>
         )}
 

@@ -5,7 +5,7 @@ import classNames from "classnames";
 import BaseLayout from "../../components/baseLayout";
 import { projectColor, ProjectMark, COLOR_KEYS } from "../../components/projectColors";
 import Button from "../../components/ui/button";
-import { Field, Input } from "../../components/ui/field";
+import { Field, Input, Checkbox } from "../../components/ui/field";
 import Alert from "../../components/ui/alert";
 import Badge from "../../components/ui/badge";
 import PageHeader from "../../components/ui/pageHeader";
@@ -186,15 +186,12 @@ export default function Projekty({ projects, sections, colorKeys }) {
             </p>
             <div className="flex gap-4 flex-wrap">
               {sections.map((s) => (
-                <label key={s.slug} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.sections.includes(s.slug)}
-                    onChange={() => toggleSection(s.slug)}
-                    className="rounded-sm border-line-strong text-accent focus:ring-0"
-                  />
-                  {s.label}
-                </label>
+                <Checkbox
+                  key={s.slug}
+                  label={s.label}
+                  checked={form.sections.includes(s.slug)}
+                  onChange={() => toggleSection(s.slug)}
+                />
               ))}
               {sections.length === 0 && (
                 <span className="text-sm text-muted">
