@@ -14,7 +14,13 @@ import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeBalance from "../../services/getOvertimeBalance";
 import getOvertimeForUser from "../../services/getOvertimeForUser";
-import { OVERTIME_KINDS, KIND_KEYS, kindLabel, signedMinutes } from "../../services/overtimeKinds";
+import {
+  OVERTIME_KINDS,
+  KIND_KEYS,
+  kindLabel,
+  signedMinutes,
+  requiresReason,
+} from "../../services/overtimeKinds";
 import { formatMinutes } from "../../utils";
 
 export async function getServerSideProps(ctx) {
@@ -49,12 +55,23 @@ export default function Nadgodziny({ balance, requests }) {
   // Odświeżenie danych z getServerSideProps bez pełnego przeładowania strony.
   const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
 
+  // Wniosek dopisujący czas do salda musi mówić, za co — wcześniejsze wyjście
+  // nie musi. Reguła siedzi w services/overtimeKinds.js i jest ta sama tutaj
+  // i w walidatorze na serwerze.
+  const reasonRequired = requiresReason(kind);
+
   const submit = async (e) => {
     e.preventDefault();
     const total = Number(hours || 0) * 60 + Number(minutes || 0);
 
     if (!data) return setErr("Podaj datę.");
     if (total <= 0) return setErr("Podaj wymiar większy niż zero.");
+    // Ten sam warunek co w services/createOvertimeRequest.js. Tutaj nie po to,
+    // żeby pilnować danych — od tego jest serwer — tylko żeby nie płacić za
+    // odmowę żądaniem i nie kasować wpisanego wymiaru.
+    if (reasonRequired && !reason.trim()) {
+      return setErr("Opisz, co dokładnie robiłeś na nadgodzinach.");
+    }
 
     setErr("");
     setBusy(true);
@@ -170,13 +187,23 @@ export default function Nadgodziny({ balance, requests }) {
             <span className="text-sm">min.</span>
           </div>
 
-          <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Powód</label>
+          <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">
+            Powód {reasonRequired ? "(wymagany)" : "(nieobowiązkowy)"}
+          </label>
+          {/* Placeholder jest PYTANIEM, nie przykładem. "np. wdrożenie u klienta"
+              podpowiadało długość odpowiedzi — trzy słowa — a kierownik dostawał
+              wnioski, z których nie wynikało nic poza tym, że ktoś został dłużej. */}
           <Textarea
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={500}
-            placeholder="np. wdrożenie u klienta"
+            required={reasonRequired}
+            placeholder={
+              reasonRequired
+                ? "Opisz, co dokładnie robiłeś na nadgodzinach"
+                : "Powód wcześniejszego wyjścia — nieobowiązkowo"
+            }
             className="mb-6"
           />
 

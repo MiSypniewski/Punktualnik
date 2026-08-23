@@ -71,7 +71,15 @@ const stmtIdle = (count) => {
       db.prepare(`
         SELECT u.id, u.name, u.surname, u.section,
                t.lastEndedAt,
-               COALESCE(t.seconds, 0) AS seconds
+               COALESCE(t.seconds, 0) AS seconds,
+               -- Rodzaj zatwierdzonej nieobecności obejmującej dzisiaj, albo NULL.
+               -- Podzapytanie, a nie kolejny LEFT JOIN: przy dwóch złączeniach do
+               -- tabel "wiele" wiersze mnożyłyby się wzajemnie i dzisiejszy czas
+               -- policzyłby się tylekroć, ile ktoś ma nieobecności.
+               (SELECT a.kind FROM Absences a
+                 WHERE a.userID = u.id AND a.status = 'approved'
+                   AND a.dateFrom <= @today AND a.dateTo >= @today
+                 LIMIT 1) AS absenceKind
           FROM Users u
           LEFT JOIN (
             SELECT userID, MAX(endedAt) AS lastEndedAt, SUM(seconds) AS seconds

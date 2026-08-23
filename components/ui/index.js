@@ -1,5 +1,5 @@
 export { default as Button, ButtonLink, IconButton, buttonClass } from "./button";
-export { default as Field, Input, Select, Textarea } from "./field";
+export { default as Field, Input, Select, Textarea, Checkbox } from "./field";
 export { default as Plate, PlateHeader } from "./plate";
 export { default as Table, TableWrap, Th, Td, Tr, Num } from "./table";
 export { default as Alert } from "./alert";

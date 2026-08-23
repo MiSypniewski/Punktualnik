@@ -35,6 +35,29 @@ export const Textarea = ({ className, ...rest }) => (
   <textarea className={classNames(control, "leading-6", className)} {...rest} />
 );
 
+/**
+ * Pole wyboru razem z podpisem — bo checkbox bez podpisu jest kwadratem bez
+ * znaczenia, a podpis niebędący <label> nie przełącza go kliknięciem.
+ *
+ * Powstało z trzeciego powtórzenia tego samego ciągu klas (zadania, projekty,
+ * urlopy). Wygląd zaznaczonego pola rozstrzyga @tailwindcss/forms razem
+ * z poprawką na motyw ciemny w styles/globals.css — tutaj zostaje wyłącznie
+ * rozmiar, kolor wypełnienia i wyłączenie pierścienia fokusu (jak w `control`
+ * wyżej: globalny :focus-visible robi to lepiej i w obu motywach).
+ */
+export const Checkbox = forwardRef(({ label, className, labelClassName, ...rest }, ref) => (
+  <label className={classNames("flex items-center gap-2 text-sm cursor-pointer", labelClassName)}>
+    <input
+      ref={ref}
+      type="checkbox"
+      className={classNames("rounded-sm border-line-strong text-accent focus:ring-0", className)}
+      {...rest}
+    />
+    {label}
+  </label>
+));
+Checkbox.displayName = "Checkbox";
+
 /** Etykieta nad polem, podpowiedź i błąd pod nim. Etykieta jest elementem
  *  <label>, więc kliknięcie w napis ustawia kursor w polu. */
 export const Field = ({ label, hint, error, htmlFor, className, children }) => (

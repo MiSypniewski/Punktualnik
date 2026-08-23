@@ -17,6 +17,19 @@ export const kindLabel = (kind) => OVERTIME_KINDS[kind]?.label ?? kind;
 
 export const kindSign = (kind) => OVERTIME_KINDS[kind]?.sign ?? 1;
 
+/**
+ * Czy przy tym rodzaju powód jest obowiązkowy.
+ *
+ * Wymagamy go tam, gdzie wniosek DOPISUJE czas do salda: kierownik zatwierdza
+ * wtedy godziny, za które firma zapłaci, i musi wiedzieć za co. "Wcześniejsze
+ * wyjście" saldo obniża — pracownik oddaje własny czas i nie ma się z czego
+ * tłumaczyć, więc tam powód zostaje nieobowiązkowy.
+ *
+ * Reguła WYNIKA ze znaku, a nie jest drugą listą rodzajów do utrzymania:
+ * nowy rodzaj "na plus" dostanie wymagany powód sam z siebie.
+ */
+export const requiresReason = (kind) => kindSign(kind) > 0;
+
 // Minuty ze znakiem — tak, jak wpis wpływa na saldo.
 export const signedMinutes = (row) => kindSign(row.kind) * row.minutes;
 

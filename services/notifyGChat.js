@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import { kindLabel, signedMinutes } from "./overtimeKinds";
+import { absenceKindLabel } from "./absenceKinds";
 import { formatMinutes } from "../utils";
 
 // Powiadomienia na Google Chat przez webhook przestrzeni.
@@ -63,6 +64,43 @@ export const notifyNewOvertimeRequest = async (request, user) => {
 
   const panel = process.env.NEXTAUTH_URL
     ? `${process.env.NEXTAUTH_URL.replace(/\/$/, "")}/nadgodziny/zarzadzaj`
+    : null;
+  if (panel) lines.push(panel);
+
+  await sendMessage(lines.join("\n"));
+};
+
+/**
+ * Powiadomienie o nowym wniosku urlopowym. Jak wyżej — nigdy nie rzuca.
+ *
+ * Wołane WYŁĄCZNIE dla wniosków pracownika. Nieobecność wpisana przez
+ * kierownika jest zatwierdzona w chwili powstania, więc nie ma kogo o niej
+ * zawiadamiać: adresatem tych wiadomości jest właśnie kierownik.
+ *
+ * @param {object} absence wiersz z tabeli Absences
+ * @param {{name: string, surname: string, section: string}} user autor wniosku
+ */
+export const notifyNewAbsenceRequest = async (absence, user) => {
+  const who = user ? `${user.name} ${user.surname}` : `użytkownik #${absence.userID}`;
+  const sekcja = user?.section ? ` (${user.section})` : "";
+  const from = dayjs(absence.dateFrom).format("DD.MM.YYYY");
+  const to = dayjs(absence.dateTo).format("DD.MM.YYYY");
+  // Jeden dzień pisany raz, nie jako "05.09–05.09".
+  const zakres = from === to ? from : `${from} – ${to}`;
+
+  const lines = [
+    `*Nowy wniosek urlopowy*`,
+    `${who}${sekcja}`,
+    `${absenceKindLabel(absence.kind)}: *${zakres}*`,
+    // Dni robocze, a nie kalendarzowe — to ta liczba schodzi z puli i to o nią
+    // kierownik zapyta w pierwszej kolejności.
+    `Dni roboczych: ${absence.workDays}`,
+  ];
+
+  if (absence.reason) lines.push(`Powód: ${absence.reason}`);
+
+  const panel = process.env.NEXTAUTH_URL
+    ? `${process.env.NEXTAUTH_URL.replace(/\/$/, "")}/urlopy/zarzadzaj`
     : null;
   if (panel) lines.push(panel);
 

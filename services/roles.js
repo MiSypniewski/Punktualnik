@@ -54,3 +54,14 @@ export const canExportTasks = (role) => role === "manager";
 // cudzy błąd sprzed tygodnia, ale własnego już nie sięgał. Skoro odpowiada za
 // poprawność ewidencji całej sekcji, to tym bardziej za swoją.
 export const boundByEditWindow = (role) => !canSeeTeamTasks(role);
+
+// Akceptowanie urlopów i wpisywanie nieobecności za pracownika (L4, urlop
+// zgłoszony telefonicznie) oraz przydzielanie dni z puli.
+//
+// Osobna nazwa, choć reguła jest ta sama co przy nadgodzinach: strony urlopowe
+// nie mają powoływać się na predykat o nazwie "overtime", bo pierwsza zmiana
+// zasad w jednym z modułów kazałaby zgadywać, którego z nich dotyczy.
+export const canApproveLeave = (role) => role === "manager";
+
+// Kto może zobaczyć cudze salda urlopowe i eksport nieobecności.
+export const canExportLeave = (role) => role === "manager";
