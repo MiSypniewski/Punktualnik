@@ -80,6 +80,18 @@ const RailLink = ({ item, active, onClick, block }) => (
   </Link>
 );
 
+// Powyżej tylu pozycji pasek NIE pokazuje już pełnego menu na żadnej szerokości
+// — wszystko idzie pod przycisk.
+//
+// Podniesienie progu z xl na 2xl nic by nie dało: kontener paska ma stałą
+// maksymalną szerokość (max-w-wide, 85 rem), więc na monitorze 2560 px nawigacja
+// dostaje dokładnie tyle samo miejsca co na 1360 px. Dziesięć pozycji kierownika
+// razem ze znakiem, zegarem, kontem i przełącznikiem motywu po prostu się w tym
+// nie mieści — przy dziewiątej "Filtr GAM" wchodził na własne imię użytkownika.
+//
+// Pracownik ma pięć pozycji i zachowuje pełne menu od 1280 px, jak dotąd.
+const CROWDED_FROM = 8;
+
 const MenuIcon = ({ open }) => (
   <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
     {open ? (
@@ -118,6 +130,8 @@ export default function StationRail({ user }) {
   // się ze stanowiska.
   const isKiosk = user.role === "editor";
 
+  const crowded = items.length >= CROWDED_FROM;
+
   return (
     <header className="sticky top-0 z-30 bg-surface border-b border-line shadow-rail">
       <div className="mx-auto max-w-wide px-4">
@@ -125,11 +139,12 @@ export default function StationRail({ user }) {
           <Logo />
           <StationClock />
 
-          {/* Próg 1280 px, nie 1024: przy siedmiu pozycjach kierownika, zegarze,
-              znaku, koncie i przełączniku motywu pasek nie mieścił się na
-              tablecie i wypychał stronę w poziomie. Poniżej — menu pod
-              przyciskiem. */}
-          <nav className="hidden xl:flex items-center gap-4 2xl:gap-5 flex-grow min-w-0" aria-label="Sekcje aplikacji">
+          {/* Pełne menu dopiero od progu wyliczonego z liczby pozycji (LAYOUTS
+              wyżej) — poniżej wszystko chowa się pod przyciskiem. */}
+          <nav
+            className={classNames("hidden items-center gap-4 2xl:gap-5 flex-grow min-w-0", !crowded && "xl:flex")}
+            aria-label="Sekcje aplikacji"
+          >
             {items.map((item) => (
               <RailLink key={item.href} item={item} active={router.pathname === item.match} />
             ))}
@@ -145,7 +160,7 @@ export default function StationRail({ user }) {
                     {user.name}
                   </a>
                 </Link>
-                <SignOutButton className="hidden xl:block text-sm" />
+                <SignOutButton className={classNames("hidden text-sm", crowded ? "sm:block" : "xl:block")} />
               </>
             )}
             {/* Poniżej 640 px przełącznik przenosi się do menu: znak, zegar,
@@ -161,7 +176,10 @@ export default function StationRail({ user }) {
               aria-expanded={open}
               aria-controls="menu-paska"
               aria-label={open ? "Zamknij menu" : "Otwórz menu"}
-              className="xl:hidden flex items-center justify-center w-9 h-9 rounded border border-line text-muted hover:text-body hover:bg-raised"
+              className={classNames(
+                "flex items-center justify-center w-9 h-9 rounded border border-line text-muted hover:text-body hover:bg-raised",
+                !crowded && "xl:hidden"
+              )}
             >
               <MenuIcon open={open} />
             </button>
@@ -172,7 +190,7 @@ export default function StationRail({ user }) {
       {open && (
         <nav
           id="menu-paska"
-          className="xl:hidden border-t border-line-subtle bg-surface"
+          className={classNames("border-t border-line-subtle bg-surface", !crowded && "xl:hidden")}
           aria-label="Sekcje aplikacji"
         >
           <div className="mx-auto max-w-wide px-4 py-2">
