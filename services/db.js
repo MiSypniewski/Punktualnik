@@ -261,6 +261,65 @@ const createDb = () => {
       FOREIGN KEY (userID) REFERENCES Users(id)
     );
 
+    -- Nieobecności: urlopy, zwolnienia, opieka. Obieg jak przy nadgodzinach
+    -- (pending → approved/rejected, anulowanie przez pracownika), ale wniosek
+    -- dotyczy ZAKRESU dni, nie jednego dnia.
+    --
+    -- createdBy/createdByName nie mają odpowiednika w Overtime i to jest
+    -- różnica celowa: tam autorem zawsze jest pracownik, a tutaj wpis potrafi
+    -- założyć kierownik (L4 ze zwolnienia, urlop zgłoszony telefonicznie).
+    -- Bez tego po miesiącu nie da się odróżnić wniosku pracownika od notatki
+    -- kierownika. Imię jest denormalizowane z tego samego powodu co
+    -- decidedByName: podpis pod historycznym wpisem ma zostać taki, jaki był.
+    --
+    -- workDays jest REDUNDANTNE wobec pary dat i kalendarza świąt — trzymamy je
+    -- z tego samego powodu co TaskEntries.seconds: salda je sumują, a liczenie
+    -- kalendarza w każdym zapytaniu byłoby wolne i rozjechałoby się po zmianie
+    -- listy świąt. Liczy je JEDNO miejsce, przy zapisie (services/createAbsence.js).
+    --
+    -- year wynika z dateFrom i istnieje po to, żeby pula urlopowa dała się
+    -- rozliczyć rocznie jednym warunkiem. Wniosek przechodzący przez sylwestra
+    -- jest odrzucany, więc rok jest zawsze jednoznaczny.
+    CREATE TABLE IF NOT EXISTS Absences (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      userID        INTEGER NOT NULL,
+      kind          TEXT    NOT NULL,
+      dateFrom      TEXT    NOT NULL,
+      dateTo        TEXT    NOT NULL,
+      year          INTEGER NOT NULL,
+      workDays      INTEGER NOT NULL,
+      reason        TEXT,
+      status        TEXT    NOT NULL DEFAULT 'pending',
+      createdAt     TEXT    NOT NULL,
+      createdBy     INTEGER,
+      createdByName TEXT,
+      decidedAt     TEXT,
+      decidedBy     INTEGER,
+      decidedByName TEXT,
+      decisionNote  TEXT,
+      FOREIGN KEY (userID) REFERENCES Users(id)
+    );
+
+    -- Przydziały dni urlopu. Pula pracownika na dany rok = suma tych wierszy;
+    -- wykorzystanie odejmują zatwierdzone Absences rodzajów z usesPool.
+    --
+    -- Osobna tabela, a nie kolumna w Users, bo liczba dni ZMIENIA SIĘ w czasie
+    -- i ma historię: 26 dni na start roku, 4 dni zaległe dopisane w lutym,
+    -- korekta in minus po sprostowaniu wymiaru etatu. Kolumna zapamiętałaby
+    -- wyłącznie ostatnią wartość i nikt by nie wiedział, skąd się wzięła.
+    -- days bywa UJEMNE i to jest poprawne — tak wygląda korekta.
+    CREATE TABLE IF NOT EXISTS LeaveAllowance (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      userID        INTEGER NOT NULL,
+      year          INTEGER NOT NULL,
+      days          INTEGER NOT NULL,
+      note          TEXT,
+      createdAt     TEXT    NOT NULL,
+      createdBy     INTEGER,
+      createdByName TEXT,
+      FOREIGN KEY (userID) REFERENCES Users(id)
+    );
+
     -- Które sekcje obsługuje dany kierownik. Przypisanie jest JAWNE i niezależne
     -- od Users.section kierownika: kierownik siedzący w sekcji "dyrekcja" może
     -- obsługiwać "spedycja" i "cns", a jedną sekcję może obsługiwać kilka osób.
@@ -362,6 +421,14 @@ const createDb = () => {
     CREATE INDEX IF NOT EXISTS idx_users_section      ON Users(section);
     CREATE INDEX IF NOT EXISTS idx_overtime_user      ON Overtime(userID, data);
     CREATE INDEX IF NOT EXISTS idx_overtime_status    ON Overtime(status);
+
+    CREATE INDEX IF NOT EXISTS idx_absences_user      ON Absences(userID, dateFrom, dateTo);
+    CREATE INDEX IF NOT EXISTS idx_absences_status    ON Absences(status);
+    CREATE INDEX IF NOT EXISTS idx_absences_user_year ON Absences(userID, year);
+    -- Pytanie kiosku: "kto z sekcji jest nieobecny DZISIAJ". Zakres dat bez
+    -- userID z przodu, bo pytamy o wszystkich naraz.
+    CREATE INDEX IF NOT EXISTS idx_absences_range     ON Absences(dateFrom, dateTo);
+    CREATE INDEX IF NOT EXISTS idx_allowance_user_year ON LeaveAllowance(userID, year);
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_name  ON Projects(name COLLATE NOCASE);
     ${ENTRY_INDEXES}
