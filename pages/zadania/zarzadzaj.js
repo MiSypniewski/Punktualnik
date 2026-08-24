@@ -15,7 +15,7 @@ import Stat from "../../components/ui/stat";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table as UiTable, Th as UiTh, Td as UiTd } from "../../components/ui/table";
-import { PencilIcon, DownloadIcon } from "../../components/ui/icons";
+import { PencilIcon, TrashIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
 import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
@@ -117,6 +117,7 @@ const ERRORS = {
   permission_denied: "Ten wpis jest poza twoim zasięgiem.",
   not_found: "Tego wpisu już nie ma — odśwież raport.",
   bad_project: "Wybierz projekt.",
+  edit_window_closed: "Tego wpisu nie da się już ruszyć.",
 };
 
 export default function ZarzadzajZadaniami({
@@ -137,6 +138,9 @@ export default function ZarzadzajZadaniami({
 
   const [form, setForm] = useState(filters);
   const [editingID, setEditingID] = useState(null);
+  // Wpis z otwartym pytaniem o powód usunięcia. Osobno od editingID, bo to dwie
+  // różne intencje i jednoczesne otwarcie obu w jednym wierszu nie ma sensu.
+  const [deletingID, setDeletingID] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -174,6 +178,45 @@ export default function ZarzadzajZadaniami({
         setErr(payload.message || ERRORS[payload.error] || "Nie udało się zapisać zmiany.");
         return false;
       }
+      await router.replace(router.asPath, undefined, { scroll: false });
+      return true;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Usunięcie cudzego wpisu — od zadania dopisanego "dla zabawy" po duplikat
+   * wklejony dwa razy. Kierownika nie obowiązuje okno "dziś i wczoraj"; pilnuje
+   * tego API (services/roles.js: boundByEditWindow), nie ten formularz.
+   *
+   * Wpis znika z bazy NA STAŁE — TaskEntries nie zna statusów ani miejsca na
+   * notatkę, więc kasujemy tak samo, jak robi to pracownik na własnym wpisie.
+   * Powód idzie do logu serwera (services/log.js), czyli do `pm2 logs`: jedyny
+   * ślad, jaki bez tabeli audytu da się po takim usunięciu zostawić.
+   */
+  const removeEntry = async (id, reason) => {
+    const why = (reason || "").trim();
+    if (!why) {
+      setErr("Podaj powód usunięcia — trafi do logu serwera.");
+      return false;
+    }
+
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/entries/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: why }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        setErr(payload.message || ERRORS[payload.error] || "Nie udało się usunąć wpisu.");
+        return false;
+      }
+      // Jak przy poprawce: przeładowanie propsów z serwera, bo usunięcie rusza
+      // sumy, udziały projektów i zestawienie z obecnością nad tabelą.
       await router.replace(router.asPath, undefined, { scroll: false });
       return true;
     } finally {
@@ -498,6 +541,19 @@ export default function ZarzadzajZadaniami({
                       }}
                       onSave={(body) => saveEntry(r.id, body).then((ok) => ok && setEditingID(null))}
                     />
+                  ) : r.id === deletingID ? (
+                    <EntryRemover
+                      key={r.id}
+                      entry={r}
+                      busy={busy}
+                      onCancel={() => {
+                        setDeletingID(null);
+                        setErr("");
+                      }}
+                      onConfirm={(reason) =>
+                        removeEntry(r.id, reason).then((ok) => ok && setDeletingID(null))
+                      }
+                    />
                   ) : (
                     <EntryRow
                       key={r.id}
@@ -505,6 +561,12 @@ export default function ZarzadzajZadaniami({
                       busy={busy}
                       onEdit={() => {
                         setEditingID(r.id);
+                        setDeletingID(null);
+                        setErr("");
+                      }}
+                      onDelete={() => {
+                        setDeletingID(r.id);
+                        setEditingID(null);
                         setErr("");
                       }}
                     />
@@ -521,15 +583,26 @@ export default function ZarzadzajZadaniami({
                   projects={projectsBySection[r.userSection] ?? []}
                   busy={busy}
                   editing={r.id === editingID}
+                  deleting={r.id === deletingID}
                   onEdit={() => {
                     setEditingID(r.id);
+                    setDeletingID(null);
+                    setErr("");
+                  }}
+                  onDelete={() => {
+                    setDeletingID(r.id);
+                    setEditingID(null);
                     setErr("");
                   }}
                   onCancel={() => {
                     setEditingID(null);
+                    setDeletingID(null);
                     setErr("");
                   }}
                   onSave={(body) => saveEntry(r.id, body).then((ok) => ok && setEditingID(null))}
+                  onConfirmDelete={(reason) =>
+                    removeEntry(r.id, reason).then((ok) => ok && setDeletingID(null))
+                  }
                 />
               ))}
             </ul>
@@ -547,7 +620,7 @@ export default function ZarzadzajZadaniami({
 // potrafią wylądować wpisy z dwóch lat i samo „14.08” nic nie rozstrzyga.
 const dayLabel = (data) => dayjs(data).format("DD.MM.YY");
 
-const EntryRow = ({ entry, busy, onEdit }) => (
+const EntryRow = ({ entry, busy, onEdit, onDelete }) => (
   <tr className={classNames("border-b border-line-subtle", entry.autoClosed && "bg-signal-soft")}>
     <Td className="whitespace-nowrap">{dayLabel(entry.data)}</Td>
     <Td className="whitespace-nowrap">
@@ -572,7 +645,10 @@ const EntryRow = ({ entry, busy, onEdit }) => (
     </Td>
     <Td className="font-mono text-right tabular-nums font-medium whitespace-nowrap">{formatDuration(entry.seconds)}</Td>
     <Td className="text-right">
-      <PencilButton busy={busy} onClick={onEdit} />
+      <span className="inline-flex gap-1">
+        <PencilButton busy={busy} onClick={onEdit} />
+        <TrashButton busy={busy} onClick={onDelete} />
+      </span>
     </Td>
   </tr>
 );
@@ -589,6 +665,81 @@ const PencilButton = ({ busy, onClick }) => (
 );
 
 /**
+ * Kosz przy cudzym wpisie — dla zadania dopisanego "dla zabawy", duplikatu albo
+ * wpisu założonego na złym koncie. Poprawka takiego wpisu nie załatwia sprawy:
+ * zostałby w sumach jako czyjaś praca, tylko z inną nazwą.
+ *
+ * Kliknięcie niczego nie kasuje — otwiera pytanie o powód w miejscu wiersza
+ * (EntryRemover). Świadomie zamiast window.confirm, którym pracownik potwierdza
+ * usunięcie WŁASNEGO wpisu na /zadania: tam decyzja dotyczy siebie i wystarczy
+ * "tak", tutaj znika cudza praca i powinno zostać po tym zdanie w logu.
+ */
+const TrashButton = ({ busy, onClick }) => (
+  <IconButton disabled={busy} label="Usuń wpis" onClick={onClick} className="w-auto h-auto py-1 px-2">
+    <TrashIcon />
+  </IconButton>
+);
+
+/**
+ * Wiersz zamieniony w pytanie "na pewno, i dlaczego". Ten sam kształt co
+ * EntryEditor: formularz przez całą szerokość, bo w sześciu wąskich kolumnach
+ * nie ma miejsca ani na opis usuwanego wpisu, ani na pole powodu.
+ */
+const EntryRemover = ({ entry, busy, onCancel, onConfirm }) => {
+  const [reason, setReason] = useState("");
+
+  return (
+    <tr className="border-b border-line bg-danger-soft">
+      <td colSpan={7} className="py-3 px-2">
+        <EntryRemoveForm
+          entry={entry}
+          reason={reason}
+          setReason={setReason}
+          busy={busy}
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+        />
+      </td>
+    </tr>
+  );
+};
+
+/** Wspólne wnętrze dla tabeli i dla karty na telefonie — jedne reguły w obu układach. */
+const EntryRemoveForm = ({ entry, reason, setReason, busy, onCancel, onConfirm }) => (
+  <div>
+    <p className="text-sm">
+      Usunąć wpis{" "}
+      <strong>
+        {entry.surname} {entry.name}
+      </strong>{" "}
+      z {dayLabel(entry.data)} — {entry.description || NO_PROJECT} ({formatDuration(entry.seconds)})?
+    </p>
+    <p className="mt-1 text-xs text-muted">
+      Wpis zniknie z bazy na stałe, razem z jego czasem w podsumowaniach. Powód trafi do logu
+      serwera.
+    </p>
+
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <Input
+        type="text"
+        autoFocus
+        maxLength={200}
+        placeholder="Powód usunięcia (obowiązkowy)"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        className="flex-grow w-auto min-w-[12rem]"
+      />
+      <Button variant="danger" disabled={busy || !reason.trim()} onClick={() => onConfirm(reason)}>
+        Usuń wpis
+      </Button>
+      <Button variant="ghost" disabled={busy} onClick={onCancel}>
+        Anuluj
+      </Button>
+    </div>
+  </div>
+);
+
+/**
  * Ten sam wpis na telefonie: cztery krótkie rzędy zamiast siedmiu kolumn.
  *
  * Kolejność jest inna niż w tabeli i to jest celowe. W tabeli oko jedzie po
@@ -596,11 +747,39 @@ const PencilButton = ({ busy, onClick }) => (
  * pytanie brzmi "co to za praca", a nie "z którego dnia". Data i wymiar stoją
  * z prawej, gdzie wzrok wraca po nazwisku.
  */
-const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave }) => {
+const EntryCard = ({
+  entry,
+  projects,
+  busy,
+  editing,
+  deleting,
+  onEdit,
+  onDelete,
+  onCancel,
+  onSave,
+  onConfirmDelete,
+}) => {
+  const [reason, setReason] = useState("");
+
   if (editing) {
     return (
       <li className="p-3 border border-line rounded bg-accent-soft">
         <EntryForm entry={entry} projects={projects} busy={busy} onCancel={onCancel} onSave={onSave} />
+      </li>
+    );
+  }
+
+  if (deleting) {
+    return (
+      <li className="p-3 border border-danger/40 rounded bg-danger-soft">
+        <EntryRemoveForm
+          entry={entry}
+          reason={reason}
+          setReason={setReason}
+          busy={busy}
+          onCancel={onCancel}
+          onConfirm={onConfirmDelete}
+        />
       </li>
     );
   }
@@ -637,6 +816,7 @@ const EntryCard = ({ entry, projects, busy, editing, onEdit, onCancel, onSave })
         <span className="flex items-center gap-2">
           <span className="font-mono text-sm font-medium tabular-nums">{formatDuration(entry.seconds)}</span>
           <PencilButton busy={busy} onClick={onEdit} />
+          <TrashButton busy={busy} onClick={onDelete} />
         </span>
       </div>
     </li>

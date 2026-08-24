@@ -11,7 +11,7 @@ import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
-import { logApiError } from "../../../services/log";
+import { logApiError, logInfo } from "../../../services/log";
 
 // "retag" to opis i projekt biegnącego timera, "setstart" — jego godzina
 // rozpoczęcia; "update" to cały zamknięty wpis razem z czasami. Rozdzielone, bo
@@ -90,6 +90,26 @@ export default async (req, res) => {
       userID: entry.userID,
       enforceWindow: access.enforceWindow,
     });
+
+    // Usunięcie CUDZEGO wpisu zostawia ślad w logu.
+    //
+    // TaskEntries nie ma statusów ani kolumny na notatkę, a wpis kasujemy
+    // twardo — po skasowanym wierszu nie zostaje w bazie nic, o co można by
+    // zapytać. Skoro kierownik zdejmuje komuś zaraportowaną pracę, to niech
+    // przynajmniej `pm2 logs` odpowiadało, kto, co i dlaczego. Przy własnym
+    // wpisie nie ma komu o tym mówić, więc log milczy — jak przy podpisie
+    // "popr." (services/taskEntries.js).
+    if (removed && access.actor) {
+      logInfo("api/entries/[id]", "wpis usunięty przez kierownika", {
+        entryID: Number(id),
+        ownerID: Number(entry.userID),
+        data: entry.data,
+        seconds: entry.seconds,
+        by: access.actor.userID,
+        reason: String(req.body?.reason ?? "").trim().slice(0, 200) || "(bez powodu)",
+      });
+    }
+
     // changes === 0 przy istniejącym wpisie znaczy dokładnie jedno: warunek
     // okna w SQL go odrzucił.
     return removed
