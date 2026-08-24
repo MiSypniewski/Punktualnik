@@ -5,6 +5,7 @@ import { ProjectMark } from "./projectColors";
 import LiveDot from "./liveDot";
 import Plate, { PlateHeader } from "./ui/plate";
 import { formatDuration, hhmm } from "../utils";
+import { LIVE_POLL_MS, fetchLive } from "../utils/live";
 import { absenceKindShort } from "../services/absenceKinds";
 
 // Sekcja "Teraz w toku" na górze raportu kierownika.
@@ -14,30 +15,23 @@ import { absenceKindShort } from "../services/absenceKinds";
 // z services/ — tamte moduły wciągają better-sqlite3, które w bundlu klienta
 // nie ma czego szukać.
 
-const POLL_MS = 45_000;
-
 // Timer biegnący dłużej niż dniówka to prawie zawsze zapomniany licznik, a nie
 // ośmiogodzinne zadanie. Auto-domknięcie złapie go dopiero o 3:00, więc ta
 // lista jest jedynym miejscem, gdzie da się zareagować tego samego dnia.
 const LONG_RUN_MIN = 8 * 60;
 
-// Świadomie NIE używamy jsonFetcher z utils/ — tamten nie sprawdza res.ok, więc
-// odpowiedź 403 albo 401 wróciłaby do SWR jako poprawne dane ({error: ...})
-// i lista wyzerowałaby się bez żadnego śladu. Rzucony wyjątek zostawia
-// na ekranie ostatni znany stan.
-const fetchBoard = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
+// Cykl odpytywania i fetcher z kontrolą res.ok siedzą w utils/live.js — dzieli
+// je z tablicą kiosku (pages/time/[id].js). Oba widoki pokazują stan na teraz
+// tej samej sekcji, więc rozjazd częstotliwości znaczyłby dwa ekrany z danymi
+// z różnych chwil.
 
 const fullName = (person) => `${person.surname} ${person.name}`;
 
 export default function LiveBoard({ initial, currentUserID }) {
-  const { data, error } = useSWR("/api/entries/running", fetchBoard, {
+  const { data, error } = useSWR("/api/entries/running", fetchLive, {
     // Dane z SSR jako pierwszy render — sekcja nie miga pustką przy wejściu.
     fallbackData: initial,
-    refreshInterval: POLL_MS,
+    refreshInterval: LIVE_POLL_MS,
     // refreshWhenHidden zostaje domyślnie wyłączone: karta schowana w tle nie
     // odpytuje serwera, a revalidateOnFocus dociąga świeże dane dokładnie
     // w chwili powrotu do zakładki, bez czekania na koniec cyklu.

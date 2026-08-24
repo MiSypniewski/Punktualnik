@@ -1,22 +1,22 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { getToken } from "next-auth/jwt";
-import getSectionTime from "../../services/getSectionTime";
+import useSWR, { useSWRConfig } from "swr";
+import { getSectionBoard } from "../../services/sectionBoard";
 import { canSeeSection } from "../../services/scope";
-import getUsers from "../../services/getUsers";
 import { getSection } from "../../services/sections";
-import getAbsencesForDay from "../../services/getAbsencesForDay";
-import { workDay } from "../../services/workday";
-import useSWR from "swr";
+import { LIVE_POLL_MS, fetchLive } from "../../utils/live";
 import BaseLayout from "../../components/baseLayout";
 import Card from "../../components/card";
 import Spinner from "../../components/spinner";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
-import dayjs from "dayjs";
-import "dayjs/locale/pl";
-dayjs.locale("pl");
+
+// Adres, spod którego tablica dociąga świeże karty. Ta sama funkcja liczy klucz
+// dla useSWR i dla mutate po odbiciu — dwa różne łańcuchy znaczyłyby dwa różne
+// wpisy w cache SWR i odbicie nie odświeżałoby tego widoku.
+const boardKey = (section) => `/api/time/board?section=${encodeURIComponent(section)}`;
 
 export const getServerSideProps = async (context) => {
   // Kontrola po stronie serwera. Wcześniej strona nie sprawdzała sesji w ogóle
@@ -33,108 +33,27 @@ export const getServerSideProps = async (context) => {
     return { notFound: true };
   }
 
-  //pobieranie dzisiejszej daty i ustawnianie godziny na 3 w nocy aby uniknąć problemów ze zmianą czasu na letni i zimowy
-  const toDay = dayjs().hour(3).minute(0).second(0).millisecond(0).format();
-  //pobieranie aktywnych użytkowników z danej sekcji (contex.params.id) -- tylko "user", żaden edytor
-  const users = await getUsers(context.params.id);
-  //pobieranie z bazy dzisiejszych rekordów z danej sekcji, Jeżeli ktoś już zaznaczył swoją obecność będzie w tej bazie.
-  const cardData = await getSectionTime(context.params.id, toDay);
-  // pusta tablica na dane użytkowników
-  const newCardData = [];
-
-  // tworzenie nowego pustego użytkownika
-  const addEmptyUser = (user) => {
-    const emptyUser = {
-      ID: `empty_${user.ID}`,
-      userID: user.ID,
-      name: user.name,
-      surname: user.surname,
-      section: user.section,
-      location: user.location,
-      data: toDay,
-      startTime: toDay,
-      endTime: toDay,
-      // differenceTime: moment(newDay).hours(8).minutes(0).seconds(0).milliseconds(0).format(),
-      totalWorkTime: `00:00:00`,
-      status: "wait",
-      overTime: false,
-    };
-    //dodawanie nowego pustego użytkownika.
-    newCardData.push(emptyUser);
-  };
-
-  // porównanie czy każdy aktywny użytkownik jest zapisany w bazie.
-
-  // brak zapisanego czasu ŻADNEGO użytkownika w danym dniu
-  if (Array.isArray(cardData) && cardData.length === 0) {
-    //dodawanie każdego aktywnego użytkownika
-    users.forEach((user) => {
-      addEmptyUser(user);
-    });
-  }
-
-  // znalezione czasy użytkowników w bazie
-  if (Array.isArray(cardData) && cardData.length > 0) {
-    // sprawdza który użytkownik z danej sekcji zapisaj już swój czas wejścia w bazie
-    users.forEach((user) => {
-      cardData.forEach((card) => {
-        if (user.ID === card.userID) {
-          // znaleziony użytkownik
-          newCardData.push(card);
-        }
-      });
-    });
-
-    // sprawdza który użytkownik jeszcze nie zapisał swojego czasu przyjścia w bazie
-    users.forEach((user) => {
-      let flag = true;
-      newCardData.forEach((newCard) => {
-        if (newCard.userID === user.ID) {
-          flag = false;
-        }
-      });
-
-      if (flag) {
-        addEmptyUser(user);
-        flag = true;
-      }
-    });
-  }
+  // Te same karty, które poda potem /api/time/board — jedna funkcja dla obu
+  // ścieżek (services/sectionBoard.js).
+  const board = await getSectionBoard(section);
 
   // Etykieta działu do nagłówka tablicy — slug (`spedycja`) jest kluczem
   // technicznym, a na ścianie ma stać nazwa dla ludzi.
-  const sectionRow = getSection(context.params.id);
-
-  // Kto jest dziś nieobecny. workDay() z services/workday.js, a NIE `toDay`
-  // wyżej: daty nieobecności to gołe 'YYYY-MM-DD' (jak w Overtime), podczas gdy
-  // Times.data trzyma pełne ISO z offsetem przypięte do 03:00. Dwa różne formaty
-  // w jednej funkcji są mylące, ale zamiana ich tutaj oznaczałaby ruszenie
-  // dopasowania kart — a to najstarsza i najmniej pilnowana część aplikacji.
-  const absences = getAbsencesForDay(context.params.id, workDay());
-
-  // Nieobecność dokładamy do gotowych kart, zamiast wplatać ją w scalanie wyżej:
-  // dotyczy zarówno tych, którzy nie odbili karty, jak i tych, którzy odbili
-  // (ktoś wraca z L4 wcześniej albo wpada na dwie godziny).
-  newCardData.forEach((card) => {
-    const absence = absences[card.userID];
-    if (absence) card.absence = absence;
-  });
+  const sectionRow = getSection(section);
 
   return {
     props: {
-      newCardData,
-      id: context.params.id,
-      sectionLabel: sectionRow?.label ?? context.params.id,
-      // Doba robocza zaczyna się o 3:00, więc „dzisiaj” na tablicy to nie
-      // zawsze dzisiaj w kalendarzu — stąd data prosto z serwera.
-      workdayLabel: dayjs(toDay).format("dddd, D MMMM YYYY"),
+      board,
+      id: section,
+      sectionLabel: sectionRow?.label ?? section,
     },
   };
 };
 
-export default function Home({ newCardData, id, sectionLabel, workdayLabel }) {
-  const { data: session, status } = useSession();
+export default function Home({ board, id, sectionLabel }) {
+  const { status } = useSession();
   const router = useRouter();
+  const { mutate } = useSWRConfig();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -143,16 +62,28 @@ export default function Home({ newCardData, id, sectionLabel, workdayLabel }) {
     // Dostęp rozstrzyga już getServerSideProps (własna sekcja albo zasięg
     // kierownika). Porównanie sekcji zostawione tu wyrzucałoby kierownika
     // z sekcji, którą ma prawo oglądać, a której sam nie jest członkiem.
-  }, [session, status]);
-  // const { data } = useSWR(`/api/section/${id}`, jsonFetcher, { initialData: cardData });
-  const data = undefined;
+  }, [status, router]);
+
+  // Tablica dociąga się sama, jak "Teraz w toku" na /zadania/zarzadzaj: kiosk
+  // wisi na ścianie tygodniami i nikt go nie odświeża klawiszem. Bez tego
+  // odbicie z drugiego urządzenia, nowy pracownik i zatwierdzony dziś urlop
+  // pojawiały się na ekranie dopiero po przeładowaniu o 3:30.
+  //
+  // Błąd sieci zostaje CICHY, inaczej niż w components/liveBoard.js. Tam napis
+  // "brak łączności" czyta kierownik, który może coś z tym zrobić; tu ekran
+  // ogląda się z drugiego końca hali i komunikat diagnostyczny nie ma odbiorcy.
+  // Ostatnie znane karty zostają na ekranie, SWR ponawia próbę sam.
+  const { data } = useSWR(boardKey(id), fetchLive, {
+    fallbackData: board,
+    refreshInterval: LIVE_POLL_MS,
+  });
 
   if (status !== "authenticated") {
-    // console.log(`loading`);
     return <Spinner />;
   }
 
-  const cards = data != undefined ? data : newCardData;
+  const cards = (data ?? board).cards ?? [];
+  const workdayLabel = (data ?? board).workdayLabel;
 
   return (
     <BaseLayout width="full">
@@ -170,12 +101,20 @@ export default function Home({ newCardData, id, sectionLabel, workdayLabel }) {
         // Cztery kolumny od 1280 px: tablet kiosku stoi zwykle w poziomie,
         // a przy kilkunastu osobach trzy kolumny zeszły poniżej krawędzi ekranu.
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {/* Klucz po userID, nie po ID: wiersze z tabeli Times mają `airtableID`
-              (patrz services/getSectionTime.js), a `ID` tylko kafelki dorobione
-              dla nieobecnych — czyli połowa listy szła bez klucza i React mógł
-              podmienić stan licznika między osobami. */}
           {cards.map((card) => (
-            <Card data={card} key={card.userID} />
+            // Klucz niesie SYGNATURĘ danych z serwera, nie samo userID.
+            //
+            // components/card.js kopiuje propsy do useState przy montowaniu
+            // i potem ich nie czyta, więc bez tego świeże dane z pollingu nigdy
+            // nie weszłyby na ekran. Zmiana stanu po stronie serwera przemontowuje
+            // kafelek; kliknięcie na TYM ekranie propsów nie rusza, więc sygnatura
+            // zostaje ta sama i odpowiedź pollingu wysłana przed odbiciem nie cofa
+            // tego, co pracownik przed chwilą dotknął.
+            <Card
+              data={card}
+              key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}`}
+              onSaved={() => mutate(boardKey(id))}
+            />
           ))}
         </div>
       )}
