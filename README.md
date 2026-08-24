@@ -289,6 +289,14 @@ Zasady:
   używana — to dwie różne rzeczy.
 - Datę wniosku można podać wstecz (zgłoszenie faktu) i w przód (planowane wyjście).
 - Pracownik może anulować własny wniosek, dopóki ma status *Oczekuje*.
+- **Kierownik może usunąć każdy wniosek ze swoich sekcji, w dowolnym statusie.**
+  Wniosek nie znika z bazy — dostaje status *Cofnięty*, podpis („Cofnął: …”)
+  i **obowiązkowy powód**. Saldo liczy wyłącznie wnioski zatwierdzone, więc po
+  cofnięciu poprawia się samo. To narzędzie do odkręcania własnej pomyłki
+  (zatwierdzone przez nieuwagę) i do sprzątania zgłoszeń wpisanych bez pokrycia.
+- *Anulowany* i *Cofnięty* to dwie różne rzeczy: pierwsze robi pracownik przed
+  decyzją, drugie kierownik — w każdej chwili. Jeden wspólny status znaczyłby, że
+  po pół roku nie da się odróżnić „rozmyślił się” od „kierownik wycofał zgodę”.
 - Rodzaje wniosków definiuje `services/overtimeKinds.js` — dodanie nowego rodzaju
   (wraz ze znakiem) wymaga zmiany tylko w tym pliku.
 
@@ -384,6 +392,14 @@ czeka na decyzję.
 nieobecności za pracownika, przydzielanie dni i historia z filtrami. Widzi
 wyłącznie swoje sekcje (`ManagerSections`, jak przy nadgodzinach).
 
+**Zatwierdzony urlop da się cofnąć** — i to jest najczęstszy przypadek użycia:
+pracownik rezygnuje, a sam już nic nie zrobi, bo anulowanie działa tylko na
+wniosku oczekującym. Kierownik usuwa nieobecność z historii, podając
+**obowiązkowy powód**; wniosek zostaje w bazie ze statusem *Cofnięty* i podpisem.
+Konsekwencje odkręcają się same: dni wracają do puli, kafelek nieobecności znika
+z kiosku i sprzed nazwiska w „Teraz w toku”, a ten sam termin da się zgłosić
+ponownie (kontrola nakładania patrzy tylko na *Oczekuje* i *Zatwierdzony*).
+
 ### Rodzaje
 
 | Rodzaj | Zdejmuje dni z puli | Zgłasza pracownik |
@@ -462,6 +478,30 @@ urlopie” to dokładnie ta sytuacja, o której kierownik ma wiedzieć.
 
 Zatwierdzone nieobecności podpisują się też w „Teraz w toku” na
 `/zadania/zarzadzaj`, przy nazwiskach w sekcji „bez timera”.
+
+**Tablica odświeża się sama co 45 sekund** — z `/api/time/board?section=…`, tym
+samym cyklem co „Teraz w toku” w raporcie kierownika (stała `LIVE_POLL_MS`
+w `utils/live.js`). Bez tego odbicie zrobione na drugim urządzeniu, nowo
+aktywowane konto i zatwierdzony przed chwilą urlop pojawiały się na ekranie
+dopiero po ręcznym przeładowaniu. Odbicie karty dociąga tablicę od razu, nie
+czekając na koniec cyklu.
+
+Ekran w hali nie pokazuje przy tym żadnego komunikatu o błędzie sieci — inaczej
+niż raport kierownika, gdzie taki napis jest. Na ścianie nie ma go kto przeczytać
+ani co z nim zrobić, więc przy zerwanym łączu zostają ostatnie znane kafelki,
+a odpytywanie wraca samo.
+
+**Kafelki nie zmieniają kolejności w ciągu dnia.** Lista idzie zawsze porządkiem
+pracowników, a nie „najpierw ci, którzy odbili” — inaczej przy odświeżaniu czyjś
+kafelek uciekałby spod palca w chwili dotknięcia.
+
+Pełne przeładowanie strony o 3:30 (`components/stationClock.js`) zostaje mimo
+pollingu: przy okazji podmienia kod aplikacji po wdrożeniu i odświeża sesję,
+a kosztuje jedno żądanie na dobę.
+
+Endpoint tablicy wyłącznie **czyta** i tak ma zostać — odpytuje go każdy kiosk
+w firmie, a zapis wykonywany przy odczycie to dokładnie ta przyczyna, która
+położyła serwer 21.08.2026 (zob. [Kiedy „aplikacja muli”](#kiedy-aplikacja-muli--co-sprawdzić)).
 
 ### Eksport CSV
 
@@ -666,6 +706,19 @@ nie, bo nie ma komu o niej mówić. Regułę trzyma jeden predykat
 wpisu, jak i przy wpisie ręcznym — dlatego kierownik ma na `/zadania` aktywny ołówek
 przy każdym dniu i pole daty zamiast wyboru „dziś/wczoraj”. Timera za nikogo nie
 uruchamia ani nie zatrzymuje: nie wie, kiedy tamten faktycznie zaczął i skończył.
+
+**Obok ołówka jest kosz.** Wpis dopisany „dla zabawy”, duplikat wklejony dwa razy
+albo praca zaraportowana na złym koncie nie da się naprawić poprawką — zostałby
+w sumach jako czyjaś praca, tylko pod inną nazwą. Kliknięcie kosza nie kasuje od
+razu: wiersz zamienia się w pytanie z **obowiązkowym powodem**, bo znika cudza
+praca, a nie własna notatka (na `/zadania` pracownik potwierdza usunięcie
+własnego wpisu zwykłym „na pewno?”).
+
+Wpis znika z bazy **na stałe** — `TaskEntries` nie ma statusów ani miejsca na
+notatkę, więc kasujemy tak samo, jak robi to pracownik u siebie. Powód trafia do
+logu serwera (`pm2 logs`, wpis `wpis usunięty przez kierownika` z id, właścicielem
+i wymiarem) i to jest jedyny ślad, jaki bez tabeli audytu zostaje. Przy własnym
+wpisie log milczy — nie ma komu o tym mówić, dokładnie jak przy podpisie „popr.”.
 
 Poprawka idzie wprost z tabeli wpisów — ołówek w wierszu otwiera projekt, opis,
 datę i godziny. Reguły są te same co przy pracowniku (kolizje, `10:00–10:00`), bez
