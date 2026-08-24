@@ -20,6 +20,7 @@ import {
   SELF_SERVICE_KINDS,
   absenceKindLabel,
   usesPool,
+  decisionVerb,
 } from "../../services/absenceKinds";
 import { countWorkingDays, isWorkingDay } from "../../services/workingDays";
 import { now as appNow } from "../../services/workday";
@@ -321,7 +322,7 @@ export default function Urlopy({ year, balance, absences }) {
                       )}
                       {a.decidedByName && (
                         <span className="block text-xs text-muted">
-                          {a.status === "approved" ? "Zatwierdził" : "Odrzucił"}: {a.decidedByName},{" "}
+                          {decisionVerb(a.status)}: {a.decidedByName},{" "}
                           {dayjs(a.decidedAt).format("DD.MM.YYYY HH:mm")}
                         </span>
                       )}

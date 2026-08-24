@@ -14,13 +14,7 @@ import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeBalance from "../../services/getOvertimeBalance";
 import getOvertimeForUser from "../../services/getOvertimeForUser";
-import {
-  OVERTIME_KINDS,
-  KIND_KEYS,
-  kindLabel,
-  signedMinutes,
-  requiresReason,
-} from "../../services/overtimeKinds";
+import { OVERTIME_KINDS, KIND_KEYS, kindLabel, signedMinutes, requiresReason, decisionVerb } from "../../services/overtimeKinds";
 import { formatMinutes } from "../../utils";
 
 export async function getServerSideProps(ctx) {
@@ -277,7 +271,7 @@ export default function Nadgodziny({ balance, requests }) {
                       {r.reason && <span className="block">{r.reason}</span>}
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
-                          {r.status === "approved" ? "Zatwierdził" : "Odrzucił"}: {r.decidedByName},{" "}
+                          {decisionVerb(r.status)}: {r.decidedByName},{" "}
                           {dayjs(r.decidedAt).format("DD.MM.YYYY HH:mm")}
                         </span>
                       )}

@@ -46,14 +46,21 @@ export const usesPool = (kind) => Boolean(ABSENCE_KINDS[kind]?.usesPool);
 
 export const isSelfService = (kind) => Boolean(ABSENCE_KINDS[kind]?.selfService);
 
-// Statusy jak przy nadgodzinach — ten sam obieg, te same etykiety.
+// Statusy jak przy nadgodzinach — ten sam obieg, te same etykiety, łącznie
+// z rozdziałem "anulował pracownik" (cancelled) od "cofnął kierownik" (revoked).
+// Powód rozdziału opisuje services/overtimeKinds.js.
 export const ABSENCE_STATUSES = {
   pending: "Oczekuje",
   approved: "Zatwierdzony",
   rejected: "Odrzucony",
   cancelled: "Anulowany",
+  revoked: "Cofnięty",
 };
 
 export const ABSENCE_STATUS_KEYS = Object.keys(ABSENCE_STATUSES);
 
 export const absenceStatusLabel = (status) => ABSENCE_STATUSES[status] ?? status;
+
+/** Czasownik do podpisu pod wnioskiem — jak w services/overtimeKinds.js. */
+export const decisionVerb = (status) =>
+  ({ approved: "Zatwierdził", rejected: "Odrzucił", revoked: "Cofnął" }[status] ?? "Rozpatrzył");
