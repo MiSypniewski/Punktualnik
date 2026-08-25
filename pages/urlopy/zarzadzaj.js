@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
@@ -6,12 +6,13 @@ import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import AbsenceBadge from "../../components/absenceBadge";
 import { Input, Select, Textarea } from "../../components/ui/field";
-import Button from "../../components/ui/button";
+import Button, { IconButton } from "../../components/ui/button";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
+import { TrashIcon } from "../../components/ui/icons";
 import { getAbsences, ABSENCE_LIST_LIMIT } from "../../services/getAbsences";
 import { getLeaveBalances } from "../../services/leaveBalance";
 import getAllUsers from "../../services/getAllUsers";
@@ -21,6 +22,7 @@ import {
   ABSENCE_STATUSES,
   ABSENCE_STATUS_KEYS,
   absenceKindLabel,
+  decisionVerb,
 } from "../../services/absenceKinds";
 import { countWorkingDays, isWorkingDay } from "../../services/workingDays";
 import { canApproveLeave } from "../../services/roles";
@@ -99,6 +101,12 @@ export default function Nieobecnosci({
   const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
 
   const [note, setNote] = useState({}); // id wniosku → notatka do decyzji
+
+  // Id wiersza historii z otwartym polem powodu — pole tekstowe w każdym
+
+  // wierszu tabeli byłoby nie do czytania, więc rozwija się pod tym usuwanym.
+
+  const [revoking, setRevoking] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -146,6 +154,33 @@ export default function Nieobecnosci({
         ? "Ten wniosek został już rozpatrzony (np. w innej karcie przeglądarki)."
         : "Nie udało się zapisać decyzji."
     );
+
+  /**
+   * Cofnięcie nieobecności przez kierownika.
+   *
+   * Najczęstszy przypadek: pracownik rezygnuje z ZATWIERDZONEGO urlopu. Sam go
+   * już nie anuluje (to działa tylko na wniosku oczekującym), a bez tej akcji
+   * pula dni zostawałaby pomniejszona na stałe. Wniosek nie znika z bazy —
+   * dostaje status "Cofnięty" z podpisem i powodem.
+   */
+  const revoke = async (id) => {
+    const reason = (note[id] || "").trim();
+    // Ta sama reguła stoi w API (422 reason_required); tutaj po to, żeby nie
+    // wysyłać żądania, o którym z góry wiadomo, że wróci błędem.
+    if (!reason) {
+      setErr("Podaj powód usunięcia — trafi do historii wniosku.");
+      return;
+    }
+
+    const ok = await call(`/api/absences/${id}`, { action: "revoke", note: reason }, (code) =>
+      code === "already_revoked"
+        ? "Ta nieobecność została już usunięta (np. w innej karcie przeglądarki)."
+        : code === "reason_required"
+        ? "Podaj powód usunięcia — trafi do historii wniosku."
+        : "Nie udało się usunąć nieobecności."
+    );
+    if (ok) setRevoking(null);
+  };
 
   const applyFilters = (e) => {
     e.preventDefault();
@@ -241,7 +276,7 @@ export default function Nieobecnosci({
                   <div className="mt-3 flex flex-wrap gap-2 items-center">
                     <Input
                       type="text"
-                      placeholder="Notatka do decyzji (nieobowiązkowa)"
+                      placeholder="Notatka do decyzji (przy usuwaniu obowiązkowa)"
                       value={note[a.id] || ""}
                       maxLength={300}
                       onChange={(e) => setNote({ ...note, [a.id]: e.target.value })}
@@ -257,6 +292,24 @@ export default function Nieobecnosci({
                     <Button variant="danger" disabled={busy} onClick={() => decide(a.id, "reject")}>
                       Odrzuć
                     </Button>
+                    {/* Usunięcie, nie decyzja: wniosek wpisany przez pomyłkę
+                        albo wycofany telefonicznie znika z obiegu, zamiast
+                        czekać na odrzucenie, którego nikt nie chciał wydawać.
+                        Stąd kosz obok dwóch pełnych przycisków, a nie trzeci
+                        taki sam. Powód obowiązkowy — przy pustej notatce kosz
+                        jest nieaktywny, a tytuł mówi, czego brakuje. */}
+                    <IconButton
+                      className="h-9 w-9"
+                      disabled={busy || !(note[a.id] || "").trim()}
+                      onClick={() => revoke(a.id)}
+                      label={
+                        (note[a.id] || "").trim()
+                          ? "Usuń wniosek z obiegu"
+                          : "Podaj powód w polu obok, żeby usunąć wniosek"
+                      }
+                    >
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </Plate>
               );
@@ -359,11 +412,13 @@ export default function Nieobecnosci({
                   <Th align="right">Dni</Th>
                   <Th>Status</Th>
                   <Th>Szczegóły</Th>
+                  <Th />
                 </Tr>
               </thead>
               <tbody>
                 {history.map((a) => (
-                  <Tr key={a.id}>
+                  <Fragment key={a.id}>
+                  <Tr>
                     <Td className="font-mono tabular-nums whitespace-nowrap">
                       {rangeLabel(a.dateFrom, a.dateTo)}
                     </Td>
@@ -383,13 +438,63 @@ export default function Nieobecnosci({
                       )}
                       {a.decidedByName && (
                         <span className="block text-xs">
-                          {a.status === "approved" ? "Zatwierdził" : "Rozpatrzył"}: {a.decidedByName},{" "}
+                          {decisionVerb(a.status)}: {a.decidedByName},{" "}
                           {dayjs(a.decidedAt).format("DD.MM.YYYY HH:mm")}
                         </span>
                       )}
                       {a.decisionNote && <span className="block text-xs italic">„{a.decisionNote}”</span>}
                     </Td>
+                    <Td className="text-right">
+                      {/* Cofniętej nieobecności nie ma czego cofać drugi raz —
+                          API i tak odpowiedziałoby 409. */}
+                      {a.status !== "revoked" && (
+                        <IconButton
+                          disabled={busy}
+                          label={revoking === a.id ? "Zrezygnuj z usuwania" : "Usuń nieobecność"}
+                          onClick={() => setRevoking(revoking === a.id ? null : a.id)}
+                        >
+                          <TrashIcon />
+                        </IconButton>
+                      )}
+                    </Td>
                   </Tr>
+
+                  {/* Pole powodu rozwija się POD wierszem: w tabeli o siedmiu
+                      kolumnach nie ma na nie miejsca, a powód bywa zdaniem. */}
+                  {revoking === a.id && (
+                    <tr className="border-b border-line-subtle bg-raised">
+                      <td colSpan={7} className="p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="text"
+                            autoFocus
+                            placeholder="Powód usunięcia (obowiązkowy)"
+                            maxLength={300}
+                            value={note[a.id] || ""}
+                            onChange={(e) => setNote({ ...note, [a.id]: e.target.value })}
+                            className="flex-grow w-auto min-w-[12rem]"
+                          />
+                          <Button
+                            variant="danger"
+                            disabled={busy || !(note[a.id] || "").trim()}
+                            onClick={() => revoke(a.id)}
+                          >
+                            Usuń nieobecność
+                          </Button>
+                          <Button variant="ghost" disabled={busy} onClick={() => setRevoking(null)}>
+                            Anuluj
+                          </Button>
+                        </div>
+                        {a.status === "approved" && ABSENCE_KINDS[a.kind]?.usesPool && (
+                          <p className="mt-2 text-xs text-muted">
+                            Nieobecność jest zatwierdzona — po usunięciu {a.workDays}{" "}
+                            {dayWord(a.workDays)} wróci do puli pracownika.
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </Table>

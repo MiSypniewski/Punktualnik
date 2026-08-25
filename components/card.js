@@ -67,7 +67,7 @@ const STATES = {
   },
 };
 
-const Card = ({ data }) => {
+const Card = ({ data, onSaved }) => {
   const { data: session } = useSession();
   const [airtableID, setAirtableID] = useState(data.airtableID);
   const [status, setStatus] = useState(data.status);
@@ -125,7 +125,7 @@ const Card = ({ data }) => {
 
     // jeżeli nie ma wpisu w bazie, tworzy nowy wpis i aktualizuje ID w komponencie
     if (!airtableID) {
-      await fetch(`/api/time/${data.ID}`, {
+      const res = await fetch(`/api/time/${data.ID}`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
@@ -133,14 +133,18 @@ const Card = ({ data }) => {
         },
       });
 
-      fetch(`/api/time/${data.userID}`, {
-        method: "GET",
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setAirtableID(data[0].airtableID);
-        });
+      // Nowe id bierzemy WPROST z odpowiedzi POST (services/saveTime.js zwraca
+      // lastInsertRowid). Wcześniej szło po nie osobne GET /api/time/<userID>,
+      // które wracało już po zamontowaniu kafelka — a między jednym a drugim
+      // `airtableID` był pusty i kolejne dotknięcie kafelka zakładało DRUGI wpis
+      // na ten sam dzień zamiast zamknąć pierwszy.
+      const created = await res.json().catch(() => ({}));
+      if (res.ok && created?.time?.id) setAirtableID(created.time.id);
     }
+
+    // Tablica dociąga świeże karty od razu, zamiast czekać do końca cyklu
+    // odpytywania — kiosk ma potwierdzić dotknięcie natychmiast.
+    if (onSaved) onSaved();
   };
 
   const changeStatus = () => {

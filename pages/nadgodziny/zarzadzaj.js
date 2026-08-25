@@ -1,22 +1,28 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import OvertimeBadge from "../../components/overtimeBadge";
-import Button from "../../components/ui/button";
+import Button, { IconButton } from "../../components/ui/button";
 import { Input, Select } from "../../components/ui/field";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
-import { DownloadIcon } from "../../components/ui/icons";
+import { DownloadIcon, TrashIcon } from "../../components/ui/icons";
 import getOvertimeRequests, { OVERTIME_LIST_LIMIT } from "../../services/getOvertimeRequests";
 import getOvertimeBalances from "../../services/getOvertimeBalances";
 import getAllUsers from "../../services/getAllUsers";
-import { kindLabel, signedMinutes, OVERTIME_STATUSES, STATUS_KEYS } from "../../services/overtimeKinds";
+import {
+  kindLabel,
+  signedMinutes,
+  decisionVerb,
+  OVERTIME_STATUSES,
+  STATUS_KEYS,
+} from "../../services/overtimeKinds";
 import { canApproveOvertime } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
 import { formatMinutes } from "../../utils";
@@ -67,6 +73,12 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
   const router = useRouter();
 
   const [note, setNote] = useState({}); // id wniosku → notatka do decyzji
+
+  // Id wiersza historii z otwartym polem powodu — w tabeli nie ma miejsca na
+
+  // pole tekstowe w każdym wierszu, więc rozwija się ono pod tym, który usuwamy.
+
+  const [revoking, setRevoking] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -101,6 +113,48 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
             ? "Ten wniosek został już rozpatrzony (np. w innej karcie przeglądarki)."
             : "Nie udało się zapisać decyzji."
         );
+      }
+      await router.replace(router.asPath, undefined, { scroll: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Cofnięcie wniosku — jedyna akcja działająca na wniosku już rozpatrzonym.
+   *
+   * Wniosek nie znika z bazy, tylko dostaje status "Cofnięty" z podpisem
+   * i powodem (services/revokeOvertimeRequest.js). Saldo liczy wyłącznie
+   * wnioski zatwierdzone, więc poprawia się samo.
+   */
+  const revoke = async (id) => {
+    const reason = (note[id] || "").trim();
+    // Ta sama reguła stoi w API (422 reason_required) — tutaj tylko po to, żeby
+    // nie wysyłać żądania, o którym z góry wiadomo, że wróci błędem.
+    if (!reason) {
+      setErr("Podaj powód usunięcia — trafi do historii wniosku.");
+      return;
+    }
+
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/overtime/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke", note: reason }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErr(
+          body.error === "already_revoked"
+            ? "Ten wniosek został już cofnięty (np. w innej karcie przeglądarki)."
+            : body.error === "reason_required"
+            ? "Podaj powód usunięcia — trafi do historii wniosku."
+            : "Nie udało się usunąć wniosku."
+        );
+      } else {
+        setRevoking(null);
       }
       await router.replace(router.asPath, undefined, { scroll: false });
     } finally {
@@ -199,7 +253,8 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
                   <Input
                     type="text"
-                    placeholder="Notatka do decyzji (opcjonalna)"
+                    placeholder="Notatka do decyzji (przy usuwaniu obowiązkowa)"
+                    maxLength={300}
                     value={note[r.id] || ""}
                     onChange={(e) => setNote({ ...note, [r.id]: e.target.value })}
                     className="flex-grow w-auto min-w-[12rem]"
@@ -218,6 +273,24 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                   >
                     Odrzuć
                   </button>
+                  {/* Usunięcie, nie decyzja — stąd kosz obok dwóch pełnych
+                      przycisków, a nie trzeci taki sam: zgłoszenie wpisane
+                      przez pomyłkę albo "dla zabawy" znika z obiegu zamiast
+                      czekać na odrzucenie, którego nikt nie chciał wydawać.
+                      Powód jest obowiązkowy, więc przy pustej notatce kosz
+                      jest nieaktywny, a tytuł mówi, czego brakuje. */}
+                  <IconButton
+                    className="h-9 w-9"
+                    onClick={() => revoke(r.id)}
+                    disabled={busy || !(note[r.id] || "").trim()}
+                    label={
+                      (note[r.id] || "").trim()
+                        ? "Usuń wniosek z obiegu"
+                        : "Podaj powód w polu obok, żeby usunąć wniosek"
+                    }
+                  >
+                    <TrashIcon />
+                  </IconButton>
                 </div>
               </Plate>
             ))}
@@ -355,11 +428,13 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                   <Th align="right">Wymiar</Th>
                   <Th>Status</Th>
                   <Th>Szczegóły</Th>
+                  <Th />
                 </tr>
               </thead>
               <tbody>
                 {history.map((r) => (
-                  <Tr key={r.id} className="align-top">
+                  <Fragment key={r.id}>
+                  <Tr className="align-top">
                     <Td className="font-mono tabular-nums whitespace-nowrap">{r.data}</Td>
                     <Td className="whitespace-nowrap">
                       {r.surname} {r.name}
@@ -375,13 +450,64 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                       {r.reason && <span className="block">{r.reason}</span>}
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
-                          {r.status === "approved" ? "Zatwierdził" : "Odrzucił"}: {r.decidedByName},{" "}
+                          {decisionVerb(r.status)}: {r.decidedByName},{" "}
                           {dayjs(r.decidedAt).format("DD.MM.YYYY HH:mm")}
                         </span>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}
                     </Td>
+                    <Td className="text-right">
+                      {/* Wniosek już cofnięty nie ma czego cofać drugi raz —
+                          API i tak odpowiedziałoby 409. */}
+                      {r.status !== "revoked" && (
+                        <IconButton
+                          disabled={busy}
+                          label={revoking === r.id ? "Zrezygnuj z usuwania" : "Usuń wniosek"}
+                          onClick={() => setRevoking(revoking === r.id ? null : r.id)}
+                        >
+                          <TrashIcon />
+                        </IconButton>
+                      )}
+                    </Td>
                   </Tr>
+
+                  {/* Pole powodu rozwija się POD wierszem, a nie w kolumnie:
+                      przy siedmiu kolumnach nie ma na nie miejsca, a powód
+                      bywa zdaniem, nie słowem. */}
+                  {revoking === r.id && (
+                    <tr className="border-b border-line-subtle bg-raised">
+                      <td colSpan={7} className="p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="text"
+                            autoFocus
+                            placeholder="Powód usunięcia (obowiązkowy)"
+                            maxLength={300}
+                            value={note[r.id] || ""}
+                            onChange={(e) => setNote({ ...note, [r.id]: e.target.value })}
+                            className="flex-grow w-auto min-w-[12rem]"
+                          />
+                          <Button
+                            variant="danger"
+                            disabled={busy || !(note[r.id] || "").trim()}
+                            onClick={() => revoke(r.id)}
+                          >
+                            Usuń wniosek
+                          </Button>
+                          <Button variant="ghost" disabled={busy} onClick={() => setRevoking(null)}>
+                            Anuluj
+                          </Button>
+                        </div>
+                        {r.status === "approved" && (
+                          <p className="mt-2 text-xs text-muted">
+                            Wniosek jest zatwierdzony — po usunięciu jego wymiar zniknie z salda
+                            pracownika.
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </Table>

@@ -33,13 +33,27 @@ export const requiresReason = (kind) => kindSign(kind) > 0;
 // Minuty ze znakiem — tak, jak wpis wpływa na saldo.
 export const signedMinutes = (row) => kindSign(row.kind) * row.minutes;
 
+// `cancelled` i `revoked` to dwie różne rzeczy i celowo mają dwie nazwy:
+// anuluje PRACOWNIK własny wniosek, dopóki nikt go nie rozpatrzył; cofa
+// KIEROWNIK, w dowolnym momencie i z obowiązkowym powodem. Jeden wspólny status
+// znaczyłby, że po pół roku nie da się odróżnić "rozmyślił się" od "kierownik
+// wycofał zatwierdzenie", a pod tym drugim stoi zmiana salda.
 export const OVERTIME_STATUSES = {
   pending: "Oczekuje",
   approved: "Zatwierdzony",
   rejected: "Odrzucony",
   cancelled: "Anulowany",
+  revoked: "Cofnięty",
 };
 
 export const STATUS_KEYS = Object.keys(OVERTIME_STATUSES);
 
 export const statusLabel = (status) => OVERTIME_STATUSES[status] ?? status;
+
+// Czasownik do podpisu pod wnioskiem ("Zatwierdził: Anna Kowalska").
+//
+// Jedno miejsce zamiast ternarnego `status === "approved" ? ... : ...`
+// powtórzonego na czterech stronach — tamten zapis przy trzecim stanie zaczynał
+// kłamać, bo cofnięty wniosek podpisywał się jako "Odrzucił".
+export const decisionVerb = (status) =>
+  ({ approved: "Zatwierdził", rejected: "Odrzucił", revoked: "Cofnął" }[status] ?? "Rozpatrzył");
