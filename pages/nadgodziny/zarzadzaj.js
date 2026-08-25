@@ -5,14 +5,14 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import OvertimeBadge from "../../components/overtimeBadge";
-import Button from "../../components/ui/button";
+import Button, { IconButton } from "../../components/ui/button";
 import { Input, Select } from "../../components/ui/field";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
-import { DownloadIcon } from "../../components/ui/icons";
+import { DownloadIcon, TrashIcon } from "../../components/ui/icons";
 import getOvertimeRequests, { OVERTIME_LIST_LIMIT } from "../../services/getOvertimeRequests";
 import getOvertimeBalances from "../../services/getOvertimeBalances";
 import getAllUsers from "../../services/getAllUsers";
@@ -273,23 +273,24 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                   >
                     Odrzuć
                   </button>
-                  {/* Usunięcie, nie decyzja — stąd wariant "ghost": zgłoszenie
-                      wpisane przez pomyłkę albo "dla zabawy" znika z obiegu
-                      zamiast czekać na odrzucenie, którego nikt nie chciał
-                      wydawać. Powód jest obowiązkowy, więc przy pustej notatce
-                      przycisk jest nieaktywny. */}
-                  <Button
-                    variant="ghost"
+                  {/* Usunięcie, nie decyzja — stąd kosz obok dwóch pełnych
+                      przycisków, a nie trzeci taki sam: zgłoszenie wpisane
+                      przez pomyłkę albo "dla zabawy" znika z obiegu zamiast
+                      czekać na odrzucenie, którego nikt nie chciał wydawać.
+                      Powód jest obowiązkowy, więc przy pustej notatce kosz
+                      jest nieaktywny, a tytuł mówi, czego brakuje. */}
+                  <IconButton
+                    className="h-9 w-9"
                     onClick={() => revoke(r.id)}
                     disabled={busy || !(note[r.id] || "").trim()}
-                    title={
+                    label={
                       (note[r.id] || "").trim()
                         ? "Usuń wniosek z obiegu"
                         : "Podaj powód w polu obok, żeby usunąć wniosek"
                     }
                   >
-                    Usuń
-                  </Button>
+                    <TrashIcon />
+                  </IconButton>
                 </div>
               </Plate>
             ))}
@@ -459,13 +460,13 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                       {/* Wniosek już cofnięty nie ma czego cofać drugi raz —
                           API i tak odpowiedziałoby 409. */}
                       {r.status !== "revoked" && (
-                        <Button
-                          variant="ghost"
+                        <IconButton
                           disabled={busy}
+                          label={revoking === r.id ? "Zrezygnuj z usuwania" : "Usuń wniosek"}
                           onClick={() => setRevoking(revoking === r.id ? null : r.id)}
                         >
-                          Usuń
-                        </Button>
+                          <TrashIcon />
+                        </IconButton>
                       )}
                     </Td>
                   </Tr>

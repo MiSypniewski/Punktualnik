@@ -6,12 +6,13 @@ import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import AbsenceBadge from "../../components/absenceBadge";
 import { Input, Select, Textarea } from "../../components/ui/field";
-import Button from "../../components/ui/button";
+import Button, { IconButton } from "../../components/ui/button";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
+import { TrashIcon } from "../../components/ui/icons";
 import { getAbsences, ABSENCE_LIST_LIMIT } from "../../services/getAbsences";
 import { getLeaveBalances } from "../../services/leaveBalance";
 import getAllUsers from "../../services/getAllUsers";
@@ -294,20 +295,21 @@ export default function Nieobecnosci({
                     {/* Usunięcie, nie decyzja: wniosek wpisany przez pomyłkę
                         albo wycofany telefonicznie znika z obiegu, zamiast
                         czekać na odrzucenie, którego nikt nie chciał wydawać.
-                        Powód obowiązkowy — stąd przycisk nieaktywny przy
-                        pustej notatce. */}
-                    <Button
-                      variant="ghost"
+                        Stąd kosz obok dwóch pełnych przycisków, a nie trzeci
+                        taki sam. Powód obowiązkowy — przy pustej notatce kosz
+                        jest nieaktywny, a tytuł mówi, czego brakuje. */}
+                    <IconButton
+                      className="h-9 w-9"
                       disabled={busy || !(note[a.id] || "").trim()}
                       onClick={() => revoke(a.id)}
-                      title={
+                      label={
                         (note[a.id] || "").trim()
                           ? "Usuń wniosek z obiegu"
                           : "Podaj powód w polu obok, żeby usunąć wniosek"
                       }
                     >
-                      Usuń
-                    </Button>
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </Plate>
               );
@@ -446,13 +448,13 @@ export default function Nieobecnosci({
                       {/* Cofniętej nieobecności nie ma czego cofać drugi raz —
                           API i tak odpowiedziałoby 409. */}
                       {a.status !== "revoked" && (
-                        <Button
-                          variant="ghost"
+                        <IconButton
                           disabled={busy}
+                          label={revoking === a.id ? "Zrezygnuj z usuwania" : "Usuń nieobecność"}
                           onClick={() => setRevoking(revoking === a.id ? null : a.id)}
                         >
-                          Usuń
-                        </Button>
+                          <TrashIcon />
+                        </IconButton>
                       )}
                     </Td>
                   </Tr>
