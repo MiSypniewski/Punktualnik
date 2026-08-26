@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
 import { installRuntimeGuards } from "./runtime";
-import { logInfo } from "./log";
+import { logInfo, logError } from "./log";
 
 // Lokalna baza SQLite. Ścieżkę można nadpisać zmienną SQLITE_PATH
 // (przydatne na Mikrusie, np. na wolumenie trwałym poza katalogiem aplikacji).
@@ -169,6 +169,39 @@ const migrateEntryProjectOptional = (db) => {
     }
   } finally {
     db.pragma("foreign_keys = ON");
+  }
+};
+
+/**
+ * Times dostaje kolumnę autoClosed i podpis korekty.
+ *
+ * autoClosed — kartę odbitą rano, przy której nikt nie dotknął kafelka na
+ * wyjściu, domyka o 3:00 zadanie nocne (services/closeOpenCards.js). Bez tej
+ * flagi domknięty wpis wyglądałby identycznie jak odbity ręcznie, a to dwie
+ * różne rzeczy: pierwszy jest ZGADNIĘTY i czeka na potwierdzenie kierownika.
+ *
+ * editedAt/editedBy/editedByName — podpis pod korektą, dokładnie jak
+ * w TaskEntries. Times nie ma statusów ani historii, więc bez podpisu po
+ * miesiącu nie da się odróżnić odbicia pracownika od poprawki kierownika.
+ *
+ * Idempotentna i sterowana STANEM SCHEMATU, jak migracje TaskEntries wyżej.
+ */
+const migrateTimesAudit = (db) => {
+  const columns = db.prepare(`PRAGMA table_info(Times)`).all().map((c) => c.name);
+
+  // ALTER TABLE ADD COLUMN z NOT NULL DEFAULT jest w SQLite dozwolone i wypełnia
+  // istniejące wiersze wartością domyślną — stare karty dostają autoClosed = 0.
+  if (!columns.includes("autoClosed")) {
+    db.exec(`ALTER TABLE Times ADD COLUMN autoClosed INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!columns.includes("editedAt")) {
+    db.exec(`ALTER TABLE Times ADD COLUMN editedAt TEXT`);
+  }
+  if (!columns.includes("editedBy")) {
+    db.exec(`ALTER TABLE Times ADD COLUMN editedBy INTEGER`);
+  }
+  if (!columns.includes("editedByName")) {
+    db.exec(`ALTER TABLE Times ADD COLUMN editedByName TEXT`);
   }
 };
 
@@ -406,6 +439,20 @@ const createDb = () => {
       FOREIGN KEY (projectID) REFERENCES Projects(id)
     );
 
+    -- Zapadka zadań uruchamianych raz na dobę (services/nightlyJob.js).
+    --
+    -- Na Mikrusie nie ma crona, a odpalanie zadania z timera w procesie ma jedną
+    -- wadę: proces bywa restartowany (deploy, pm2, OOM). Bez zapadki restart
+    -- o 3:05 wysłałby komplet powiadomień DRUGI raz. Trzymamy więc dobę roboczą,
+    -- dla której zadanie już poszło — jedno porównanie rozstrzyga, czy jest co robić.
+    --
+    -- W bazie, a nie w pamięci procesu, właśnie dlatego, że chodzi o przeżycie restartu.
+    CREATE TABLE IF NOT EXISTS JobRuns (
+      job     TEXT PRIMARY KEY,
+      lastDay TEXT NOT NULL,
+      ranAt   TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
 
@@ -437,6 +484,7 @@ const createDb = () => {
   backfillSections(db);
   migrateEntrySeconds(db);
   migrateEntryProjectOptional(db);
+  migrateTimesAudit(db);
 
   // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
   // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do
@@ -455,5 +503,17 @@ installRuntimeGuards();
 
 const db = globalForDb.__punktualnikDb || createDb();
 globalForDb.__punktualnikDb = db;
+
+// Budzik zadania nocnego (domykanie zapomnianych kart i timerów, powiadomienia).
+//
+// Import DYNAMICZNY i dopiero TUTAJ, po przypisaniu `db` — to nie jest ozdobnik.
+// services/nightlyJob.js importuje ten moduł, a przez niego closeOpenCards
+// i taskEntries, które przygotowują swoje zapytania na poziomie modułu. Statyczny
+// import na górze pliku wykonałby je, ZANIM `db` w tym pliku w ogóle powstanie,
+// i aplikacja wywracałaby się przy starcie na ReferenceError. Dynamiczny import
+// rozwiązuje się w kolejnym mikrotasku, czyli po zakończeniu tego modułu.
+import("./nightlyJob")
+  .then(({ installNightlyJob }) => installNightlyJob())
+  .catch((error) => logError("db", error, { phase: "nightly-install" }));
 
 export default db;

@@ -8,6 +8,7 @@ import StationClock from "./stationClock";
 import ThemeToggle from "./themeToggle";
 import RunningStrip from "./runningStrip";
 import {
+  canEditTimes,
   canExportTimes,
   canApproveOvertime,
   canTrackTasks,
@@ -55,6 +56,12 @@ const navItems = (user) => {
     items.push({ href: "/nadgodziny/zarzadzaj", match: "/nadgodziny/zarzadzaj", label: "Wnioski" });
   if (canApproveLeave(role))
     items.push({ href: "/urlopy/zarzadzaj", match: "/urlopy/zarzadzaj", label: "Nieobecności" });
+  // Korekta kart czasu — narzędzie doraźne, więc `secondary`. Kierownik zagląda
+  // tu po zapomnianym odbiciu, nie codziennie. Trasa jest STATYCZNA, więc Next
+  // dopasuje ją przed dynamiczną /time/[id] ("Moja sekcja") i obie pozycje
+  // podświetlają się niezależnie.
+  if (canEditTimes(role))
+    items.push({ href: "/time/zarzadzaj", match: "/time/zarzadzaj", label: "Karty czasu", secondary: true });
   if (canExportTimes(role))
     items.push({ href: "/utils/eksport", match: "/utils/eksport", label: "Eksport", secondary: true });
 

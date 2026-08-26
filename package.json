@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "admin": "node scripts/admin.js",
-    "migrate:airtable": "node scripts/migrateFromAirtable.js"
+    "migrate:airtable": "node scripts/migrateFromAirtable.js",
+    "mail:test": "node scripts/testmail.js"
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.2",
@@ -19,6 +20,7 @@
     "joi": "^17.6.0",
     "next": "^12.1.6",
     "next-auth": "^4.3.4",
+    "nodemailer": "^6.10.1",
     "postcss": "^8.4.14",
     "react": "18.1.0",
     "react-dom": "18.1.0",

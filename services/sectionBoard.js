@@ -41,6 +41,10 @@ const emptyCard = (user, stamp) => ({
   totalWorkTime: `00:00:00`,
   status: "wait",
   overTime: false,
+  // Nigdy nie domknięta automatycznie — tej karty jeszcze w ogóle nie ma.
+  // Pole jest tu dla samego kształtu: components/card.js czyta pusty kafelek
+  // i wiersz z Times tym samym kodem.
+  autoClosed: false,
 });
 
 /**

@@ -23,6 +23,17 @@ export const canPunchCards = (role) => role === "editor";
 // publicznym, więc nie może dawać nikomu pobrania listy z całej sekcji.
 export const canExportTimes = (role) => role === "manager";
 
+// Korekta kart czasu w tabeli Times: poprawa godzin, dopisanie zapomnianej karty
+// i usunięcie wpisu odbitego przez pomyłkę.
+//
+// Świadomie OSOBNO od canPunchCards, choć obie prowadzą do tej samej tabeli.
+// Tamto opisuje kiosk klikający kafelki w bieżącej dobie i należy WYŁĄCZNIE do
+// wspólnego ekranu w hali. To jest narzędzie do naprawiania ewidencji po fakcie,
+// z podpisem pod zmianą, i należy wyłącznie do kierownika. Jeden predykat na obie
+// rzeczy znaczyłby, że kiosk stojący w miejscu publicznym może przepisać komuś
+// dniówkę sprzed miesiąca.
+export const canEditTimes = (role) => role === "manager";
+
 // "Personel" — kto w ogóle ogląda cudze dane w swojej sekcji (kafelki sekcji).
 // Uwaga: to NIE jest uprawnienie do zmiany czegokolwiek ani do eksportu —
 // od tego są canPunchCards i canExportTimes.

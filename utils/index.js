@@ -54,6 +54,19 @@ export const jsonFetcher = (url) => fetch(url).then((res) => res.json());
 export const TASK_QUERY_MAX = 100;
 
 /**
+ * Ile kart naraz pokazuje panel korekty (/time/zarzadzaj).
+ *
+ * Siedzi TUTAJ z dokładnie tego samego powodu co TASK_QUERY_MAX wyżej: liczby
+ * potrzebuje i zapytanie w services/getSectionTimes.js, i podpis nad tabelą
+ * w przeglądarce. Import z services/ wciągnąłby do bundla klienta
+ * better-sqlite3 — czyli moduł, który próbuje otworzyć `fs`.
+ *
+ * Panel jest narzędziem do poprawiania pojedynczych pomyłek, nie do przeglądania
+ * roku wstecz. Kto potrzebuje kompletu, bierze eksport CSV, który limitu nie ma.
+ */
+export const TIME_LIST_LIMIT = 500;
+
+/**
  * Minuty → "2h 30min". Używane w module nadgodzin, gdzie saldo bywa ujemne,
  * więc znak wychodzi przed liczbę, a nie w środku ("-2h 30min", nie "-2h -30min").
  * @param {number} minutes
