@@ -11,12 +11,15 @@ dayjs.locale("pl");
 
 // Treści powiadomień mailowych i lista adresatów.
 //
-// Reguła adresowania jest jedna dla wszystkich czterech powiadomień:
-// wiadomość dostaje PRACOWNIK, którego sprawa dotyczy (To), oraz KOMPLET
-// kierowników jego sekcji (Cc). Nie jeden kierownik, nie ten, który akurat
-// kliknął — cała grupa przypisana do sekcji w tabeli ManagerSections, bo
+// Reguła adresowania: wiadomość dostaje PRACOWNIK, którego sprawa dotyczy (To),
+// oraz KOMPLET kierowników jego sekcji (Cc). Nie jeden kierownik, nie ten, który
+// akurat kliknął — cała grupa przypisana do sekcji w tabeli ManagerSections, bo
 // zastępstwo w czasie urlopu jest normalną sytuacją, a wiadomość wysłana do
 // jednej osoby przepada razem z jej nieobecnością.
+//
+// JEDEN WYJĄTEK: powiadomienia "jest coś do rozpatrzenia" idą WYŁĄCZNIE do
+// kierowników. Adresatem jest tam osoba, która ma coś ZROBIĆ, a pracownik przed
+// sekundą sam kliknął "złóż wniosek" i potwierdzenia nie potrzebuje.
 //
 // Rozdział wobec services/notifyGChat.js jest celowy: tam idzie sygnał "jest
 // nowy wniosek do rozpatrzenia" na wspólny czat, tutaj — imienna informacja
@@ -53,6 +56,15 @@ const recipients = (ownerID, section) => {
   const cc = sectionManagers(section).filter((email) => email !== to);
   return { to: to ? [to] : [], cc };
 };
+
+/**
+ * Adresaci powiadomienia "do rozpatrzenia": sami kierownicy sekcji, w polu To.
+ *
+ * Kierownik, który jest autorem wniosku (bierze urlop jak każdy), zostaje na
+ * liście świadomie — wniosek i tak musi rozpatrzyć ktoś, a przy jednoosobowej
+ * sekcji usunięcie go z adresatów znaczyłoby, że nie dowie się nikt.
+ */
+const managersOf = (section) => ({ to: sectionManagers(section), cc: [] });
 
 // --- składanie treści -------------------------------------------------------
 
@@ -241,6 +253,282 @@ export const notifyOvertimeApproved = async (request, user) => {
     cc,
     subject: `Punktualnik: ${kindLabel(request.kind).toLowerCase()} — zatwierdzone`,
     kind: "nadgodziny-zatwierdzone",
+    ...body,
+  });
+};
+
+// --- 5. wnioski czekające na decyzję ---------------------------------------
+//
+// Dwa powiadomienia bliźniacze do tych na Google Chat (services/notifyGChat.js)
+// i to jest świadome dublowanie, nie przeoczenie. Czat jest wspólną przestrzenią,
+// którą trzeba mieć otwartą; mail dociera do kierownika, który akurat jej nie
+// ogląda, i zostaje w skrzynce, dopóki ktoś się nim nie zajmie. Kanały wyłącza
+// się niezależnie (GCHAT_WEBHOOK_URL kontra email_login), więc firma może
+// zostawić jeden, drugi albo oba.
+
+/**
+ * Nowy wniosek urlopowy pracownika. Wyłącznie do kierowników.
+ *
+ * Wołane TYLKO dla wniosków pracownika — nieobecność wpisana przez kierownika
+ * jest zatwierdzona w chwili powstania i nie ma czego rozpatrywać. Od tamtej
+ * sytuacji jest notifyAbsenceRecorded niżej.
+ */
+export const notifyAbsencePending = async (absence, user) => {
+  const { to, cc } = managersOf(user?.section);
+  const zakres = formatDateRange(absence.dateFrom, absence.dateTo);
+
+  const body = compose([
+    `Nowy wniosek urlopowy czeka na decyzję.`,
+    null,
+    ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${absence.userID}`],
+    ["Rodzaj", absenceKindLabel(absence.kind)],
+    ["Termin", zakres],
+    // Dni ROBOCZE, nie kalendarzowe — to ta liczba schodzi z puli i to o nią
+    // kierownik zapyta w pierwszej kolejności.
+    ["Dni roboczych", String(absence.workDays)],
+    ...(absence.reason ? [["Powód", absence.reason]] : []),
+    null,
+    linkLine("/urlopy/zarzadzaj", "Rozpatrz wniosek"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: wniosek urlopowy do rozpatrzenia — ${zakres}`,
+    kind: "urlop-do-rozpatrzenia",
+    ...body,
+  });
+};
+
+/** Nowy wniosek o nadgodziny albo wcześniejsze wyjście. Wyłącznie do kierowników. */
+export const notifyOvertimePending = async (request, user) => {
+  const { to, cc } = managersOf(user?.section);
+
+  const body = compose([
+    `Nowy wniosek czeka na decyzję.`,
+    null,
+    ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${request.userID}`],
+    ["Rodzaj", kindLabel(request.kind)],
+    ["Wymiar", formatMinutes(signedMinutes(request), { withSign: true })],
+    ["Data", formatDate(request.data)],
+    ...(request.reason ? [["Powód", request.reason]] : []),
+    null,
+    // Saldo PRZED decyzją: wniosek jeszcze nie jest zatwierdzony, więc go nie
+    // zmienia, a kierownik decyduje w kontekście tego, co pracownik ma na koncie.
+    ["Aktualne saldo pracownika", formatMinutes(getOvertimeBalance(request.userID), { withSign: true })],
+    null,
+    linkLine("/nadgodziny/zarzadzaj", "Rozpatrz wniosek"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: ${kindLabel(request.kind).toLowerCase()} — do rozpatrzenia`,
+    kind: "nadgodziny-do-rozpatrzenia",
+    ...body,
+  });
+};
+
+// --- 6. wpisy zrobione przez kierownika ------------------------------------
+//
+// Wspólny mianownik tej grupy: ktoś ZMIENIŁ CUDZĄ EWIDENCJĘ. Pracownik nie
+// klikał, nie składał wniosku i bez maila nie ma jak się o tym dowiedzieć —
+// dotąd jedynym śladem był podpis w tabeli, do której musiałby sam zajrzeć,
+// albo wpis w logu serwera, którego nie widzi w ogóle.
+//
+// Adresaci jak w reszcie: pracownik w To, komplet kierowników sekcji w Cc.
+// Kierownik, który zmianę zrobił, dostaje własną kopię i tak ma zostać —
+// przy dwóch osobach obsługujących sekcję to jedyny sposób, żeby druga
+// wiedziała, co zrobiła pierwsza.
+
+const stmtActorName = db.prepare(`SELECT name, surname FROM Users WHERE id = ?`);
+
+/**
+ * Podpis pod zmianą — PEŁNE imię i nazwisko, dociągane z bazy.
+ *
+ * Token JWT niesie samo imię (`token.name`), a pod zmianą w cudzej ewidencji
+ * "Michał" jest bezużyteczne w firmie, w której są dwa. Ta sama sztuczka co
+ * w services/decideAbsence.js, łącznie z zapasem: gdy konta już nie ma, zostaje
+ * to, co przyszło z trasy.
+ */
+const kto = (actor) => {
+  const row = actor?.userID ? stmtActorName.get(Number(actor.userID)) : null;
+  return row ? `${row.name} ${row.surname}` : actor?.name || "kierownik";
+};
+
+/**
+ * Nieobecność wpisana przez kierownika — L4, urlop na żądanie, urlop zgłoszony
+ * telefonicznie. Taki wpis powstaje OD RAZU ZATWIERDZONY (autoApprove
+ * w services/createAbsence.js), więc nigdy nie przechodzi przez trasę decyzji
+ * i nie wywołałby notifyAbsenceApproved.
+ */
+export const notifyAbsenceRecorded = async (absence, owner, actor) => {
+  const { to, cc } = recipients(absence.userID, owner?.section);
+  const zakres = formatDateRange(absence.dateFrom, absence.dateTo);
+
+  const body = compose([
+    `Kierownik wpisał nieobecność na twoje konto.`,
+    null,
+    ["Pracownik", owner ? `${owner.name} ${owner.surname}` : `użytkownik #${absence.userID}`],
+    ["Rodzaj", absenceKindLabel(absence.kind)],
+    ["Termin", zakres],
+    ["Dni roboczych", String(absence.workDays)],
+    ["Wpisał", kto(actor)],
+    ...(absence.reason ? [["Powód", absence.reason]] : []),
+    null,
+    `Wpis jest już zatwierdzony — nie trzeba go składać jako wniosku. Jeśli termin albo rodzaj się nie zgadza, odezwij się do kierownika.`,
+    linkLine("/urlopy", "Moje nieobecności"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: wpisano nieobecność — ${zakres}`,
+    kind: "nieobecnosc-wpisana",
+    ...body,
+  });
+};
+
+/**
+ * Przydział dni urlopu do puli. `days` bywa UJEMNE i to jest poprawne — tak
+ * wygląda korekta po zmianie wymiaru etatu (services/addLeaveAllowance.js),
+ * więc wiadomość musi umieć nazwać obie sytuacje.
+ */
+export const notifyAllowanceAdded = async (allowance, owner, actor) => {
+  const { to, cc } = recipients(allowance.userID, owner?.section);
+  const ujemny = Number(allowance.days) < 0;
+
+  const body = compose([
+    ujemny ? `Kierownik skorygował twoją pulę urlopową w dół.` : `Kierownik dopisał dni do twojej puli urlopowej.`,
+    null,
+    ["Pracownik", owner ? `${owner.name} ${owner.surname}` : `użytkownik #${allowance.userID}`],
+    ["Rok", String(allowance.year)],
+    ["Zmiana", `${allowance.days > 0 ? "+" : ""}${allowance.days} dni`],
+    ["Wpisał", allowance.createdByName || kto(actor)],
+    ...(allowance.note ? [["Uwagi", allowance.note]] : []),
+    null,
+    `Pula ma historię: to jest kolejny wpis, a nie nadpisanie poprzedniej liczby. Aktualne saldo dni zobaczysz w module urlopów.`,
+    linkLine("/urlopy", "Moja pula"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: zmiana puli urlopowej ${allowance.year} (${allowance.days > 0 ? "+" : ""}${allowance.days} dni)`,
+    kind: "pula-urlopowa",
+    ...body,
+  });
+};
+
+// Co dokładnie zrobiono z kartą czasu. Jedna tablica zamiast trzech niemal
+// identycznych funkcji — różnią się czasownikiem i pierwszym zdaniem.
+const CARD_ACTIONS = {
+  created: {
+    czasownik: "dopisał",
+    zdanie: "Kierownik dopisał kartę czasu za dzień, w którym nie odbito wejścia.",
+    temat: "dopisano kartę czasu",
+  },
+  corrected: {
+    czasownik: "poprawił",
+    zdanie: "Kierownik poprawił godziny na twojej karcie czasu.",
+    temat: "poprawiono kartę czasu",
+  },
+  deleted: {
+    czasownik: "usunął",
+    zdanie: "Kierownik usunął twoją kartę czasu. Wpis nie istnieje już w ewidencji.",
+    temat: "usunięto kartę czasu",
+  },
+};
+
+/**
+ * Zmiana karty czasu przez kierownika (services/manageTime.js).
+ *
+ * `before` podajemy tylko przy korekcie — bez porównania "było → jest"
+ * wiadomość mówiłaby wyłącznie, że coś się zmieniło, i nie dałoby się
+ * stwierdzić, czy zmiana jest tą, o którą pracownik prosił.
+ *
+ * Sekcję bierzemy z KARTY, nie z konta pracownika: karta trzyma sekcję z dnia
+ * zapisu i tą samą regułą zawęża się panel korekty (services/getSectionTimes.js).
+ * Inaczej po przejściu do innego zespołu mail o poprawce starego dnia poszedłby
+ * do kierowników, którzy tej karty w ogóle nie widzą.
+ */
+export const notifyCardChanged = async (card, action, actor, before) => {
+  const opis = CARD_ACTIONS[action];
+  if (!opis) return false;
+
+  const { to, cc } = recipients(card.userID, card.section);
+  const dzienKarty = formatDate(card.data);
+
+  const godziny = (row) =>
+    row?.startTime && row?.endTime ? `${godzina(row.startTime)} – ${godzina(row.endTime)}` : "—";
+
+  const body = compose([
+    opis.zdanie,
+    null,
+    ["Pracownik", `${card.name} ${card.surname}`],
+    ["Dzień", dzienKarty],
+    ...(before ? [["Było", `${godziny(before)} (${before.totalWorkTime})`]] : []),
+    [action === "deleted" ? "Usunięta karta" : before ? "Jest" : "Godziny",
+      `${godziny(card)} (${card.totalWorkTime})`],
+    ["Kto", `${kto(actor)} — ${opis.czasownik}`],
+    null,
+    `Jeśli to nie zgadza się z twoją dniówką, zgłoś to kierownikowi.`,
+    linkLine("/time/zarzadzaj", "Karty czasu (kierownik)"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: ${opis.temat} — ${dzienKarty}`,
+    kind: `karta-${action}`,
+    ...body,
+  });
+};
+
+const ENTRY_ACTIONS = {
+  corrected: {
+    zdanie: "Kierownik poprawił twój wpis w raporcie zadań.",
+    temat: "poprawiono wpis zadania",
+  },
+  deleted: {
+    zdanie: "Kierownik usunął twój wpis z raportu zadań. Wpisu nie da się przywrócić.",
+    temat: "usunięto wpis zadania",
+  },
+};
+
+/**
+ * Korekta albo usunięcie CUDZEGO wpisu zadania (pages/api/entries/[id].js).
+ *
+ * Wołane wyłącznie wtedy, gdy wpis należy do kogoś innego niż zalogowany —
+ * o własnej poprawce nie ma kogo zawiadamiać. Trasa rozstrzyga to obecnością
+ * `actor`, tą samą flagą, która decyduje o podpisie "popr." i o wpisie w logu.
+ */
+export const notifyTaskEntryChanged = async (entry, action, actor, owner, reason) => {
+  const opis = ENTRY_ACTIONS[action];
+  if (!opis) return false;
+
+  const { to, cc } = recipients(entry.userID, entry.section);
+
+  const body = compose([
+    opis.zdanie,
+    null,
+    ["Pracownik", owner ? `${owner.name} ${owner.surname}` : `użytkownik #${entry.userID}`],
+    ["Dzień", formatDate(entry.data)],
+    ["Projekt", entry.projectName || "(nie wskazano)"],
+    ["Opis", entry.description || "(pusty)"],
+    ["Godziny", entry.startedAt && entry.endedAt ? `${godzina(entry.startedAt)} – ${godzina(entry.endedAt)}` : "—"],
+    ["Wymiar", formatDuration(entry.seconds ?? 0)],
+    ["Kto", kto(actor)],
+    ...(reason ? [["Powód", reason]] : []),
+    null,
+    linkLine("/zadania", "Moje zadania"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: ${opis.temat} — ${formatDate(entry.data)}`,
+    kind: `zadanie-${action}`,
     ...body,
   });
 };

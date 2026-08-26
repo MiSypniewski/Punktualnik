@@ -7,6 +7,7 @@ import { canApproveOvertime } from "../../../services/roles";
 import { STATUS_KEYS } from "../../../services/overtimeKinds";
 import getUserData from "../../../services/getUserData";
 import { notifyNewOvertimeRequest } from "../../../services/notifyGChat";
+import { notifyOvertimePending } from "../../../services/notifyMail";
 import { visibleSections } from "../../../services/scope";
 import { logApiError } from "../../../services/log";
 
@@ -81,6 +82,9 @@ export default async (req, res) => {
       // wyjątku poza nim, żeby nie zrobić nieobsłużonego odrzucenia.
       const [author] = await getUserData(token.userID);
       notifyNewOvertimeRequest(request, author).catch(() => {});
+      // Ten sam sygnał drugim kanałem: czat trzeba mieć otwarty, mail czeka
+      // w skrzynce. Oba wyłącza się niezależnie (services/notifyMail.js).
+      notifyOvertimePending(request, author).catch(() => {});
 
       return res.status(201).json({ status: "created", request });
     } catch (error) {

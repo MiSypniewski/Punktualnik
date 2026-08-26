@@ -2,6 +2,7 @@ import { getToken } from "next-auth/jwt";
 import { getCard, correctCard, deleteCard, STATUS_FOR } from "../../../../services/manageTime";
 import { canEditTimes } from "../../../../services/roles";
 import { canSeeSection } from "../../../../services/scope";
+import { notifyCardChanged } from "../../../../services/notifyMail";
 import { logApiError } from "../../../../services/log";
 
 // Korekta (PUT) i usunięcie (DELETE) pojedynczej karty czasu. `id` to Times.id.
@@ -43,6 +44,13 @@ export default async (req, res) => {
 
   if (req.method === "DELETE") {
     const removed = deleteCard({ id, card, actor, reason: req.body?.reason });
+
+    // Wiadomość niesie dane wiersza SPRZED skasowania — po DELETE nie ma już
+    // czego odczytać, a pracownik ma prawo wiedzieć, jaka dniówka zniknęła.
+    if (removed) {
+      notifyCardChanged(card, "deleted", actor).catch(() => {});
+    }
+
     return removed
       ? res.status(200).json({ status: "deleted" })
       : res.status(404).json({ error: "not_found" });
@@ -55,6 +63,12 @@ export default async (req, res) => {
 
   try {
     const updated = correctCard({ id, start: req.body?.start, end: req.body?.end, actor });
+
+    // `card` to stan sprzed korekty — odczytany wyżej, na potrzeby kontroli
+    // zasięgu. Idzie do wiadomości jako "było", żeby dało się sprawdzić, czy
+    // zmiana jest tą, o którą pracownik prosił.
+    notifyCardChanged(updated, "corrected", actor, card).catch(() => {});
+
     return res.status(200).json({ status: "updated", card: updated });
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;

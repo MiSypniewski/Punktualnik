@@ -11,6 +11,7 @@ import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
+import { notifyTaskEntryChanged } from "../../../services/notifyMail";
 import { logApiError, logInfo } from "../../../services/log";
 
 // "retag" to opis i projekt biegnącego timera, "setstart" — jego godzina
@@ -56,8 +57,21 @@ const resolveAccess = async (token, entry) => {
     actor: { userID: token.userID, name: token.name },
     // Cudzy wpis — zasięg właściciela, nie poprawiającego.
     scopeToken: { section: owner.section, role: "user", userID: owner.id },
+    // Właściciel wraca na zewnątrz, bo powiadomienie mailowe adresuje się do
+    // niego. Pobraliśmy go tu i tak, na potrzeby kontroli zasięgu — drugi
+    // getUserData niżej byłby zapytaniem o dokładnie to samo.
+    owner,
   };
 };
+
+/**
+ * Wpis wzbogacony o nazwę projektu — services/taskEntries.js zwraca samo
+ * projectID, a "projekt #7" w treści maila nikomu nic nie mówi.
+ */
+const withProjectName = (entry) => ({
+  ...entry,
+  projectName: entry.projectID ? getProject(entry.projectID)?.name : null,
+});
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
@@ -112,6 +126,19 @@ export default async (req, res) => {
 
     // changes === 0 przy istniejącym wpisie znaczy dokładnie jedno: warunek
     // okna w SQL go odrzucił.
+    // Powiadomienie WYŁĄCZNIE przy cudzym wpisie — tym samym warunkiem, który
+    // decyduje o podpisie "popr." i o wpisie w logu wyżej. O skasowaniu własnego
+    // wpisu nie ma kogo zawiadamiać.
+    if (removed && access.actor) {
+      notifyTaskEntryChanged(
+        withProjectName(entry),
+        "deleted",
+        access.actor,
+        access.owner,
+        String(req.body?.reason ?? "").trim().slice(0, 200)
+      ).catch(() => {});
+    }
+
     return removed
       ? res.status(200).json({ status: "deleted" })
       : res.status(409).json({ error: "edit_window_closed" });
@@ -201,6 +228,10 @@ export default async (req, res) => {
       { projectID, description, data, from, to },
       { userID: entry.userID, enforceWindow: access.enforceWindow, actor: access.actor }
     );
+    if (updated && access.actor) {
+      notifyTaskEntryChanged(withProjectName(updated), "corrected", access.actor, access.owner).catch(() => {});
+    }
+
     return updated
       ? res.status(200).json({ status: "updated", entry: updated })
       : res.status(404).json({ error: "not_found" });

@@ -5,6 +5,7 @@ import { createCardForUser, STATUS_FOR } from "../../../../services/manageTime";
 import { canEditTimes } from "../../../../services/roles";
 import { visibleSections, canSeeUser } from "../../../../services/scope";
 import getUserData from "../../../../services/getUserData";
+import { notifyCardChanged } from "../../../../services/notifyMail";
 import { logApiError } from "../../../../services/log";
 
 // Panel korekty kart czasu: lista (GET) i dopisanie brakującej karty (POST).
@@ -66,6 +67,10 @@ export default async (req, res) => {
       owner,
       actor: { userID: token.userID, name: token.name },
     });
+    // Karta dopisana za pracownika, który nie odbił wejścia — sam się o niej
+    // nie dowie, bo na tablicy kiosku widzi wyłącznie dzisiejszy dzień.
+    notifyCardChanged(card, "created", { userID: token.userID, name: token.name }).catch(() => {});
+
     return res.status(200).json({ status: "created", card });
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;
