@@ -595,6 +595,12 @@ ponownie (kontrola nakładania patrzy tylko na *Oczekuje* i *Zatwierdzony*).
 | Urlop bezpłatny | nie | tak |
 | Opieka | nie | tak |
 | Urlop okolicznościowy | nie | tak |
+| Oddanie krwi | nie | tak |
+
+Oddanie krwi **nie jest urlopem** i puli wypoczynkowej nie rusza — dzień oddania
+przysługuje niezależnie od niej. Pracownik zgłasza je sam, jak urlop
+okolicznościowy: termin zna z wyprzedzeniem, a zaświadczenie ze stacji
+krwiodawstwa donosi kierownikowi osobno, poza systemem.
 
 Rodzaje, których pracownik nie zgłasza sam, wpisuje kierownik po fakcie —
 telefon rano albo zwolnienie na biurku. **Taki wpis zapisuje się od razu jako
@@ -746,10 +752,34 @@ może się rozjechać.
 ### Raportowanie — `/zadania`
 
 Timer start/stop z licznikiem na żywo albo wpis ręczny od–do. Opis zadania jest
-dowolnym tekstem; aplikacja podpowiada wcześniejsze opisy z historii (natywny
-`<datalist>`, filtrowany po wybranym projekcie) i pozwala wznowić poprzednie
-zadanie jednym kliknięciem. Podpowiedzi są sortowane po **liczbie użyć**, więc
-codzienna rutyna wypada wyżej niż coś zrobionego raz.
+dowolnym tekstem, a aplikacja podpowiada wcześniejsze opisy z historii i pozwala
+wznowić poprzednie zadanie jednym kliknięciem. Podpowiedzi buduje
+`services/entrySuggestions.js` i sortuje je po **liczbie użyć**, więc codzienna
+rutyna wypada wyżej niż coś zrobionego raz.
+
+**Dwa różne mechanizmy podpowiedzi, celowo.**
+
+W pasku „Nad czym pracujesz?” działa własna lista (`components/taskSuggest.js`):
+po **dwóch znakach** rozwija się spis wcześniejszych zadań, każde z nazwą projektu
+obok, a wybór wypełnia opis **i ustawia projekt**. Szuka po CAŁEJ historii, także
+gdy projekt nie jest jeszcze wybrany — bo zdanie zaczyna się od tego, co się robi,
+a projekt ma się dobrać sam. Fraza dopasowuje się bez względu na wielkość liter
+i **bez diakrytyków**: „mape” znajduje „Mapę tras”.
+
+Pozostałe trzy pola opisu (biegnący timer, wpis ręczny, edycja wpisu) zostają na
+natywnym `<datalist>` filtrowanym po wybranym projekcie. Tam projekt jest już
+wskazany, więc zawężenie do niego jest właściwym zachowaniem, a `<datalist>`
+kosztuje zero kodu i działa na tablecie.
+
+> **Podpowiedzi NIE odpytują serwera.** Filtrowana jest tablica, która przyjechała
+> w propsach strony — jedno zapytanie w `getServerSideProps`, 50 pozycji z 90 dni.
+> Przy pisaniu nie leci ani jedno żądanie i ani jedno zapytanie do SQLite.
+> To nie jest przesadna ostrożność: baza jest synchroniczna, a całą firmę obsługuje
+> jeden proces, więc zapytanie na każde naciśnięcie klawisza razy kilkanaście osób
+> piszących naraz to dokładnie ten wzorzec, który
+> [położył serwer 21.08.2026](#kiedy-aplikacja-muli--co-sprawdzić). Jeśli kiedyś
+> zabraknie podpowiedzi, właściwą odpowiedzią jest podniesienie `LIMIT`
+> w `services/entrySuggestions.js`, a **nie** przeniesienie wyszukiwania na serwer.
 
 Czas liczy się **co do sekundy** (`TaskEntries.seconds`) i tak też jest pokazywany
 („2h 15min 07s”). Wpis potrafi trwać pół minuty — „odbiłem maila”, „podpis na

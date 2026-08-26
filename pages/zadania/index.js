@@ -18,6 +18,7 @@ import EmptyState from "../../components/ui/emptyState";
 import { listProjects, projectScope } from "../../services/projects";
 import { getEntriesForUser, getRunningEntry, sweepStaleEntries } from "../../services/taskEntries";
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
+import TaskSuggest from "../../components/taskSuggest";
 import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
 import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
@@ -26,6 +27,12 @@ import { groupEntries } from "../../utils/groupEntries";
 dayjs.locale("pl");
 
 const HISTORY_DAYS = 14;
+
+// Ile kafelków "Wznów" pod paskiem. Do tej zmiany liczba siedziała w
+// getServerSideProps jako `.slice(0, 6)` — teraz serwer przysyła komplet
+// podpowiedzi (potrzebuje go lista w pasku startu), więc cięcie przenosi się
+// do renderu i dostaje nazwę. Sześć mieści się w dwóch rzędach na laptopie.
+const RESUME_TILES = 6;
 
 export async function getServerSideProps(ctx) {
   const token = await getToken({ req: ctx.req });
@@ -55,7 +62,16 @@ export async function getServerSideProps(ctx) {
         from: dayjs(today).subtract(HISTORY_DAYS, "day").format("YYYY-MM-DD"),
         to: today,
       }),
-      suggestions: suggestions.slice(0, 6),
+      // KOMPLET podpowiedzi, nie sześć: listy w pasku startu (components/taskSuggest.js)
+      // szuka po całej historii, a kafelki "Wznów" tną ją w miejscu renderu.
+      // Odchudzone do pól, których potrzebuje przeglądarka — `uses` i `lastUsed`
+      // służą wyłącznie do sortowania w SQL i nie mają po co jechać na klienta.
+      suggestions: suggestions.map(({ projectID, description, projectName, projectColor }) => ({
+        projectID,
+        description,
+        projectName,
+        projectColor,
+      })),
       descByProject: suggestionsByProject(suggestions),
       today,
       minEditable: minEditableDay(),
@@ -237,6 +253,7 @@ export default function Zadania({
         <TimerBar
           running={running}
           projects={projects}
+          suggestions={suggestions}
           descByProject={descByProject}
           busy={busy}
           call={call}
@@ -258,7 +275,7 @@ export default function Zadania({
         {/* Podpowiedzi zostają na ekranie TAKŻE przy biegnącym timerze — to jedyne
             miejsce, z którego da się jednym kliknięciem przejść na inne zadanie. */}
         {suggestions.length > 0 && (
-          <Resume suggestions={suggestions} running={running} busy={busy} onResume={resume} />
+          <Resume suggestions={suggestions.slice(0, RESUME_TILES)} running={running} busy={busy} onResume={resume} />
         )}
 
         <ManualForm
@@ -618,7 +635,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
   );
 };
 
-const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => {
+const TimerBar = ({ running, projects, suggestions, descByProject, busy, call, onError }) => {
   // Pusto, a NIE projects[0]. Podstawiony pierwszy projekt alfabetycznie znaczył,
   // że kto nie spojrzy w to pole, ten po cichu raportuje czas na cudzy projekt —
   // a wpis wygląda wtedy tak samo dobrze jak prawdziwy.
@@ -655,17 +672,28 @@ const TimerBar = ({ running, projects, descByProject, busy, call, onError }) => 
           a projekt jest doprecyzowaniem. Opis dostaje też całą wolną szerokość,
           bo bywa dłuższy niż nazwa projektu. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Input
-          type="text"
+        {/* Własna lista podpowiedzi zamiast natywnego <datalist>, który został
+            w trzech pozostałych polach opisu na tej stronie. Różnica jest
+            kierunkowa: tam projekt jest już wybrany i lista filtruje się po nim,
+            a tutaj zaczyna się od tego, CO się robi — więc lista szuka po całej
+            historii i sama ustawia projekt wybranej pozycji.
+
+            Filtrowanie idzie po tablicy z propsów, bez ani jednego zapytania
+            przy pisaniu — powód opisuje components/taskSuggest.js. */}
+        <TaskSuggest
+          suggestions={suggestions}
           value={description}
-          list={`opisy-${projectID}`}
+          projectID={projectID}
+          onChange={setDescription}
+          onPick={(pick) => {
+            setDescription(pick.description);
+            setProjectID(pick.projectID);
+          }}
+          onSubmit={start}
           maxLength={200}
           placeholder="np. Weryfikacja raportów z instalacji"
-          onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && start()}
           className="flex-grow w-auto min-w-[12rem]"
         />
-        <DescriptionOptions descByProject={descByProject} />
 
         {/* Stała szerokość, bo nazwy projektów bywają długie ("Nowe i remontowane
             sklepy") i bez niej select albo rozpycha pasek, albo ucina tekst

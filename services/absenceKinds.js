@@ -17,6 +17,12 @@ export const ABSENCE_KINDS = {
   unpaid: { label: "Urlop bezpłatny", usesPool: false, selfService: true },
   care: { label: "Opieka nad dzieckiem lub członkiem rodziny", usesPool: false, selfService: true },
   occasional: { label: "Urlop okolicznościowy", usesPool: false, selfService: true },
+  // Zwolnienie od pracy dla honorowego dawcy krwi. Nie jest urlopem i puli
+  // wypoczynkowej nie rusza — dzień oddania (a w praktyce także dzień badań)
+  // przysługuje niezależnie od niej. Pracownik zgłasza sam, jak urlop
+  // okolicznościowy: termin zna z wyprzedzeniem, a zaświadczenie ze stacji
+  // krwiodawstwa donosi kierownikowi osobno, poza systemem.
+  blood_donation: { label: "Oddanie krwi", usesPool: false, selfService: true },
 };
 
 export const ABSENCE_KIND_KEYS = Object.keys(ABSENCE_KINDS);
@@ -38,6 +44,7 @@ const SHORT = {
   unpaid: "Bezpłatny",
   care: "Opieka",
   occasional: "Okolicznościowy",
+  blood_donation: "Krwiodawstwo",
 };
 
 export const absenceKindShort = (kind) => SHORT[kind] ?? absenceKindLabel(kind);
