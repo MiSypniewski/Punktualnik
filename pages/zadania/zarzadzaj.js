@@ -24,7 +24,7 @@ import getAllUsers from "../../services/getAllUsers";
 import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
 import { visibleSections } from "../../services/scope";
-import { formatDuration, hhmm, keepSeconds, timePart, TASK_QUERY_MAX } from "../../utils";
+import { formatDate, formatDuration, hhmm, keepSeconds, timePart, TASK_QUERY_MAX } from "../../utils";
 
 dayjs.locale("pl");
 
@@ -615,14 +615,9 @@ export default function ZarzadzajZadaniami({
 
 // --- wiersz wpisu -----------------------------------------------------------
 
-// Rok w dacie jest tu potrzebny, inaczej niż na stronie pracownika: raport
-// filtruje po nazwie zadania „nieważne z jakiego okresu”, więc w jednej tabeli
-// potrafią wylądować wpisy z dwóch lat i samo „14.08” nic nie rozstrzyga.
-const dayLabel = (data) => dayjs(data).format("DD.MM.YY");
-
 const EntryRow = ({ entry, busy, onEdit, onDelete }) => (
   <tr className={classNames("border-b border-line-subtle", entry.autoClosed && "bg-signal-soft")}>
-    <Td className="whitespace-nowrap">{dayLabel(entry.data)}</Td>
+    <Td className="whitespace-nowrap">{formatDate(entry.data)}</Td>
     <Td className="whitespace-nowrap">
       {entry.surname} {entry.name}
     </Td>
@@ -712,7 +707,7 @@ const EntryRemoveForm = ({ entry, reason, setReason, busy, onCancel, onConfirm }
       <strong>
         {entry.surname} {entry.name}
       </strong>{" "}
-      z {dayLabel(entry.data)} — {entry.description || NO_PROJECT} ({formatDuration(entry.seconds)})?
+      z {formatDate(entry.data)} — {entry.description || NO_PROJECT} ({formatDuration(entry.seconds)})?
     </p>
     <p className="mt-1 text-xs text-muted">
       Wpis zniknie z bazy na stałe, razem z jego czasem w podsumowaniach. Powód trafi do logu
@@ -796,7 +791,7 @@ const EntryCard = ({
           <ProjectMark color={entry.projectColor} className="mr-2" />
           <span className="text-sm text-muted truncate">{entry.projectName || NO_PROJECT}</span>
         </span>
-        <span className="font-mono text-sm text-muted tabular-nums whitespace-nowrap">{dayLabel(entry.data)}</span>
+        <span className="font-mono text-sm text-muted tabular-nums whitespace-nowrap">{formatDate(entry.data)}</span>
       </div>
 
       <p className="mt-1 font-medium break-words">
@@ -880,7 +875,7 @@ const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
   return (
     <form onSubmit={submit}>
       <p className="mb-2 text-xs text-muted">
-        {entry.surname} {entry.name} · wpis z {dayjs(entry.data).format("D MMMM YYYY")}
+        {entry.surname} {entry.name} · wpis z {formatDate(entry.data)}
       </p>
 
       <div className="flex gap-2 flex-col sm:flex-row mb-2">

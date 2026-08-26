@@ -55,7 +55,12 @@ const StationClock = () => {
     <span className="flex items-baseline gap-2 shrink-0 leading-none">
       {/* Data w dwóch długościach: od 1536 px pełna, niżej skrócona. Przy ośmiu
           pozycjach menu pełna data zjadała tyle miejsca, że pozycje wchodziły
-          na nazwisko. Poniżej 768 px znika zupełnie — zostaje sama godzina. */}
+          na nazwisko. Poniżej 768 px znika zupełnie — zostaje sama godzina.
+
+          Data SŁOWNIE, nie RRRR-MM-DD jak w tabelach (zob. README, „Daty”):
+          pasek czyta się kątem oka, żeby wiedzieć, jaki dziś dzień, a nie po to,
+          żeby przepisać datę do arkusza. „środa” odpowiada na to pytanie od razu,
+          „2026-08-26” wymaga liczenia. */}
       <span className="hidden md:inline 2xl:hidden text-xs text-muted first-letter:uppercase whitespace-nowrap">
         {now.format("ddd, D.MM")}
       </span>

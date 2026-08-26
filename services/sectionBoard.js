@@ -41,6 +41,10 @@ const emptyCard = (user, stamp) => ({
   totalWorkTime: `00:00:00`,
   status: "wait",
   overTime: false,
+  // Nigdy nie domknięta automatycznie — tej karty jeszcze w ogóle nie ma.
+  // Pole jest tu dla samego kształtu: components/card.js czyta pusty kafelek
+  // i wiersz z Times tym samym kodem.
+  autoClosed: false,
 });
 
 /**
@@ -77,6 +81,11 @@ export const getSectionBoard = async (section) => {
     cards,
     // Doba robocza zaczyna się o 3:00, więc "dzisiaj" na tablicy to nie zawsze
     // dzisiaj w kalendarzu — stąd etykieta prosto z serwera.
+    //
+    // Data SŁOWNIE, wyjątek od RRRR-MM-DD obowiązującego w tabelach i raportach
+    // (zob. README, „Daty”). Ten napis ogląda się z drugiego końca hali i pełni
+    // dokładnie jedną rolę: potwierdzić, że tablica pokazuje dzisiejszy dzień.
+    // Nazwa dnia robi to natychmiast, ciąg cyfr wymaga porównania.
     workdayLabel: dayjs(stamp).format("dddd, D MMMM YYYY"),
     generatedAt: dayjs().format(),
   };

@@ -65,6 +65,22 @@ const STATES = {
     plate: "bg-raised border-line-strong text-muted",
     caption: { punch: "Dotknij, jeśli mimo to jesteś w pracy", watch: "Nieobecny" },
   },
+  // Karta, której nikt nie zamknął — domknięta o 3:00 przez zadanie nocne
+  // (services/closeOpenCards.js) na osiem godzin od odbicia wejścia.
+  //
+  // Paleta NEUTRALNA, z tego samego powodu co przy nieobecności. Zieleń w tym
+  // systemie znaczy „przepracowane i pełne", a tutaj liczba jest ZGADNIĘTA:
+  // wiemy, o której ktoś przyszedł, i nie wiemy, o której wyszedł. Zielony
+  // kafelek mówiłby, że dniówka się zgadza, a to jest dokładnie to zdanie,
+  // którego nie wolno tu postawić.
+  //
+  // Dotknięcie niczego nie zmienia (changeStatus nie obsługuje finishWork) —
+  // i tak ma zostać. Poprawia kierownik, na /time/zarzadzaj, z podpisem.
+  autoClosed: {
+    label: "Domknięto auto",
+    plate: "bg-raised border-line-strong text-muted",
+    caption: { punch: "Brak odbicia wyjścia · do korekty", watch: "Brak odbicia wyjścia" },
+  },
 };
 
 const Card = ({ data, onSaved }) => {
@@ -226,9 +242,18 @@ const Card = ({ data, onSaved }) => {
   // mimo urlopu, ten jest w pracy i kafelek ma pokazywać jego czas — sam
   // znacznik urlopu zostaje wtedy w rogu, jako informacja.
   const absence = data.absence;
+
+  // Flaga przychodzi WYŁĄCZNIE z serwera i nie ma jej w stanie komponentu:
+  // kliknięcie kafelka nie potrafi jej zdjąć, a korekta kierownika zmienia
+  // endTime, czyli sygnaturę w kluczu kafelka (pages/time/[id].js) — kafelek
+  // przemontuje się wtedy ze świeżymi propsami.
+  const autoClosed = Boolean(data.autoClosed) && status === "finishWork";
+
   const stateKey =
     absence && !punched
       ? "absence"
+      : autoClosed
+      ? "autoClosed"
       : status === "finishWork"
       ? overTime
         ? "finishFull"
@@ -242,7 +267,9 @@ const Card = ({ data, onSaved }) => {
   const label = stateKey === "absence" ? absenceKindShort(absence.kind) : state.label;
 
   // Do kiedy — żeby nie trzeba było sprawdzać w panelu, czy ktoś wraca jutro,
-  // czy za dwa tygodnie.
+  // czy za dwa tygodnie. Sam dzień i miesiąc, bez roku i bez RRRR-MM-DD: to
+  // kafelek na ścianie, a nie wiersz tabeli, i doklejona data ma zmieścić się
+  // w jednej linii podpisu obok reszty tekstu.
   const caption =
     stateKey === "absence"
       ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${dayjs(absence.dateTo).format("DD.MM")}`

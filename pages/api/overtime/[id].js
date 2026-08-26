@@ -6,6 +6,7 @@ import { canApproveOvertime } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import findOvertimeRequest from "../../../services/getOvertimeRequestById";
+import { notifyOvertimeApproved } from "../../../services/notifyMail";
 
 // "cancel" jest osobno, bo to akcja pracownika, nie kierownika.
 // "revoke" też stoi osobno, ale z odwrotnego powodu: to jedyna akcja, która
@@ -100,6 +101,13 @@ export default async (req, res) => {
 
   if (!changed) {
     return res.status(409).json({ error: "already_decided" });
+  }
+
+  // Jak przy urlopach: tylko zatwierdzenie, tylko fire-and-forget. Saldo do
+  // treści maila liczy się już po zapisie, więc pracownik dostaje liczbę
+  // uwzględniającą tę decyzję.
+  if (action === "approve") {
+    notifyOvertimeApproved(request, author).catch(() => {});
   }
 
   return res.status(200).json({ status: DECISIONS[action], request });

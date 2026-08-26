@@ -54,6 +54,60 @@ export const jsonFetcher = (url) => fetch(url).then((res) => res.json());
 export const TASK_QUERY_MAX = 100;
 
 /**
+ * Ile kart naraz pokazuje panel korekty (/time/zarzadzaj).
+ *
+ * Siedzi TUTAJ z dokładnie tego samego powodu co TASK_QUERY_MAX wyżej: liczby
+ * potrzebuje i zapytanie w services/getSectionTimes.js, i podpis nad tabelą
+ * w przeglądarce. Import z services/ wciągnąłby do bundla klienta
+ * better-sqlite3 — czyli moduł, który próbuje otworzyć `fs`.
+ *
+ * Panel jest narzędziem do poprawiania pojedynczych pomyłek, nie do przeglądania
+ * roku wstecz. Kto potrzebuje kompletu, bierze eksport CSV, który limitu nie ma.
+ */
+export const TIME_LIST_LIMIT = 500;
+
+// --- daty ------------------------------------------------------------------
+//
+// JEDEN format daty w całej aplikacji: RRRR-MM-DD.
+//
+// Wcześniej ta sama data potrafiła wyglądać na pięć sposobów naraz — "14.08.26"
+// w raporcie zadań, "14.08.2026" w urlopach, "środa, 14 sierpnia" w nagłówku dnia,
+// "śr, 14.08" na tablicy kiosku i "2026-08-14" w eksporcie CSV. Przy porównywaniu
+// wydruku z ekranem trzeba było za każdym razem tłumaczyć jedno na drugie, a przy
+// dwucyfrowym roku ("14.08.26") dochodziło jeszcze pytanie, czy to nie 2014.
+//
+// Format ISO jest jednoznaczny (dzień nigdy nie myli się z miesiącem), sortuje się
+// leksykograficznie i jest DOKŁADNIE tym samym kształtem, w którym daty siedzą
+// w bazie (Absences.dateFrom, Overtime.data, TaskEntries.data) i w eksportach CSV.
+//
+// Te funkcje siedzą TUTAJ, a nie w services/, bo potrzebują ich obie strony:
+// przeglądarka do tabel i serwer do treści powiadomień. utils/index.js nie dotyka
+// bazy, więc wolno go zaimportować i tu, i tam — ta sama zasada co przy
+// TASK_QUERY_MAX i TIME_LIST_LIMIT wyżej.
+
+export const DATE_FORMAT = "YYYY-MM-DD";
+export const DATETIME_FORMAT = "YYYY-MM-DD HH:mm";
+
+/** Dowolny znacznik → "2026-08-14". Pusta wartość zostaje pusta, nie "Invalid Date". */
+export const formatDate = (value) => (value ? dayjs(value).format(DATE_FORMAT) : "");
+
+/** Znacznik z godziną → "2026-08-14 07:12". Sekund nie pokazujemy nigdzie w tekście. */
+export const formatDateTime = (value) => (value ? dayjs(value).format(DATETIME_FORMAT) : "");
+
+/**
+ * Zakres dat — jeden dzień pisany RAZ, nie jako "2026-09-05 – 2026-09-05".
+ *
+ * Powstało z trzech niezależnych kopii tej samej funkcji (pages/urlopy/index.js,
+ * pages/urlopy/zarzadzaj.js, services/notifyGChat.js) plus czwartej w treści maila.
+ * Wszystkie robiły to samo i wszystkie trzeba było poprawiać osobno.
+ */
+export const formatDateRange = (from, to) => {
+  const a = formatDate(from);
+  const b = formatDate(to);
+  return a === b ? a : `${a} – ${b}`;
+};
+
+/**
  * Minuty → "2h 30min". Używane w module nadgodzin, gdzie saldo bywa ujemne,
  * więc znak wychodzi przed liczbę, a nie w środku ("-2h 30min", nie "-2h -30min").
  * @param {number} minutes

@@ -2,7 +2,6 @@ import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
-import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import OvertimeBadge from "../../components/overtimeBadge";
 import Button, { IconButton } from "../../components/ui/button";
@@ -25,7 +24,7 @@ import {
 } from "../../services/overtimeKinds";
 import { canApproveOvertime } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
-import { formatMinutes } from "../../utils";
+import { formatMinutes, formatDateTime } from "../../utils";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -451,7 +450,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
                           {decisionVerb(r.status)}: {r.decidedByName},{" "}
-                          {dayjs(r.decidedAt).format("DD.MM.YYYY HH:mm")}
+                          {formatDateTime(r.decidedAt)}
                         </span>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}

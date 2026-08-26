@@ -138,7 +138,15 @@ const useGrouping = () => {
   return [grouped, choose];
 };
 
-/** Etykieta dnia: "dziś", "wczoraj", inaczej data słownie. */
+/**
+ * Etykieta dnia: "dziś", "wczoraj", inaczej data słownie.
+ *
+ * Wyjątek od RRRR-MM-DD obowiązującego w tabelach (zob. README, „Daty”). To jest
+ * nagłówek GRUPY na własnej liście zadań, czytany po to, żeby się w niej odnaleźć
+ * — a "Dziś" odnajduje się szybciej niż jakikolwiek zapis daty. Sam wiersz wpisu
+ * daty nie pokazuje (stoją w nim godziny), więc nie ma tu czego zestawiać
+ * z arkuszem; od porównywania dat jest raport kierownika i tam data jest ISO.
+ */
 const dayLabel = (data, today) => {
   if (data === today) return "Dziś";
   if (data === dayjs(today).subtract(1, "day").format("YYYY-MM-DD")) return "Wczoraj";

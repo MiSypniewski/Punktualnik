@@ -112,7 +112,7 @@ export default function Home({ board, id, sectionLabel }) {
             // tego, co pracownik przed chwilą dotknął.
             <Card
               data={card}
-              key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}`}
+              key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}:${card.autoClosed ? 1 : 0}`}
               onSaved={() => mutate(boardKey(id))}
             />
           ))}

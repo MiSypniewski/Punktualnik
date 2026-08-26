@@ -102,6 +102,27 @@ export const sweepStaleEntries = () => {
   }
 };
 
+// Wpisy domknięte automatycznie w podanej dobie — adresaci nocnego powiadomienia
+// "nie zakończyłeś zadania".
+//
+// Pytamy o STAN BAZY, a nie o zwrotkę closeStaleEntries. Domknięcie jest leniwe
+// i wołane z kilku tras (pages/zadania/index.js, pages/api/entries/timer.js), więc
+// zanim ruszy zadanie nocne, wpis bywa już zamknięty przez kogoś, kto po prostu
+// wszedł na stronę. Liczba zmienionych wierszy byłaby wtedy zerem, a pracownik
+// nie dostałby maila o zadaniu, które chodziło całą noc.
+const stmtAutoClosedForDay = db.prepare(`
+  SELECT e.id, e.userID, e.description, e.data, e.startedAt, e.endedAt, e.seconds,
+         e.section, p.name AS projectName,
+         u.email, u.name AS userName, u.surname AS userSurname
+    FROM TaskEntries e
+    LEFT JOIN Projects p ON p.id = e.projectID
+    LEFT JOIN Users    u ON u.id = e.userID
+   WHERE e.autoClosed = 1 AND e.data = ?
+   ORDER BY u.surname, u.name`);
+
+/** @param {string} day doba robocza 'YYYY-MM-DD' */
+export const getAutoClosedEntries = (day) => stmtAutoClosedForDay.all(day);
+
 // --- odczyt -----------------------------------------------------------------
 
 export const getEntry = (id) => toRow(stmtById.get(Number(id)));

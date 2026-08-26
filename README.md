@@ -32,7 +32,7 @@ zmiany widać od razu po odświeżeniu strony.
 |---|---|
 | `npm run admin -- role <email\|id> user` | pracownik: własne karty, nadgodziny i zadania |
 | `npm run admin -- role <email\|id> editor` | wspólny kiosk: obsługa kart czasu sekcji (zadań nie raportuje) |
-| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, urlopy, projekty, raport zadań, eksporty |
+| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, urlopy, projekty, raport zadań, korekta kart czasu, eksporty |
 | `npm run admin -- sections <email\|id>` | pokazuje, które sekcje obsługuje kierownik |
 | `npm run admin -- sections <email\|id> <a,b,c>` | ustawia je (podmienia całą listę) |
 | `npm run admin -- sections <email\|id> -` | czyści przypisania |
@@ -65,6 +65,7 @@ Szczegóły: [Sekcje (działy)](#sekcje-działy).
 | `npm run lint` | ESLint |
 | `node scripts/loadtest.js` | test obciążeniowy uruchomionej aplikacji (patrz niżej) |
 | `npm run migrate:airtable -- --dry-run` | jednorazowa migracja kont z Airtable (podgląd) |
+| `npm run mail:test -- adres@example.pl` | test poczty wychodzącej: sprawdza logowanie do SMTP-a i wysyła jedną wiadomość |
 
 Aplikację prowadzi `pm2`. Pełna sekwencja: [Wdrożenie na Mikrus](#wdrożenie-na-mikrus).
 
@@ -271,6 +272,80 @@ sam slug, do poprawienia komendą `section-label`.
 > Lokalizacje (`Users.location`) mają wciąż starą postać: lista jest zaszyta
 > w `pages/users/register.js` i jej zmiana wymaga builda.
 
+## Karty czasu
+
+Odbicia z kiosku (tabela `Times`). Kafelek na tablicy sekcji ma dwa dotknięcia:
+pierwsze zapisuje wejście, drugie wyjście. Między nimi wpis ma status
+`workInProgress` i leci licznik.
+
+### Domykanie o 3:00
+
+Drugiego dotknięcia często nie ma — ktoś wychodzi bocznym wyjściem, ktoś zapomina.
+Taki wpis zostawał otwarty **na zawsze**: nie liczył się jako dniówka w żadnym
+raporcie, a na ścianie wisiał z licznikiem lecącym trzecią dobę.
+
+Na granicy doby roboczej (3:00) zadanie nocne domyka je same:
+
+- **koniec = wejście + 8 h**, `totalWorkTime` = `08:00:00`, status `finishWork`;
+- wpis dostaje flagę `autoClosed`, a kafelek i panel korekty pokazują znacznik
+  **`auto`**.
+
+Ta godzina jest **założona, nie zmierzona** — stąd znacznik i stąd mail
+(zob. [Powiadomienia mailowe](#powiadomienia-mailowe)). Reguła jest inna niż przy
+zadaniach, gdzie timer zamyka się na granicy doby: tam wpis mierzy czas przy
+robocie i „do 3:00" jest najbliższą prawdą, jaką da się obronić, a tutaj karta
+mówi o dniówce — a dniówka trwająca 19 godzin jest w eksporcie do kadr oczywistym
+fałszem. Kafelek `auto` ma **paletę neutralną**, nie zieloną: zieleń w tym systemie
+znaczy „przepracowane i pełne", czyli dokładnie to zdanie, którego tu nie wolno
+postawić.
+
+**Nie ma tu crona** — na Mikrusie go nie ma, a drugi proces przy tej samej bazie
+SQLite to przyczyna awarii z 21.08.2026. Budzikiem jest `setInterval` wewnątrz
+procesu Next (`services/nightlyJob.js`), a o tym, czy jest co robić, rozstrzyga
+**zapadka w tabeli `JobRuns`**: trzyma dobę roboczą, dla której zadanie już poszło.
+
+| Sytuacja | Co się dzieje |
+|---|---|
+| Restart procesu o 3:05, po przebiegu | nic — zapadka trzyma dzisiejszą dobę |
+| Restart o 2:59, przed przebiegiem | przebieg leci normalnie po 3:00 |
+| Proces leżał całą noc, wstaje o 8:00 | **nadrabia** zaległy przebieg od razu przy starcie |
+| Pierwsze uruchomienie na tej bazie | zapadka zakładana w ciszy, bez wysyłki — inaczej wdrożenie rozesłałoby lawinę maili o kartach otwartych od miesięcy |
+| `next build` obok działającej aplikacji | budzik się nie instaluje (`NEXT_PHASE`), żeby maili nie wysłał proces, który za chwilę znika |
+
+Domykanie nadrabia **wszystkie** zaległe doby (`<= dzień`), powiadomienia idą
+**tylko** o tej, która właśnie się skończyła: mail o karcie sprzed trzech tygodni
+nie ma już czego naprawić.
+
+### Korekta — `/time/zarzadzaj`
+
+Wyłącznie rola `manager`, w zasięgu z [Kto czyje dane widzi](#kto-czyje-dane-widzi).
+Trzy operacje:
+
+- **poprawa godzin** istniejącej karty — przelicza `totalWorkTime` tą samą funkcją,
+  której używa kafelek (`utils/index.js`: `DifferenceTime`), i **zdejmuje flagę
+  `autoClosed`**: korekta jest właśnie tym potwierdzeniem, o które prosił znacznik;
+- **dopisanie karty** za dzień, w którym nikt nie odbił wejścia. Dzień, na który
+  pracownik ma już kartę, jest odrzucany (`409`) — dwa wpisy na jedną dobę
+  rozstrajają dopasowanie kafelka;
+- **usunięcie** wpisu odbitego przez pomyłkę. Nieodwracalne: `Times` nie ma
+  statusów ani miejsca na notatkę, więc ślad (kto, kiedy, czyja karta, powód)
+  idzie do logu serwera z prefiksem `[manageTime]`.
+
+Każda zmiana zostaje **podpisana** (`editedBy`, `editedByName`) i widać ją
+w tabeli jako `popr.`. Okno „dziś i wczoraj", które wiąże pracownika w module
+zadań, kierownika tu nie dotyczy — odpowiada za poprawność ewidencji, więc musi
+sięgnąć także starszego błędu.
+
+Godziny wpisuje się jako `HH:MM`, a serwer sam przypina je do doby roboczej karty:
+godzina wcześniejsza niż 3:00 należy do następnego dnia kalendarzowego, więc
+zmianę nocną wpisuje się wprost jako `22:00 – 01:00` i wychodzą z niej trzy
+godziny, a nie ujemne dwadzieścia jeden.
+
+> Uprawnienie `canEditTimes` jest **osobne** od `canPunchCards`, choć obie
+> prowadzą do tej samej tabeli. Kiosk stoi w miejscu publicznym i klika go byle
+> kto stojący przed tabletem; przepisywanie cudzych dniówek sprzed miesiąca nie
+> ma prawa być o jedno dotknięcie od odbicia karty.
+
 ## Nadgodziny
 
 Osobny moduł rozliczania nadgodzin, niezależny od kart czasu pracy (tabela `Times`).
@@ -328,8 +403,11 @@ spoza tabeli `Sections`, bo literówka po cichu odcięłaby kierownika od jego l
 Sekcje wyłączone (`isActive = 0`) są dozwolone — kierownik musi widzieć historię
 działu, który już nie przyjmuje nowych pracowników.
 
-Zasięg obejmuje: panel nadgodzin, oba eksporty CSV, `GET /api/time/[id]`
-i stronę kart `/time/[sekcja]`. Eksport czasów filtruje po `Times.section`,
+Zasięg obejmuje: panel nadgodzin, oba eksporty CSV, `GET /api/time/[id]`,
+stronę kart `/time/[sekcja]` oraz [korektę kart](#korekta--timezarzadzaj).
+Ta ostatnia zawęża się po `Times.section`, czyli po sekcji Z DNIA ZAPISU — tą samą
+regułą, którą składa listę, więc kierownik nigdy nie zobaczy w tabeli wiersza,
+którego nie da się zapisać. Eksport czasów filtruje po `Times.section`,
 czyli po sekcji z dnia zapisu — po zmianie zespołu stare dni zostają
 u poprzedniego kierownika.
 
@@ -367,6 +445,67 @@ GCHAT_WEBHOOK_URL=https://chat.googleapis.com/v1/spaces/XXXX/messages?key=...&to
   Błędy lądują w logu serwera z prefiksem `[gchat]`.
 - Link w powiadomieniu budowany jest z `NEXTAUTH_URL`, więc na produkcji ta
   zmienna musi wskazywać publiczny adres aplikacji.
+
+### Powiadomienia mailowe
+
+Drugi, **niezależny** kanał obok Google Chat. Czat mówi „jest nowy wniosek do
+rozpatrzenia" i trafia na wspólną przestrzeń; mail jest imienny i mówi, jak sprawa
+się skończyła. Żaden nie zastępuje drugiego.
+
+Adresat jest zawsze ten sam: **pracownik, którego sprawa dotyczy** (pole `To`)
+oraz **komplet kierowników jego sekcji** (pole `Cc`) — wszyscy przypisani
+w `ManagerSections`, a nie ten jeden, który kliknął. Zastępstwo w czasie urlopu
+jest normalną sytuacją, a wiadomość wysłana do jednej osoby przepadłaby razem
+z jej nieobecnością. Kierownik będący jednocześnie bohaterem sprawy dostaje
+wiadomość raz, nie dwa.
+
+| Kiedy | Treść |
+|---|---|
+| **Brak odbicia wyjścia** — karta domknięta o 3:00 | dzień, godzina wejścia, wpisana godzina wyjścia z zaznaczeniem, że jest ZAŁOŻONA, link do korekty |
+| **Niezakończone zadanie** — timer domknięty o 3:00 | projekt, opis, start, wymiar po domknięciu, link do `/zadania` |
+| **Zatwierdzony urlop** | rodzaj, termin, dni robocze, kto zatwierdził **i przypomnienie o obowiązku wypisania urlopu w systemie Comarch** |
+| **Zatwierdzone nadgodziny / wcześniejsze wyjście** | rodzaj, wymiar ze znakiem, data, kto zatwierdził, saldo po tej decyzji |
+
+Wysyłamy **wyłącznie przy zatwierdzeniu**. Odrzucenie, anulowanie przez pracownika
+i cofnięcie przez kierownika zostają poza tym kanałem.
+
+```bash
+# .env.local — plik jest w .gitignore i NIE trafia do repozytorium
+email_login=anetka@opss.pl
+email_password=…
+# poniższe mają wartości domyślne zgodne z instrukcją OVH i można je pominąć
+SMTP_HOST=ssl0.ovh.net          # alternatywnie smtp.mail.ovh.net
+SMTP_PORT=465                   # SSL/TLS od pierwszego bajtu, bez STARTTLS
+EMAIL_FROM=Punktualnik <anetka@opss.pl>
+```
+
+- **Brak `email_login` lub `email_password` = powiadomienia wyłączone**, reszta
+  aplikacji działa bez zmian. Ta sama zasada co przy webhooku czatu.
+- Wysyłka z tras wniosków **nie blokuje odpowiedzi** dla kierownika: decyzja jest
+  już w bazie, a niedostępna skrzynka nie ma prawa jej spowolnić. Błędy lądują
+  w logu z prefiksem `[mail]`; adresów w logu nie ma.
+- OVH odrzuca kopertę z adresem nadawcy innym niż zalogowany — `EMAIL_FROM` musi
+  wskazywać tę samą skrzynkę co `email_login`.
+- Link w treści budowany jest z `NEXTAUTH_URL`, więc na produkcji ta zmienna musi
+  wskazywać publiczny adres aplikacji.
+
+**Zanim uznasz, że to nie działa**, sprawdź sam transport, w oderwaniu od aplikacji:
+
+```bash
+npm run mail:test -- adres@example.pl
+```
+
+Skrypt najpierw robi `verify()` (samo połączenie i logowanie, bez wysyłki), potem
+wysyła jedną wiadomość. To rozdziela dwa zupełnie różne powody, dla których mail
+nie dochodzi: złe hasło albo port (widać tutaj) od błędu w logice wysyłki
+(widać dopiero w aplikacji).
+
+> **DNS.** Domena jest w OVH, ale rekordami zarządza Cloudflare. Poczta wychodząca
+> z serwerów OVH potrzebuje rekordu SPF, który je dopuszcza
+> (`v=spf1 include:mx.ovh.com ~all`), i najlepiej włączonego DKIM-a w panelu OVH.
+> Bez tego kod jest poprawny, a wiadomości i tak lądują w spamie. Po pierwszej
+> udanej wysyłce zajrzyj w źródło dostarczonej wiadomości: nagłówek
+> `Authentication-Results` mówi wprost, czy SPF i DKIM przeszły.
 
 Nadanie uprawnień kierownika:
 
@@ -494,6 +633,10 @@ a odpytywanie wraca samo.
 **Kafelki nie zmieniają kolejności w ciągu dnia.** Lista idzie zawsze porządkiem
 pracowników, a nie „najpierw ci, którzy odbili” — inaczej przy odświeżaniu czyjś
 kafelek uciekałby spod palca w chwili dotknięcia.
+
+Kafelek ze znacznikiem **`auto`** to karta, której nikt nie zamknął — domknęło
+ją zadanie nocne o 3:00 na osiem godzin od wejścia. Zasady i korekta:
+[Karty czasu](#karty-czasu).
 
 Pełne przeładowanie strony o 3:30 (`components/stationClock.js`) zostaje mimo
 pollingu: przy okazji podmienia kod aplikacji po wdrożeniu i odświeża sesję,
@@ -862,6 +1005,47 @@ na podzbiór.
 
 Podmiana kroju to podmiana plików w `public/fonts`, deklaracji `@font-face`
 i `fontFamily` w `tailwind.config.js` — nic więcej nie zna nazw krojów.
+
+### Daty
+
+**Data, którą się CZYTA JAKO DANĄ, ma postać `RRRR-MM-DD`; znacznik z godziną —
+`RRRR-MM-DD GG:MM`.** W kodzie: `formatDate`, `formatDateTime` i `formatDateRange`
+z `utils/index.js`. Nowy wiersz tabeli, nowa kolumna eksportu i nowa treść
+powiadomienia nie wołają `dayjs(...).format(...)` — od tego są te trzy funkcje.
+
+Wcześniej ta sama data wyglądała na pięć sposobów naraz: `14.08.26` w raporcie
+zadań, `14.08.2026` w urlopach i `2026-08-14` w eksporcie CSV. Porównanie wydruku
+z ekranem wymagało tłumaczenia jednego na drugie, a dwucyfrowy rok dokładał
+pytanie, czy `14.08.26` to nie rok 2014.
+
+Format ISO wygrał z trzech powodów: dzień nigdy nie myli się z miesiącem, sortuje
+się leksykograficznie i jest **dokładnie tym samym kształtem**, w którym daty
+siedzą w bazie (`Absences.dateFrom`, `Overtime.data`, `TaskEntries.data`) i we
+wszystkich eksportach CSV. To samo dotyczy treści powiadomień — mailowych
+i czatowych: mail o zatwierdzonym urlopie ma dać się zestawić z wierszem arkusza
+bez przeliczania w głowie.
+
+#### Cztery miejsca z datą słowną
+
+Reguła dotyczy daty w roli DANEJ. Są cztery napisy, które daną nie są — nikt ich
+nie przepisuje, nie sortuje ani nie porównuje z arkuszem. Odpowiadają na pytanie
+„który to dzień", rzucone kątem oka, i dlatego zostają po polsku:
+
+| Miejsce | Postać | Dlaczego |
+|---|---|---|
+| zegar w pasku (`components/stationClock.js`) | `śr, 26.08` / `środa, 26 sierpnia` | pasek czyta się kątem oka, żeby wiedzieć, jaki dziś dzień |
+| nagłówek tablicy kiosku (`services/sectionBoard.js`) | `środa, 26 sierpnia 2026` | napis oglądany z drugiego końca hali; ma potwierdzić, że tablica pokazuje dziś |
+| kafelek nieobecności (`components/card.js`) | `do 28.08` | dopisek w jednej linii podpisu na kafelku, obok reszty tekstu |
+| nagłówki grup dni w zadaniach (`pages/zadania/index.js`) | `Dziś`, `Wczoraj`, `wtorek, 18 sierpnia` | nagłówek grupy, do odnalezienia się na własnej liście; w wierszach stoją godziny, nie daty — od zestawiania dat jest raport kierownika |
+
+Wspólny mianownik: **wszystkie cztery to ekrany „na rzut oka", a nie tabele.**
+`środa` odpowiada na pytanie od razu, `2026-08-26` wymaga policzenia. Wszędzie
+indziej — w każdej tabeli, w każdym eksporcie, w każdym powiadomieniu i w każdym
+komunikacie walidacji — obowiązuje `RRRR-MM-DD`.
+
+`utils/index.js` jest właściwym miejscem dla tych funkcji, bo potrzebują ich OBIE
+strony: przeglądarka do tabel i serwer do treści maili. Ten moduł nie dotyka bazy,
+więc wolno go zaimportować i tam, i tam — jak `TASK_QUERY_MAX` czy `TIME_LIST_LIMIT`.
 
 ### Komponenty
 

@@ -6,6 +6,7 @@ import findAbsence from "../../../services/getAbsenceById";
 import { canApproveLeave } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
+import { notifyAbsenceApproved } from "../../../services/notifyMail";
 
 // Kopia bramek z pages/api/overtime/[id].js — ten sam obieg, więc ta sama
 // kolejność sprawdzeń i te same kody odpowiedzi.
@@ -97,6 +98,14 @@ export default async (req, res) => {
 
   if (!changed) {
     return res.status(409).json({ error: "already_decided" });
+  }
+
+  // Mail leci WYŁĄCZNIE przy zatwierdzeniu i bez await — dokładnie tym samym
+  // wzorcem co powiadomienie na czat (pages/api/absences/index.js). Niedostępny
+  // serwer poczty nie ma prawa spowolnić ani wywrócić decyzji kierownika, która
+  // jest już zapisana w bazie.
+  if (action === "approve") {
+    notifyAbsenceApproved(absence, author).catch(() => {});
   }
 
   return res.status(200).json({ status: DECISIONS[action], absence });

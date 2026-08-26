@@ -1,7 +1,6 @@
-import dayjs from "dayjs";
 import { kindLabel, signedMinutes } from "./overtimeKinds";
 import { absenceKindLabel } from "./absenceKinds";
-import { formatMinutes } from "../utils";
+import { formatMinutes, formatDate, formatDateRange } from "../utils";
 
 // Powiadomienia na Google Chat przez webhook przestrzeni.
 //
@@ -57,7 +56,7 @@ export const notifyNewOvertimeRequest = async (request, user) => {
     `*Nowy wniosek o nadgodziny*`,
     `${who}${sekcja}`,
     `${kindLabel(request.kind)}: *${formatMinutes(signedMinutes(request), { withSign: true })}*`,
-    `Data: ${dayjs(request.data).format("DD.MM.YYYY")}`,
+    `Data: ${formatDate(request.data)}`,
   ];
 
   if (request.reason) lines.push(`Powód: ${request.reason}`);
@@ -83,10 +82,7 @@ export const notifyNewOvertimeRequest = async (request, user) => {
 export const notifyNewAbsenceRequest = async (absence, user) => {
   const who = user ? `${user.name} ${user.surname}` : `użytkownik #${absence.userID}`;
   const sekcja = user?.section ? ` (${user.section})` : "";
-  const from = dayjs(absence.dateFrom).format("DD.MM.YYYY");
-  const to = dayjs(absence.dateTo).format("DD.MM.YYYY");
-  // Jeden dzień pisany raz, nie jako "05.09–05.09".
-  const zakres = from === to ? from : `${from} – ${to}`;
+  const zakres = formatDateRange(absence.dateFrom, absence.dateTo);
 
   const lines = [
     `*Nowy wniosek urlopowy*`,
