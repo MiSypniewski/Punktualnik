@@ -15,7 +15,7 @@ import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeBalance from "../../services/getOvertimeBalance";
 import getOvertimeForUser from "../../services/getOvertimeForUser";
 import { OVERTIME_KINDS, KIND_KEYS, kindLabel, signedMinutes, requiresReason, decisionVerb } from "../../services/overtimeKinds";
-import { formatMinutes } from "../../utils";
+import { formatMinutes, formatDateTime } from "../../utils";
 
 export async function getServerSideProps(ctx) {
   const token = await getToken({ req: ctx.req });
@@ -272,7 +272,7 @@ export default function Nadgodziny({ balance, requests }) {
                       {r.decidedByName && (
                         <span className="block text-xs mt-1">
                           {decisionVerb(r.status)}: {r.decidedByName},{" "}
-                          {dayjs(r.decidedAt).format("DD.MM.YYYY HH:mm")}
+                          {formatDateTime(r.decidedAt)}
                         </span>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}

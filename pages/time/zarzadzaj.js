@@ -9,7 +9,7 @@ import getAllUsers from "../../services/getAllUsers";
 import getSectionTimes from "../../services/getSectionTimes";
 import { canEditTimes } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
-import { TIME_LIST_LIMIT } from "../../utils";
+import { formatDate, TIME_LIST_LIMIT } from "../../utils";
 import {
   Alert,
   Button,
@@ -140,7 +140,7 @@ const CardRow = ({ card, onChanged, onError }) => {
 
   return (
     <Tr className={classNames(card.autoClosed && "bg-signal-soft")}>
-      <Td className="whitespace-nowrap">{dayjs(card.data).format("dd, D.MM")}</Td>
+      <Td className="whitespace-nowrap">{formatDate(card.data)}</Td>
       <Td>
         <span className="font-medium">{card.surname}</span> {card.name}
         {card.autoClosed && (

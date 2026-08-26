@@ -4,6 +4,7 @@ import getUsers from "./getUsers";
 import getSectionTime from "./getSectionTime";
 import getAbsencesForDay from "./getAbsencesForDay";
 import { workDay } from "./workday";
+import { formatDate } from "../utils";
 
 dayjs.locale("pl");
 
@@ -80,8 +81,10 @@ export const getSectionBoard = async (section) => {
   return {
     cards,
     // Doba robocza zaczyna się o 3:00, więc "dzisiaj" na tablicy to nie zawsze
-    // dzisiaj w kalendarzu — stąd etykieta prosto z serwera.
-    workdayLabel: dayjs(stamp).format("dddd, D MMMM YYYY"),
+    // dzisiaj w kalendarzu — stąd etykieta prosto z serwera. Nazwa dnia zostaje
+    // PRZED datą: na ekranie w hali "poniedziałek" niesie informację, której
+    // sama liczba nie niesie, a wymagany format RRRR-MM-DD stoi zaraz obok.
+    workdayLabel: `${dayjs(stamp).format("dddd")}, ${formatDate(stamp)}`,
     generatedAt: dayjs().format(),
   };
 };

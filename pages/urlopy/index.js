@@ -13,6 +13,7 @@ import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
 import { DownloadIcon } from "../../components/ui/icons";
+import { formatDateRange, formatDateTime } from "../../utils";
 import getAbsencesForUser from "../../services/getAbsencesForUser";
 import { getLeaveBalance } from "../../services/leaveBalance";
 import {
@@ -58,13 +59,6 @@ const nextWorkingDay = () => {
   // pętlą, gdyby kalendarz kiedyś zwrócił coś nieoczekiwanego.
   for (let i = 0; i < 14 && !isWorkingDay(d); i += 1) d = d.add(1, "day");
   return d.format("YYYY-MM-DD");
-};
-
-/** Zakres dat po ludzku — jeden dzień pisany raz, nie jako "05.09–05.09". */
-const rangeLabel = (from, to) => {
-  const a = dayjs(from).format("DD.MM.YYYY");
-  const b = dayjs(to).format("DD.MM.YYYY");
-  return a === b ? a : `${a} – ${b}`;
 };
 
 export default function Urlopy({ year, balance, absences }) {
@@ -307,7 +301,7 @@ export default function Urlopy({ year, balance, absences }) {
               <tbody>
                 {absences.map((a) => (
                   <Tr key={a.id}>
-                    <Td>{rangeLabel(a.dateFrom, a.dateTo)}</Td>
+                    <Td>{formatDateRange(a.dateFrom, a.dateTo)}</Td>
                     <Td>{absenceKindLabel(a.kind)}</Td>
                     <Num>{a.workDays}</Num>
                     <Td>
@@ -323,7 +317,7 @@ export default function Urlopy({ year, balance, absences }) {
                       {a.decidedByName && (
                         <span className="block text-xs text-muted">
                           {decisionVerb(a.status)}: {a.decidedByName},{" "}
-                          {dayjs(a.decidedAt).format("DD.MM.YYYY HH:mm")}
+                          {formatDateTime(a.decidedAt)}
                         </span>
                       )}
                       {a.decisionNote && <span className="block text-xs italic">„{a.decisionNote}”</span>}

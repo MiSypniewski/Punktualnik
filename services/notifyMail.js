@@ -5,7 +5,7 @@ import { sendMail, appUrl, mailEnabled } from "./mailer";
 import { absenceKindLabel } from "./absenceKinds";
 import { kindLabel, signedMinutes } from "./overtimeKinds";
 import getOvertimeBalance from "./getOvertimeBalance";
-import { formatMinutes, formatDuration } from "../utils";
+import { formatMinutes, formatDuration, formatDate, formatDateRange } from "../utils";
 
 dayjs.locale("pl");
 
@@ -105,7 +105,7 @@ const linkLine = (path, label) => {
   return url ? `${label}: ${url}` : null;
 };
 
-const dzien = (stamp) => dayjs(stamp).format("dddd, D MMMM YYYY");
+const dzien = formatDate;
 const godzina = (stamp) => dayjs(stamp).format("HH:mm");
 
 // --- 1. brak odbicia wyjścia ------------------------------------------------
@@ -136,7 +136,7 @@ export const notifyMissingPunchOut = async (card) => {
   return sendMail({
     to,
     cc,
-    subject: `Punktualnik: brak odbicia wyjścia — ${dayjs(card.data).format("DD.MM.YYYY")}`,
+    subject: `Punktualnik: brak odbicia wyjścia — ${formatDate(card.data)}`,
     kind: "brak-odbicia",
     ...body,
   });
@@ -165,7 +165,7 @@ export const notifyUnfinishedTask = async (entry) => {
   return sendMail({
     to,
     cc,
-    subject: `Punktualnik: niezakończone zadanie — ${dayjs(entry.data).format("DD.MM.YYYY")}`,
+    subject: `Punktualnik: niezakończone zadanie — ${formatDate(entry.data)}`,
     kind: "niezakonczone-zadanie",
     ...body,
   });
@@ -184,9 +184,7 @@ export const notifyUnfinishedTask = async (entry) => {
 export const notifyAbsenceApproved = async (absence, user) => {
   const { to, cc } = recipients(absence.userID, user?.section);
 
-  const from = dayjs(absence.dateFrom).format("DD.MM.YYYY");
-  const till = dayjs(absence.dateTo).format("DD.MM.YYYY");
-  const zakres = from === till ? from : `${from} – ${till}`;
+  const zakres = formatDateRange(absence.dateFrom, absence.dateTo);
 
   const body = compose([
     `Wniosek urlopowy został zatwierdzony.`,
@@ -227,7 +225,7 @@ export const notifyOvertimeApproved = async (request, user) => {
     ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${request.userID}`],
     ["Rodzaj", kindLabel(request.kind)],
     ["Wymiar", formatMinutes(signedMinutes(request), { withSign: true })],
-    ["Data", dayjs(request.data).format("DD.MM.YYYY")],
+    ["Data", formatDate(request.data)],
     ...(request.decidedByName ? [["Zatwierdził", request.decidedByName]] : []),
     ...(request.decisionNote ? [["Uwagi", request.decisionNote]] : []),
     null,

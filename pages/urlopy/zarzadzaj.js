@@ -13,6 +13,7 @@ import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
 import { TrashIcon } from "../../components/ui/icons";
+import { formatDateRange, formatDateTime } from "../../utils";
 import { getAbsences, ABSENCE_LIST_LIMIT } from "../../services/getAbsences";
 import { getLeaveBalances } from "../../services/leaveBalance";
 import getAllUsers from "../../services/getAllUsers";
@@ -73,12 +74,6 @@ export async function getServerSideProps(ctx) {
 }
 
 const dayWord = (n) => (n === 1 ? "dzień" : "dni");
-
-const rangeLabel = (from, to) => {
-  const a = dayjs(from).format("DD.MM.YYYY");
-  const b = dayjs(to).format("DD.MM.YYYY");
-  return a === b ? a : `${a} – ${b}`;
-};
 
 const nextWorkingDay = () => {
   let d = dayjs();
@@ -245,7 +240,7 @@ export default function Nieobecnosci({
                     </span>
                     <span className="text-xs text-muted">{a.section}</span>
                     <span className="ml-auto font-mono text-sm tabular-nums">
-                      {rangeLabel(a.dateFrom, a.dateTo)}
+                      {formatDateRange(a.dateFrom, a.dateTo)}
                     </span>
                   </div>
 
@@ -420,7 +415,7 @@ export default function Nieobecnosci({
                   <Fragment key={a.id}>
                   <Tr>
                     <Td className="font-mono tabular-nums whitespace-nowrap">
-                      {rangeLabel(a.dateFrom, a.dateTo)}
+                      {formatDateRange(a.dateFrom, a.dateTo)}
                     </Td>
                     <Td>
                       {a.surname} {a.name}
@@ -439,7 +434,7 @@ export default function Nieobecnosci({
                       {a.decidedByName && (
                         <span className="block text-xs">
                           {decisionVerb(a.status)}: {a.decidedByName},{" "}
-                          {dayjs(a.decidedAt).format("DD.MM.YYYY HH:mm")}
+                          {formatDateTime(a.decidedAt)}
                         </span>
                       )}
                       {a.decisionNote && <span className="block text-xs italic">„{a.decisionNote}”</span>}

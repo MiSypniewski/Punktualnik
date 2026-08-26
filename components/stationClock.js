@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
+import { formatDate } from "../utils";
 dayjs.locale("pl");
 
 // Zegar stacyjny w pasku: data słownie, godzina w monospace z sekundami.
@@ -53,14 +54,13 @@ const StationClock = () => {
 
   return (
     <span className="flex items-baseline gap-2 shrink-0 leading-none">
-      {/* Data w dwóch długościach: od 1536 px pełna, niżej skrócona. Przy ośmiu
-          pozycjach menu pełna data zjadała tyle miejsca, że pozycje wchodziły
-          na nazwisko. Poniżej 768 px znika zupełnie — zostaje sama godzina. */}
-      <span className="hidden md:inline 2xl:hidden text-xs text-muted first-letter:uppercase whitespace-nowrap">
-        {now.format("ddd, D.MM")}
-      </span>
-      <span className="hidden 2xl:inline text-xs text-muted first-letter:uppercase whitespace-nowrap">
-        {now.format("dddd, D MMMM")}
+      {/* Jedna data zamiast dwóch długości przełączanych szerokością ekranu.
+          Wariantów było dwa, bo pełna data słownie („środa, 26 sierpnia”) przy
+          ośmiu pozycjach menu zjadała tyle miejsca, że wchodziły na nazwisko.
+          RRRR-MM-DD ma stałe dziesięć znaków i mieści się wszędzie, więc powód
+          podziału zniknął. Poniżej 768 px data znika — zostaje sama godzina. */}
+      <span className="hidden md:inline text-xs text-muted tabular-nums whitespace-nowrap">
+        {formatDate(now)}
       </span>
       <time
         className="font-mono text-sm font-medium tabular-nums"

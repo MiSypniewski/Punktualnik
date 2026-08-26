@@ -1006,6 +1006,34 @@ na podzbiór.
 Podmiana kroju to podmiana plików w `public/fonts`, deklaracji `@font-face`
 i `fontFamily` w `tailwind.config.js` — nic więcej nie zna nazw krojów.
 
+### Daty
+
+**Data wyświetlana to zawsze `RRRR-MM-DD`, znacznik z godziną — `RRRR-MM-DD GG:MM`.**
+W kodzie: `formatDate`, `formatDateTime` i `formatDateRange` z `utils/index.js`.
+Nowy ekran nie woła `dayjs(...).format(...)` do daty — od tego są te trzy funkcje.
+
+Wcześniej ta sama data wyglądała na pięć sposobów naraz: `14.08.26` w raporcie
+zadań, `14.08.2026` w urlopach, `środa, 14 sierpnia` w nagłówku dnia, `śr, 14.08`
+na tablicy kiosku i `2026-08-14` w eksporcie CSV. Porównanie wydruku z ekranem
+wymagało tłumaczenia jednego na drugie, a dwucyfrowy rok dokładał pytanie, czy
+`14.08.26` to nie rok 2014.
+
+Format ISO wygrał z trzech powodów: dzień nigdy nie myli się z miesiącem, sortuje
+się leksykograficznie i jest **dokładnie tym samym kształtem**, w którym daty
+siedzą w bazie (`Absences.dateFrom`, `Overtime.data`, `TaskEntries.data`) i we
+wszystkich eksportach CSV. To samo dotyczy treści powiadomień — mailowych
+i czatowych.
+
+Nazwy dni zostają tam, gdzie niosą informację, ale **obok daty, nie zamiast niej**:
+nagłówek tablicy kiosku (`środa, 2026-08-26`), nagłówki grup dni w zadaniach
+(`Dziś · 2026-08-26`, `Wczoraj · 2026-08-25`, `wtorek, 2026-08-18`). W gęstych
+tabelach skróconych nazw dni nie ma — istniały wyłącznie po to, żeby ścisnąć
+krótką datę, a `2026-08-26` czyta się bez podpowiedzi.
+
+`utils/index.js` jest tu właściwym miejscem, bo tych funkcji potrzebują OBIE
+strony: przeglądarka do tabel i serwer do treści maili. Ten moduł nie dotyka bazy,
+więc wolno go zaimportować i tam, i tam — jak `TASK_QUERY_MAX` czy `TIME_LIST_LIMIT`.
+
 ### Komponenty
 
 Nowy ekran składa się z `components/ui/`, nie z klas pisanych na miejscu:

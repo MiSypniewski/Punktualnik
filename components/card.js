@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
 import { absenceKindShort } from "../services/absenceKinds";
-import { DifferenceTime, Timer } from "../utils";
+import { DifferenceTime, Timer, formatDate } from "../utils";
 import LiveDot from "./liveDot";
 
 import dayjs from "dayjs";
@@ -270,7 +270,7 @@ const Card = ({ data, onSaved }) => {
   // czy za dwa tygodnie.
   const caption =
     stateKey === "absence"
-      ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${dayjs(absence.dateTo).format("DD.MM")}`
+      ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${formatDate(absence.dateTo)}`
       : state.caption[canPunch ? "punch" : "watch"];
 
   return (

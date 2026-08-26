@@ -20,7 +20,7 @@ import { getEntriesForUser, getRunningEntry, sweepStaleEntries } from "../../ser
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
 import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
-import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
+import { formatDate, formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
 import { groupEntries } from "../../utils/groupEntries";
 
 dayjs.locale("pl");
@@ -138,11 +138,17 @@ const useGrouping = () => {
   return [grouped, choose];
 };
 
-/** Etykieta dnia: "dziś", "wczoraj", inaczej data słownie. */
+/**
+ * Etykieta dnia: sama data w formacie RRRR-MM-DD, a przed nią słowo, jeśli jest
+ * czym je zastąpić. "Dziś" i "Wczoraj" ZOSTAJĄ, ale już nie ZAMIAST daty —
+ * lista sięga kilkunastu dni wstecz i przy zwijaniu grup trzeba było liczyć
+ * na palcach, którego dnia dotyczy „Wczoraj”.
+ */
 const dayLabel = (data, today) => {
-  if (data === today) return "Dziś";
-  if (data === dayjs(today).subtract(1, "day").format("YYYY-MM-DD")) return "Wczoraj";
-  return dayjs(data).format("dddd, D MMMM");
+  const date = formatDate(data);
+  if (data === today) return `Dziś · ${date}`;
+  if (data === dayjs(today).subtract(1, "day").format("YYYY-MM-DD")) return `Wczoraj · ${date}`;
+  return `${dayjs(data).format("dddd")}, ${date}`;
 };
 
 export default function Zadania({

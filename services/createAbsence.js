@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import db from "./db";
 import { ABSENCE_KIND_KEYS } from "./absenceKinds";
 import { countWorkingDays } from "./workingDays";
+import { formatDateRange } from "../utils";
 
 // Zakładanie nieobecności — wniosek pracownika ALBO wpis kierownika.
 //
@@ -55,8 +56,6 @@ const insert = db.prepare(`
 
 const findById = db.prepare(`SELECT * FROM Absences WHERE id = ?`);
 
-const pl = (date) => dayjs(date).format("DD.MM.YYYY");
-
 /**
  * @param {object} payload
  * @param {boolean} [payload.autoApprove] wpis kierownika — od razu zatwierdzony,
@@ -95,7 +94,7 @@ const createAbsence = async ({ autoApprove = false, createdBy, createdByName, ..
 
   const clash = stmtOverlap.get({ userID, dateFrom, dateTo });
   if (clash) {
-    fail("overlap", `Ten zakres nachodzi na nieobecność ${pl(clash.dateFrom)}–${pl(clash.dateTo)}.`);
+    fail("overlap", `Ten zakres nachodzi na nieobecność ${formatDateRange(clash.dateFrom, clash.dateTo)}.`);
   }
 
   const now = dayjs().format();
