@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
 import { absenceKindShort } from "../services/absenceKinds";
-import { DifferenceTime, Timer, formatDate } from "../utils";
+import { DifferenceTime, Timer } from "../utils";
 import LiveDot from "./liveDot";
 
 import dayjs from "dayjs";
@@ -267,10 +267,12 @@ const Card = ({ data, onSaved }) => {
   const label = stateKey === "absence" ? absenceKindShort(absence.kind) : state.label;
 
   // Do kiedy — żeby nie trzeba było sprawdzać w panelu, czy ktoś wraca jutro,
-  // czy za dwa tygodnie.
+  // czy za dwa tygodnie. Sam dzień i miesiąc, bez roku i bez RRRR-MM-DD: to
+  // kafelek na ścianie, a nie wiersz tabeli, i doklejona data ma zmieścić się
+  // w jednej linii podpisu obok reszty tekstu.
   const caption =
     stateKey === "absence"
-      ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${formatDate(absence.dateTo)}`
+      ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${dayjs(absence.dateTo).format("DD.MM")}`
       : state.caption[canPunch ? "punch" : "watch"];
 
   return (

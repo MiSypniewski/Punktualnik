@@ -1008,29 +1008,42 @@ i `fontFamily` w `tailwind.config.js` — nic więcej nie zna nazw krojów.
 
 ### Daty
 
-**Data wyświetlana to zawsze `RRRR-MM-DD`, znacznik z godziną — `RRRR-MM-DD GG:MM`.**
-W kodzie: `formatDate`, `formatDateTime` i `formatDateRange` z `utils/index.js`.
-Nowy ekran nie woła `dayjs(...).format(...)` do daty — od tego są te trzy funkcje.
+**Data, którą się CZYTA JAKO DANĄ, ma postać `RRRR-MM-DD`; znacznik z godziną —
+`RRRR-MM-DD GG:MM`.** W kodzie: `formatDate`, `formatDateTime` i `formatDateRange`
+z `utils/index.js`. Nowy wiersz tabeli, nowa kolumna eksportu i nowa treść
+powiadomienia nie wołają `dayjs(...).format(...)` — od tego są te trzy funkcje.
 
 Wcześniej ta sama data wyglądała na pięć sposobów naraz: `14.08.26` w raporcie
-zadań, `14.08.2026` w urlopach, `środa, 14 sierpnia` w nagłówku dnia, `śr, 14.08`
-na tablicy kiosku i `2026-08-14` w eksporcie CSV. Porównanie wydruku z ekranem
-wymagało tłumaczenia jednego na drugie, a dwucyfrowy rok dokładał pytanie, czy
-`14.08.26` to nie rok 2014.
+zadań, `14.08.2026` w urlopach i `2026-08-14` w eksporcie CSV. Porównanie wydruku
+z ekranem wymagało tłumaczenia jednego na drugie, a dwucyfrowy rok dokładał
+pytanie, czy `14.08.26` to nie rok 2014.
 
 Format ISO wygrał z trzech powodów: dzień nigdy nie myli się z miesiącem, sortuje
 się leksykograficznie i jest **dokładnie tym samym kształtem**, w którym daty
 siedzą w bazie (`Absences.dateFrom`, `Overtime.data`, `TaskEntries.data`) i we
 wszystkich eksportach CSV. To samo dotyczy treści powiadomień — mailowych
-i czatowych.
+i czatowych: mail o zatwierdzonym urlopie ma dać się zestawić z wierszem arkusza
+bez przeliczania w głowie.
 
-Nazwy dni zostają tam, gdzie niosą informację, ale **obok daty, nie zamiast niej**:
-nagłówek tablicy kiosku (`środa, 2026-08-26`), nagłówki grup dni w zadaniach
-(`Dziś · 2026-08-26`, `Wczoraj · 2026-08-25`, `wtorek, 2026-08-18`). W gęstych
-tabelach skróconych nazw dni nie ma — istniały wyłącznie po to, żeby ścisnąć
-krótką datę, a `2026-08-26` czyta się bez podpowiedzi.
+#### Cztery miejsca z datą słowną
 
-`utils/index.js` jest tu właściwym miejscem, bo tych funkcji potrzebują OBIE
+Reguła dotyczy daty w roli DANEJ. Są cztery napisy, które daną nie są — nikt ich
+nie przepisuje, nie sortuje ani nie porównuje z arkuszem. Odpowiadają na pytanie
+„który to dzień", rzucone kątem oka, i dlatego zostają po polsku:
+
+| Miejsce | Postać | Dlaczego |
+|---|---|---|
+| zegar w pasku (`components/stationClock.js`) | `śr, 26.08` / `środa, 26 sierpnia` | pasek czyta się kątem oka, żeby wiedzieć, jaki dziś dzień |
+| nagłówek tablicy kiosku (`services/sectionBoard.js`) | `środa, 26 sierpnia 2026` | napis oglądany z drugiego końca hali; ma potwierdzić, że tablica pokazuje dziś |
+| kafelek nieobecności (`components/card.js`) | `do 28.08` | dopisek w jednej linii podpisu na kafelku, obok reszty tekstu |
+| nagłówki grup dni w zadaniach (`pages/zadania/index.js`) | `Dziś`, `Wczoraj`, `wtorek, 18 sierpnia` | nagłówek grupy, do odnalezienia się na własnej liście; w wierszach stoją godziny, nie daty — od zestawiania dat jest raport kierownika |
+
+Wspólny mianownik: **wszystkie cztery to ekrany „na rzut oka", a nie tabele.**
+`środa` odpowiada na pytanie od razu, `2026-08-26` wymaga policzenia. Wszędzie
+indziej — w każdej tabeli, w każdym eksporcie, w każdym powiadomieniu i w każdym
+komunikacie walidacji — obowiązuje `RRRR-MM-DD`.
+
+`utils/index.js` jest właściwym miejscem dla tych funkcji, bo potrzebują ich OBIE
 strony: przeglądarka do tabel i serwer do treści maili. Ten moduł nie dotyka bazy,
 więc wolno go zaimportować i tam, i tam — jak `TASK_QUERY_MAX` czy `TIME_LIST_LIMIT`.
 
