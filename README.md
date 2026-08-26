@@ -448,26 +448,72 @@ GCHAT_WEBHOOK_URL=https://chat.googleapis.com/v1/spaces/XXXX/messages?key=...&to
 
 ### Powiadomienia mailowe
 
-Drugi, **niezależny** kanał obok Google Chat. Czat mówi „jest nowy wniosek do
-rozpatrzenia" i trafia na wspólną przestrzeń; mail jest imienny i mówi, jak sprawa
-się skończyła. Żaden nie zastępuje drugiego.
+Drugi, **niezależny** kanał obok Google Chat. Czat trafia na wspólną przestrzeń,
+którą trzeba mieć otwartą; mail jest imienny i czeka w skrzynce. Żaden nie
+zastępuje drugiego.
 
-Adresat jest zawsze ten sam: **pracownik, którego sprawa dotyczy** (pole `To`)
-oraz **komplet kierowników jego sekcji** (pole `Cc`) — wszyscy przypisani
+Adresat domyślnie: **pracownik, którego sprawa dotyczy** (pole `To`) oraz
+**komplet kierowników jego sekcji** (pole `Cc`) — wszyscy przypisani
 w `ManagerSections`, a nie ten jeden, który kliknął. Zastępstwo w czasie urlopu
 jest normalną sytuacją, a wiadomość wysłana do jednej osoby przepadłaby razem
 z jej nieobecnością. Kierownik będący jednocześnie bohaterem sprawy dostaje
-wiadomość raz, nie dwa.
+wiadomość raz, nie dwa. **Wyjątkiem są powiadomienia „do rozpatrzenia"** — te
+idą wyłącznie do kierowników (niżej).
+
+Dziesięć powiadomień w czterech grupach:
+
+**Do rozpatrzenia** — jedyne powiadomienia idące WYŁĄCZNIE do kierowników, w polu
+`To`. Adresatem jest tu osoba, która ma coś zrobić, a pracownik przed sekundą sam
+kliknął „złóż wniosek" i potwierdzenia nie potrzebuje.
+
+| Kiedy | Treść |
+|---|---|
+| **Nowy wniosek urlopowy** | pracownik, rodzaj, termin, dni robocze, powód, link do panelu |
+| **Nowy wniosek o nadgodziny / wcześniejsze wyjście** | pracownik, rodzaj, wymiar ze znakiem, data, powód, **saldo przed decyzją**, link do panelu |
+
+To samo zdarzenie idzie równolegle na Google Chat i to jest **świadome
+dublowanie**: czat trzeba mieć otwarty, mail dociera do kierownika, który akurat
+go nie ogląda, i zostaje w skrzynce, dopóki ktoś się nim nie zajmie. Kanały wyłącza
+się niezależnie (`GCHAT_WEBHOOK_URL` kontra `email_login`).
+
+**Po decyzji** — `To` = pracownik, `Cc` = kierownicy sekcji.
+
+| Kiedy | Treść |
+|---|---|
+| **Zatwierdzony urlop** | rodzaj, termin, dni robocze, kto zatwierdził **i przypomnienie o obowiązku wypisania urlopu w systemie Comarch** |
+| **Zatwierdzone nadgodziny / wcześniejsze wyjście** | rodzaj, wymiar ze znakiem, data, kto zatwierdził, saldo po tej decyzji |
+
+Wyłącznie przy **zatwierdzeniu**. Odrzucenie, anulowanie przez pracownika
+i cofnięcie przez kierownika zostają poza tym kanałem.
+
+**Zadanie nocne** — `To` = pracownik, `Cc` = kierownicy sekcji.
 
 | Kiedy | Treść |
 |---|---|
 | **Brak odbicia wyjścia** — karta domknięta o 3:00 | dzień, godzina wejścia, wpisana godzina wyjścia z zaznaczeniem, że jest ZAŁOŻONA, link do korekty |
 | **Niezakończone zadanie** — timer domknięty o 3:00 | projekt, opis, start, wymiar po domknięciu, link do `/zadania` |
-| **Zatwierdzony urlop** | rodzaj, termin, dni robocze, kto zatwierdził **i przypomnienie o obowiązku wypisania urlopu w systemie Comarch** |
-| **Zatwierdzone nadgodziny / wcześniejsze wyjście** | rodzaj, wymiar ze znakiem, data, kto zatwierdził, saldo po tej decyzji |
 
-Wysyłamy **wyłącznie przy zatwierdzeniu**. Odrzucenie, anulowanie przez pracownika
-i cofnięcie przez kierownika zostają poza tym kanałem.
+**Kierownik zmienił cudzą ewidencję** — `To` = pracownik, `Cc` = kierownicy sekcji.
+
+Wspólny mianownik: pracownik nie klikał, nie składał wniosku i **bez maila nie ma
+jak się o tym dowiedzieć**. Dotąd jedynym śladem był podpis w tabeli, do której
+musiałby sam zajrzeć, albo wpis w logu serwera, którego nie widzi w ogóle.
+
+| Kiedy | Treść |
+|---|---|
+| **Nieobecność wpisana przez kierownika** (L4, urlop na żądanie, urlop zgłoszony telefonicznie) | rodzaj, termin, dni robocze, kto wpisał, adnotacja że wpis jest już zatwierdzony |
+| **Zmiana puli urlopowej** | rok, zmiana ze znakiem (bywa ujemna — to korekta), kto wpisał, uwagi |
+| **Karta czasu: dopisana / poprawiona / usunięta** | dzień, godziny, przy korekcie **„było → jest"**, kto i co zrobił |
+| **Wpis zadania: poprawiony / usunięty cudzy** | dzień, projekt, opis, godziny, wymiar, kto, powód usunięcia |
+
+Kierownik, który zmianę wykonał, dostaje własną kopię w `Cc` i tak ma zostać:
+przy dwóch osobach obsługujących sekcję to jedyny sposób, żeby druga wiedziała,
+co zrobiła pierwsza. Wpisy robione **na własnym koncie** nie wysyłają nic —
+nie ma kogo zawiadamiać.
+
+> Każda korekta to osobna wiadomość. Kierownik poprawiający dziesięć kart pod rząd
+> wyśle dziesięć maili — świadomie, bo każda z nich dotyczy innego pracownika
+> i innego dnia.
 
 ```bash
 # .env.local — plik jest w .gitignore i NIE trafia do repozytorium

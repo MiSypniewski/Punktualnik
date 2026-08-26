@@ -3,6 +3,7 @@ import addLeaveAllowance from "../../../services/addLeaveAllowance";
 import { canApproveLeave } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
+import { notifyAllowanceAdded } from "../../../services/notifyMail";
 import { logApiError } from "../../../services/log";
 
 // Przydzielanie dni urlopu. Wyłącznie kierownik i wyłącznie własnym
@@ -50,6 +51,10 @@ export default async (req, res) => {
       createdBy: token.userID,
       createdByName: me ? `${me.name} ${me.surname}` : token.name,
     });
+
+    // Pula to liczba, na którą pracownik patrzy raz w roku i której sam nie
+    // ustawia — o jej zmianie musi się dowiedzieć w chwili, gdy zachodzi.
+    notifyAllowanceAdded(allowance, target, { userID: token.userID, name: token.name }).catch(() => {});
 
     return res.status(201).json({ status: "created", allowance });
   } catch (error) {

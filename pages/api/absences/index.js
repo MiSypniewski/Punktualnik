@@ -9,6 +9,7 @@ import { canApproveLeave } from "../../../services/roles";
 import { visibleSections, canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyNewAbsenceRequest } from "../../../services/notifyGChat";
+import { notifyAbsencePending, notifyAbsenceRecorded } from "../../../services/notifyMail";
 import { logApiError } from "../../../services/log";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -113,12 +114,22 @@ export default async (req, res) => {
         autoApprove: forSomeoneElse,
       });
 
-      // Powiadomienie tylko dla wniosków pracownika: adresatem jest kierownik,
-      // a on właśnie sam ten wpis założył. Bez await — proces żyje dalej
-      // (next start), więc żądanie dokończy się w tle.
-      if (!forSomeoneElse) {
+      // Bez await — proces żyje dalej (next start), więc żądanie dokończy się
+      // w tle, a pracownik nie czeka na Google ani na serwer poczty.
+      //
+      // Dwie ścieżki, dwie różne wiadomości i dwóch różnych adresatów:
+      if (forSomeoneElse) {
+        // Wpis kierownika: zatwierdzony w chwili powstania, więc nie ma czego
+        // rozpatrywać i nigdy nie przejdzie przez trasę decyzji. Bez tego maila
+        // pracownik nie dowiaduje się o własnym L4 w systemie w ogóle.
+        const [owner] = await getUserData(absence.userID);
+        notifyAbsenceRecorded(absence, owner, { userID: token.userID, name: authorName }).catch(() => {});
+      } else {
+        // Wniosek pracownika: adresatem jest kierownik, który ma go rozpatrzyć.
+        // Czat i mail lecą oba — patrz komentarz w services/notifyMail.js.
         const [me] = await getUserData(token.userID);
         notifyNewAbsenceRequest(absence, me).catch(() => {});
+        notifyAbsencePending(absence, me).catch(() => {});
       }
 
       return res.status(201).json({ status: "created", absence });
