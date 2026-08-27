@@ -25,6 +25,7 @@ zmiany widać od razu po odświeżeniu strony.
 | `npm run admin -- deactivate <email\|id>` | blokuje konto, nie kasując danych |
 | `npm run admin -- passwd <email\|id> <noweHaslo>` | ustawia nowe hasło |
 | `npm run admin -- section <email\|id> <slug>` | przenosi pracownika do innej sekcji |
+| `npm run admin -- user-delete <email\|id>` | liczy wpisy konta; z `--force` kasuje je razem z kontem, z `--scal-z <email\|id>` przepina na inne konto ([szczegóły](#usuwanie-konta)) |
 
 ### Role i dostępy
 
@@ -215,6 +216,7 @@ node scripts/admin.js deactivate 5                # zablokuj
 node scripts/admin.js role       5 editor         # rola: user | editor | manager
 node scripts/admin.js section    5 biedronka_ch22 # zmień sekcję (tylko istniejąca)
 node scripts/admin.js passwd     jan@example.pl noweHaslo
+node scripts/admin.js user-delete 5               # usuń konto (patrz: Usuwanie konta)
 
 # alternatywnie przez npm (uwaga na `--`):
 npm run admin -- pending
@@ -230,6 +232,41 @@ Typowy flow nowego pracownika: formularz `/users/register` → `pending` →
 /api/users` bez sesji odpowiada 401, bo inaczej dowolna osoba z internetu
 wsypywałaby wiersze do tabeli `Users` i listy „do aktywacji”. Konto pierwsze
 oraz konta zakładane hurtem robi się i tak z linii poleceń.
+
+### Usuwanie konta
+
+`deactivate` tylko blokuje logowanie — konto zostaje w bazie i do niedawna nadal
+wisiało w listach „wybierz pracownika”. Do usunięcia go na dobre służy
+`user-delete`, jedyna komenda w `admin.js`, która kasuje dane.
+
+```bash
+npm run admin -- user-delete jan@example.pl                        # policz wpisy, nic nie ruszaj
+npm run admin -- user-delete jan@example.pl --force                # usuń konto RAZEM z wpisami
+npm run admin -- user-delete jan@example.pl --scal-z anna@example.pl  # przepnij wpisy i usuń duplikat
+```
+
+Bez flagi komenda jest raportem: wypisuje, ile wierszy konto ma w `Times`,
+`TaskEntries`, `Absences`, `Overtime`, `LeaveAllowance` i `ManagerSections`, oraz ile
+podpisów zostawiło pod **cudzymi** wpisami. Dopiero flaga coś zmienia — dlatego nie
+ma pytania „na pewno?”, które przez SSH i tak byłoby uciążliwe.
+
+- `--force` kasuje konto i wszystkie jego wpisy. Odwołania w cudzych wierszach
+  (`Projects.createdBy`, `Absences.decidedBy`, `Times.editedBy` itd.) idą do `NULL`,
+  ale kolumny `*ByName` **zostają** — inaczej z audytu zniknęłoby nazwisko osoby, która
+  zatwierdziła cudzy wniosek, a to nie to samo co usunięcie jej konta.
+- `--scal-z` przepina wpisy na inne konto i kasuje puste źródło. To właściwa droga przy
+  duplikacie konta jednej osoby. Komenda odmawia, gdy oba konta mają biegnący timer
+  (`TaskEntries` dopuszcza jeden na konto), i ostrzega, gdy pule urlopowe za ten sam rok
+  się zsumują.
+
+Przed każdym zapisem powstaje kopia bazy `data/backup-przed-usunieciem-<id>-<data>.sqlite`
+(`VACUUM INTO`, więc spójna nawet przy działającej aplikacji) — przy `--force` to jedyna
+droga powrotu. Odrzucone próby kopii nie zostawiają. Po operacji skrypt sprawdza, czy nie
+przybyło osieroconych wierszy, i cofa całość, gdyby przybyło.
+
+Sesja JWT usuniętego konta pozostaje ważna aż do wygaśnięcia. Przy koncie nieaktywnym to
+bez znaczenia (i tak nie mogło się zalogować), ale kasując konto czynne, trzeba się z tym
+liczyć.
 
 ## Sekcje (działy)
 
@@ -661,11 +698,33 @@ przyszłego przydziału jest jego decyzją, nie pomyłką systemu.
 | Rodzaj spoza listy pracownika, zgłoszony przez pracownika | `403 kind_not_self_service` |
 | Wpis za kogoś bez uprawnień kierownika | `403 permission_denied` |
 | Dwie karty kierownika rozpatrujące ten sam wniosek | `409 already_decided` |
+| Wpis na koncie nieaktywnym (zwolniony pracownik) | `409 user_inactive` |
 
 Rok rozliczeniowy bierze się z daty początkowej i dlatego wniosek nie może
 przechodzić przez sylwestra — inaczej jeden wpis musiałby dzielić dni między dwa
 salda i mieć dwa wymiary naraz. Raz na rok trzeba złożyć dwa wnioski i to jest
 tańsze niż tłumaczenie, czemu pula się nie zgadza.
+
+Reguła ostatnia dubluje to, co widać w formularzu: listy „wybierz pracownika”
+pokazują wyłącznie konta aktywne (patrz niżej). Serwer sprawdza to jeszcze raz, bo
+ukrycie opcji w `<select>` nie jest zabezpieczeniem — żądanie da się złożyć ręcznie.
+Ta sama reguła obowiązuje przy puli dni i przy dopisywaniu karty czasu. Nie dotyczy
+natomiast POPRAWIANIA istniejących wpisów: dezaktywacja konta nie może zamrażać jego
+historii tak, że nie da się w niej poprawić literówki.
+
+### Listy wyboru pracownika
+
+Wszystkie siedem dropdownów „wybierz pracownika” (urlopy, karty czasu, zadania,
+nadgodziny) karmi jedna funkcja `services/getAllUsers.js`, a renderuje jeden komponent
+`components/ui/userOptions.js`. Dzieli je na dwie role:
+
+- **formularz zapisu** (wpisanie nieobecności, pula dni, nowa karta) — wyłącznie konta
+  aktywne. Konto zwolnionego pracownika nie ma jak dostać urlopu;
+- **filtr i raport** — wszyscy, ale zwolnieni w osobnej grupie „Byli pracownicy”.
+  Ich wpisy nadal są w `Times`, `Absences` i `TaskEntries`, więc muszą dać się wyfiltrować.
+
+Grupa „Byli pracownicy” pojawia się tylko wtedy, gdy ktoś w niej jest. Konta kiosku
+(`role = 'editor'`) nie ma w żadnej z tych list — to konto współdzielone, nie człowiek.
 
 ### Kiosk
 

@@ -27,6 +27,7 @@ import {
   Num,
   EmptyState,
   FormatChoice,
+  UserOptions,
   PageHeader,
   CheckIcon,
   CloseIcon,
@@ -247,11 +248,7 @@ const AddCard = ({ users, onChanged, onError }) => {
         <Field label="Pracownik" htmlFor="nowy-user" className="sm:col-span-2">
           <Select id="nowy-user" value={userID} onChange={(e) => setUserID(e.target.value)}>
             <option value="">— wybierz —</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.surname} {u.name}
-              </option>
-            ))}
+            <UserOptions users={users} />
           </Select>
         </Field>
         <Field label="Dzień" htmlFor="nowy-dzien">
@@ -349,11 +346,7 @@ export default function ZarzadzajKartami({ users, hasSections, initial, from: fr
         <Field label="Pracownik" htmlFor="userID">
           <Select id="userID" value={userID} onChange={(e) => setUserID(e.target.value)}>
             <option value="">— wszyscy —</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.surname} {u.name}
-              </option>
-            ))}
+            <UserOptions users={users} includeInactive />
           </Select>
         </Field>
       </div>

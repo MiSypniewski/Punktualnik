@@ -15,6 +15,7 @@
  *   node scripts/admin.js section    <email|id> <slugSekcji>
  *   node scripts/admin.js sections   <email|id> [sekcja1,sekcja2]
  *   node scripts/admin.js passwd     <email|id> <noweHaslo>
+ *   node scripts/admin.js user-delete <email|id> [--force | --scal-z <email|id>]
  *   node scripts/admin.js section-list [--all]
  *   node scripts/admin.js section-add   <slug> [Etykieta]
  *   node scripts/admin.js section-label <slug> <Etykieta>
@@ -145,6 +146,74 @@ const printList = (rows) => {
   }
   rows.forEach((u) => console.log(fmt(u)));
   console.log(`\nRazem: ${rows.length}`);
+};
+
+// --- Kasowanie i scalanie kont ------------------------------------------
+//
+// Tabele z danymi NALEŻĄCYMI do konta. Kolejność jest kolejnością kasowania:
+// dzieci przed rodzicem, bo wszystkie FK w tej bazie są bez ON DELETE (NO ACTION).
+// Times jest ostatnie i jako jedyne nie ma FK w ogóle — kasujemy je jawnie, bo
+// baza sama by o nim nie przypomniała.
+const OWNED = [
+  ["TaskEntries", "userID"],
+  ["Absences", "userID"],
+  ["LeaveAllowance", "userID"],
+  ["Overtime", "userID"],
+  ["ManagerSections", "managerID"],
+  ["Times", "userID"],
+];
+
+// To samo przy scalaniu, ale bez Times (ma zdenormalizowane nazwisko, więc idzie
+// osobnym UPDATE-em) i bez ManagerSections (klucz główny wymaga INSERT OR IGNORE).
+const MOVE = [
+  ["TaskEntries", "userID"],
+  ["Absences", "userID"],
+  ["LeaveAllowance", "userID"],
+  ["Overtime", "userID"],
+];
+
+// Odwołania do konta w wierszach, które do NIEGO NIE należą: kto założył wniosek,
+// kto go rozstrzygnął, kto poprawił kartę. Trzecia pozycja to kolumna właściciela
+// wiersza — służy wyłącznie do liczenia, żeby raport nie wykazywał własnych wpisów
+// konta drugi raz. Wszystkie te kolumny są nullable, więc da się je wyzerować.
+const REFS = [
+  ["Projects", "createdBy", null],
+  ["Times", "editedBy", "userID"],
+  ["TaskEntries", "editedBy", "userID"],
+  ["Absences", "createdBy", "userID"],
+  ["Absences", "decidedBy", "userID"],
+  ["LeaveAllowance", "createdBy", "userID"],
+  ["Overtime", "decidedBy", "userID"],
+];
+
+// Odmiana rzeczownika przez liczebnik: 1 wpis, 2 wpisy, 5 wpisów, 12 wpisów.
+// Skrypt czyta kierownik, a nie programista — "1 wpisów" w komunikacie o kasowaniu
+// danych wygląda na błąd skryptu, nie na drobiazg stylistyczny.
+const odmien = (n, poj, mno, dop) => {
+  const setki = n % 100;
+  const dzies = n % 10;
+  if (n === 1) return poj;
+  if (dzies >= 2 && dzies <= 4 && (setki < 12 || setki > 14)) return mno;
+  return dop;
+};
+
+// Ile w bazie jest wierszy wskazujących na nieistniejące konto. `foreign_key_check`
+// nie obejmuje Times — ta tabela nigdy nie dostała klauzuli FOREIGN KEY — więc
+// liczymy ją osobno.
+const countOrphans = () => ({
+  fk: db.pragma("foreign_key_check").length,
+  times: db.prepare("SELECT COUNT(*) AS n FROM Times WHERE userID NOT IN (SELECT id FROM Users)").get().n,
+});
+
+// Baza mogła mieć sieroty już wcześniej — Times nigdy nie miało FK, a ten skrypt do
+// dziś działał z foreign_keys=OFF — więc porównujemy stan przed i po zamiast żądać
+// zera. Wyjątek rzucony stąd leci z wnętrza transakcji i cofa całą operację.
+const assertIntact = (before) => {
+  const now = countOrphans();
+  const added = now.fk - before.fk + (now.times - before.times);
+  if (added > 0) {
+    throw new Error(`operacja zostawiłaby ${added} osieroconych wierszy — nic nie zapisano`);
+  }
 };
 
 const argv = process.argv.slice(2);
@@ -344,6 +413,180 @@ switch (cmd) {
     break;
   }
 
+  // --- Kasowanie konta ---------------------------------------------------
+  //
+  // Jedyna komenda w tym pliku, która USUWA dane, i jedyna, która włącza
+  // `foreign_keys`. Reszcie admin.js domyślny OFF SQLite nie przeszkadza (same
+  // UPDATE-y), ale tutaj bez tego `DELETE FROM Users` przechodzi gładko i po
+  // cichu zostawia sieroty w sześciu tabelach — bez błędu, bez śladu.
+  //
+  // Bez flagi komenda niczego nie rusza, tylko liczy wiersze. `--force` jest więc
+  // potwierdzeniem: nie ma pytania na stdin, bo to się odpala przez SSH.
+  case "user-delete": {
+    const u = findUser(selector);
+    const flags = argv.slice(2);
+    const force = flags.includes("--force");
+    const mergeAt = flags.indexOf("--scal-z");
+    const mergeSel = mergeAt === -1 ? null : flags[mergeAt + 1];
+
+    if (mergeAt !== -1 && !mergeSel) die("--scal-z wymaga konta docelowego (e-mail lub id).");
+    if (force && mergeSel) die("--force i --scal-z wykluczają się — wybierz jedno.");
+
+    db.pragma("foreign_keys = ON");
+
+    const owned = OWNED.map(([table, column]) => ({
+      table,
+      n: db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} = ?`).get(u.id).n,
+    }));
+    const ownedTotal = owned.reduce((sum, r) => sum + r.n, 0);
+
+    // Ślady liczymy z pominięciem wierszy SAMEGO konta (kierownik podpisuje też
+    // własne korekty) — inaczej raport pokazywałby dwa razy to samo.
+    const refs = REFS.map(([table, column, owner]) => ({
+      label: `${table}.${column}`,
+      n: db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM ${table}
+            WHERE ${column} = @id${owner ? ` AND ${owner} <> @id` : ""}`
+        )
+        .get({ id: u.id }).n,
+    })).filter((r) => r.n > 0);
+
+    console.log(fmt(u));
+    console.log("\nWpisy należące do konta:");
+    owned.forEach((r) => console.log(`  ${r.table.padEnd(16)} ${String(r.n).padStart(5)}`));
+    if (refs.length > 0) {
+      console.log("\nŚlady w CUDZYCH wpisach (podpisy pod korektą i decyzją):");
+      refs.forEach((r) => console.log(`  ${r.label.padEnd(24)} ${String(r.n).padStart(5)}`));
+    }
+
+    if (!force && !mergeSel) {
+      console.log(
+        ownedTotal === 0
+          ? "\nKonto nie ma własnych wpisów. Usuń je:  --force"
+          : `\nKonto ma ${ownedTotal} ${odmien(ownedTotal, "wpis", "wpisy", "wpisów")}.` +
+              " Skasuj konto razem z danymi:  --force" +
+              "\nAlbo przepnij je na inne konto (scalenie duplikatu):  --scal-z <email|id>"
+      );
+      break;
+    }
+
+    // Konto docelowe i wszystkie przeszkody rozstrzygamy PRZED kopią bazy — inaczej
+    // każda odrzucona próba scalenia zostawiałaby na dysku Mikrusa kolejny plik kopii.
+    const target = mergeSel ? findUser(mergeSel) : null;
+
+    if (target) {
+      if (target.id === u.id) die("konto źródłowe i docelowe to ten sam użytkownik.");
+
+      // idx_entries_running to UNIQUE indeks częściowy: jeden biegnący wpis na konto.
+      // Gdy oba konta mają timer w biegu, UPDATE wywali się w środku transakcji —
+      // lepiej powiedzieć to wprost, zanim cokolwiek ruszymy.
+      const running = (id) =>
+        db.prepare("SELECT COUNT(*) AS n FROM TaskEntries WHERE userID = ? AND endedAt IS NULL").get(id).n;
+      if (running(u.id) > 0 && running(target.id) > 0) {
+        die("oba konta mają biegnący wpis zadania — zamknij jeden z nich i powtórz.");
+      }
+
+      // LeaveAllowance nie ma UNIQUE na (userID, year), więc pule za ten sam rok
+      // po prostu się zsumują. Bywa to poprawne (dwie decyzje kierownika), ale przy
+      // duplikacie konta zwykle nie jest — stąd ostrzeżenie zamiast cichego scalenia.
+      const clash = db
+        .prepare(
+          `SELECT year FROM LeaveAllowance
+            WHERE userID = @source
+              AND year IN (SELECT year FROM LeaveAllowance WHERE userID = @target)
+            ORDER BY year`
+        )
+        .all({ source: u.id, target: target.id })
+        .map((r) => r.year);
+      if (clash.length > 0) {
+        console.log(`\nUWAGA: pule urlopowe obu kont za ${clash.join(", ")} ZSUMUJĄ SIĘ.`);
+      }
+    }
+
+    // VACUUM INTO, a nie kopia pliku: daje obraz spójny transakcyjnie także wtedy,
+    // gdy aplikacja pisze w tle (WAL). db.backup() odpada — jest asynchroniczne,
+    // a ten skrypt kończy się synchronicznym db.close().
+    const backupPath = path.join(
+      path.dirname(dbPath),
+      `backup-przed-usunieciem-${u.id}-${new Date().toISOString().replace(/[:.]/g, "-")}.sqlite`
+    );
+    db.prepare("VACUUM INTO ?").run(backupPath);
+    console.log(`\nKopia bazy przed operacją: ${backupPath}`);
+
+    // Stan sprzed operacji — patrz assertIntact().
+    const orphansBefore = countOrphans();
+
+    if (target) {
+      db.transaction(() => {
+        // Imię i nazwisko w Times są zdenormalizowane (pozostałość po Airtable),
+        // więc po przepięciu muszą mówić o koncie docelowym. Sekcja i lokalizacja
+        // zostają HISTORYCZNE — Times świadomie trzyma stan z dnia odbicia.
+        db.prepare(
+          "UPDATE Times SET userID = @target, name = @name, surname = @surname WHERE userID = @source"
+        ).run({ source: u.id, target: target.id, name: target.name, surname: target.surname });
+
+        MOVE.forEach(([table, column]) => {
+          db.prepare(`UPDATE ${table} SET ${column} = @target WHERE ${column} = @source`).run({
+            source: u.id,
+            target: target.id,
+          });
+        });
+
+        // PK (managerID, section) nie zniesie przepięcia na konto, które tę samą
+        // sekcję już obsługuje — stąd INSERT OR IGNORE zamiast UPDATE.
+        db.prepare(
+          `INSERT OR IGNORE INTO ManagerSections (managerID, section)
+                SELECT @target, section FROM ManagerSections WHERE managerID = @source`
+        ).run({ source: u.id, target: target.id });
+        db.prepare("DELETE FROM ManagerSections WHERE managerID = ?").run(u.id);
+
+        // Podpisy pod cudzymi wpisami wskazują na TĘ SAMĄ osobę, więc idą na konto
+        // docelowe, a nie do NULL-a jak przy zwykłym kasowaniu.
+        REFS.forEach(([table, column]) => {
+          db.prepare(`UPDATE ${table} SET ${column} = @target WHERE ${column} = @source`).run({
+            source: u.id,
+            target: target.id,
+          });
+        });
+
+        db.prepare("DELETE FROM Users WHERE id = ?").run(u.id);
+        assertIntact(orphansBefore);
+      })();
+
+      console.log(
+        `\nPrzepięto ${ownedTotal} ${odmien(ownedTotal, "wpis", "wpisy", "wpisów")} ` +
+          `na konto #${target.id} i usunięto duplikat.`
+      );
+      console.log(fmt(findUser(String(target.id))));
+      break;
+    }
+
+    const removed = db.transaction(() => {
+      const counts = OWNED.map(([table, column]) => ({
+        table,
+        n: db.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).run(u.id).changes,
+      }));
+
+      // Wiersze własne już nie istnieją, więc zerujemy wyłącznie CUDZE podpisy.
+      // Kolumny *ByName zostają: bez nich z audytu zniknęłoby nazwisko osoby, która
+      // zatwierdziła cudzy wniosek, a to nie to samo co usunięcie jej konta.
+      REFS.forEach(([table, column]) => {
+        db.prepare(`UPDATE ${table} SET ${column} = NULL WHERE ${column} = ?`).run(u.id);
+      });
+
+      db.prepare("DELETE FROM Users WHERE id = ?").run(u.id);
+      assertIntact(orphansBefore);
+      return counts;
+    })();
+
+    console.log("\nUsunięto konto i jego wpisy:");
+    removed.filter((r) => r.n > 0).forEach((r) => console.log(`  ${r.table.padEnd(16)} -${r.n}`));
+    const total = removed.reduce((sum, r) => sum + r.n, 0);
+    console.log(`Razem: ${total} ${odmien(total, "wiersz", "wiersze", "wierszy")}.`);
+    break;
+  }
+
   default:
     console.log(
       [
@@ -359,6 +602,13 @@ switch (cmd) {
         "  sections   <email|id>                 pokaż sekcje obsługiwane przez kierownika",
         "  sections   <email|id> <a,b,c>         ustaw je ('-' czyści; kierownik bez sekcji nie widzi nikogo)",
         "  passwd     <email|id> <noweHaslo>     ustaw nowe hasło",
+        "",
+        "Usuwanie konta (jedyna komenda, która kasuje dane):",
+        "  user-delete <email|id>                policz wpisy konta i nic nie rób",
+        "  user-delete <email|id> --force        usuń konto RAZEM ze wszystkimi jego wpisami",
+        "  user-delete <email|id> --scal-z <email|id>",
+        "                                        przepnij wpisy na inne konto i usuń duplikat",
+        "  (przed zapisem powstaje kopia bazy w katalogu data/)",
         "",
         "Słownik sekcji (działów):",
         "  section-list [--all]                  wypisz sekcje (--all także wyłączone)",

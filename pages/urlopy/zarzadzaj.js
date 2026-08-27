@@ -12,6 +12,7 @@ import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import FormatChoice from "../../components/ui/formatChoice";
+import UserOptions from "../../components/ui/userOptions";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
 import { TrashIcon } from "../../components/ui/icons";
 import { formatDateRange, formatDateTime } from "../../utils";
@@ -336,11 +337,7 @@ export default function Nieobecnosci({
             <span className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Pracownik</span>
             <Select value={fUser} onChange={(e) => setFUser(e.target.value)} className="!w-52">
               <option value="">— wszyscy —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.surname} {u.name}
-                </option>
-              ))}
+              <UserOptions users={users} includeInactive />
             </Select>
           </label>
           <label className="flex flex-col">
@@ -550,11 +547,7 @@ const ManualAbsence = ({ users, busy, call }) => {
               className="!w-52"
             >
               <option value="">— wybierz —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.surname} {u.name}
-                </option>
-              ))}
+              <UserOptions users={users} />
             </Select>
           </label>
           <label className="flex flex-col">
@@ -675,11 +668,7 @@ const Allowances = ({ balances, users, year, currentYear, busy, call, onYear }) 
               className="!w-52"
             >
               <option value="">— wybierz —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.surname} {u.name}
-                </option>
-              ))}
+              <UserOptions users={users} />
             </Select>
           </label>
           <label className="flex flex-col">

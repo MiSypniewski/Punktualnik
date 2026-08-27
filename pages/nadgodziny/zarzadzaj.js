@@ -11,6 +11,7 @@ import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import FormatChoice from "../../components/ui/formatChoice";
+import UserOptions from "../../components/ui/userOptions";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { DownloadIcon, TrashIcon } from "../../components/ui/icons";
 import getOvertimeRequests, { OVERTIME_LIST_LIMIT } from "../../services/getOvertimeRequests";
@@ -344,11 +345,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
               
             >
               <option value="">— wszyscy —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.surname} {u.name} ({u.section})
-                </option>
-              ))}
+              <UserOptions users={users} includeInactive showSection />
             </Select>
           </div>
 
