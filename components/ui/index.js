@@ -7,4 +7,5 @@ export { default as Badge } from "./badge";
 export { default as Stat } from "./stat";
 export { default as PageHeader } from "./pageHeader";
 export { default as EmptyState } from "./emptyState";
+export { default as FormatChoice } from "./formatChoice";
 export * from "./icons";

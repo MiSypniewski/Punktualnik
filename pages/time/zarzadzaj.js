@@ -7,7 +7,7 @@ import classNames from "classnames";
 import BaseLayout from "../../components/baseLayout";
 import getAllUsers from "../../services/getAllUsers";
 import getSectionTimes from "../../services/getSectionTimes";
-import { canEditTimes } from "../../services/roles";
+import { canEditTimes, canExportTimes } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
 import { formatDate, TIME_LIST_LIMIT } from "../../utils";
 import {
@@ -26,9 +26,11 @@ import {
   Tr,
   Num,
   EmptyState,
+  FormatChoice,
   PageHeader,
   CheckIcon,
   CloseIcon,
+  DownloadIcon,
   PencilIcon,
   TrashIcon,
 } from "../../components/ui";
@@ -75,6 +77,12 @@ export async function getServerSideProps(ctx) {
       initial: { cards: getSectionTimes({ from, to, sections }) },
       from,
       to,
+      // Strona wisi na canEditTimes, ale plik wydaje /api/report, które pyta
+      // o canExportTimes. Oba predykaty są w services/roles.js świadomie
+      // ROZDZIELONE, więc przycisk musi sprawdzać dokładnie ten, który
+      // sprawdzi endpoint — inaczej pierwsza zmiana zasad da przycisk
+      // zwracający 403.
+      canExport: canExportTimes(token.role),
     },
   };
 }
@@ -270,11 +278,32 @@ const AddCard = ({ users, onChanged, onError }) => {
 
 // --- strona -----------------------------------------------------------------
 
-export default function ZarzadzajKartami({ users, hasSections, initial, from: from0, to: to0 }) {
+export default function ZarzadzajKartami({ users, hasSections, initial, from: from0, to: to0, canExport }) {
   const [from, setFrom] = useState(from0);
   const [to, setTo] = useState(to0);
   const [userID, setUserID] = useState("");
+  const [format, setFormat] = useState("csv");
   const [err, setErr] = useState("");
+
+  // Eksport bierze DOKŁADNIE te same trzy filtry, które stoją nad tabelą —
+  // stąd zniknęła osobna strona /utils/eksport, będąca drugim formularzem
+  // do tego samego zapytania.
+  const download = () => {
+    if (!from || !to) {
+      setErr("Podaj obie daty.");
+      return;
+    }
+    if (from > to) {
+      setErr("Data 'od' jest późniejsza niż 'do'.");
+      return;
+    }
+    setErr("");
+
+    const qs = new URLSearchParams({ from, to, format });
+    if (userID) qs.set("userID", userID);
+    // Nawigacja, nie fetch — inaczej nie zadziała Content-Disposition.
+    window.location.href = `/api/report?${qs.toString()}`;
+  };
 
   const key = listKey({ from, to, userID });
   const { data, mutate } = useSWR(key, fetcher, { fallbackData: initial });
@@ -289,7 +318,18 @@ export default function ZarzadzajKartami({ users, hasSections, initial, from: fr
     <BaseLayout width="wide">
       <PageHeader
         title="Karty czasu"
-        description="Poprawa godzin, dopisanie zapomnianej karty i usunięcie wpisu odbitego przez pomyłkę. Każda zmiana zostaje podpisana."
+        description="Poprawa godzin, dopisanie zapomnianej karty i usunięcie wpisu odbitego przez pomyłkę. Każda zmiana zostaje podpisana. Ten sam zakres można pobrać do arkusza."
+        actions={
+          canExport && (
+            <>
+              <FormatChoice value={format} onChange={setFormat} />
+              <Button variant="secondary" onClick={download}>
+                <DownloadIcon />
+                Pobierz
+              </Button>
+            </>
+          )
+        }
       />
 
       {!hasSections && (
@@ -335,7 +375,7 @@ export default function ZarzadzajKartami({ users, hasSections, initial, from: fr
             title="Odbicia"
             aside={
               cards.length >= TIME_LIST_LIMIT
-                ? `Pokazano ${TIME_LIST_LIMIT} najnowszych — zawęź zakres dat`
+                ? `Pokazano ${TIME_LIST_LIMIT} najnowszych — zawęź zakres dat albo pobierz plik, który limitu nie ma`
                 : `${cards.length} kart`
             }
           />

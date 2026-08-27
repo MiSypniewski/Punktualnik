@@ -10,6 +10,7 @@ import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
+import FormatChoice from "../../components/ui/formatChoice";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { DownloadIcon, TrashIcon } from "../../components/ui/icons";
 import getOvertimeRequests, { OVERTIME_LIST_LIMIT } from "../../services/getOvertimeRequests";
@@ -85,6 +86,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
   const [status, setStatus] = useState(filters.status);
   const [from, setFrom] = useState(filters.from);
   const [to, setTo] = useState(filters.to);
+  const [format, setFormat] = useState("csv");
 
   // Przy zmianie samego query stringu (np. klik „Historia" w tabeli sald)
   // Next nie montuje komponentu od nowa, więc useState zostałby z poprzednimi
@@ -163,9 +165,9 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
 
   // Zwykła nawigacja, nie fetch — przeglądarka sama zapisze plik zgodnie
   // z Content-Disposition, a ciasteczko sesji leci automatycznie (ten sam origin).
-  // Tak samo działa eksport czasów w utils/eksport.js.
-  const downloadCsv = (tryb) => {
-    const qs = new URLSearchParams({ tryb });
+  // Tak samo działa eksport czasów w time/zarzadzaj.js.
+  const download = (tryb) => {
+    const qs = new URLSearchParams({ tryb, format });
     if (tryb === "wnioski") {
       if (userID) qs.set("userID", userID);
       if (status) qs.set("status", status);
@@ -390,22 +392,23 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
           <Button variant="ghost" onClick={() => router.push("/nadgodziny/zarzadzaj")}>
             Wyczyść
           </Button>
-          <Button variant="secondary" onClick={() => downloadCsv("wnioski")}>
+          <FormatChoice value={format} onChange={setFormat} />
+          <Button variant="secondary" onClick={() => download("wnioski")}>
             <DownloadIcon />
-            Pobierz CSV
+            Pobierz
           </Button>
         </form>
 
         {history.length >= historyLimit && (
           <Alert tone="warn" className="mb-4">
             Lista jest przycięta do {historyLimit} najnowszych wniosków. Zawęź zakres dat
-            albo pobierz CSV — eksport obejmuje komplet.
+            albo pobierz plik — eksport obejmuje komplet.
           </Alert>
         )}
 
         <p className="mb-4 text-xs text-muted">
-          „Pobierz CSV” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
-          <button type="button" onClick={() => downloadCsv("salda")} className="font-medium text-accent-strong hover:underline">
+          „Pobierz” eksportuje listę wniosków wg ustawionych wyżej filtrów.{" "}
+          <button type="button" onClick={() => download("salda")} className="font-medium text-accent-strong hover:underline">
             Pobierz zestawienie sald wszystkich pracowników
           </button>
           .

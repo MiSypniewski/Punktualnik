@@ -4,8 +4,26 @@
 // nadgodzin nie miały dwóch osobnych (i rozjeżdżających się) implementacji
 // tych samych trzech pułapek: cudzysłowów, separatora i kodowania.
 
+/** Liczba po polsku — przecinek dziesiętny, inaczej Excel potraktuje ją jak tekst. */
+export const plNumber = (n, decimals = 2) => Number(n).toFixed(decimals).replace(".", ",");
+
+/**
+ * Komórka liczbowa: w CSV zapisze się po polsku (przecinek dziesiętny), w XLSX
+ * jako prawdziwa liczba, którą arkusz zsumuje.
+ *
+ * Znacznik jest tutaj, a nie w `utils/xlsx.js`, bo to `csvCell` musi go umieć
+ * rozpakować — inaczej dołożenie XLSX zmieniłoby zawartość plików CSV, które
+ * ludzie mają podpięte pod swoje formuły.
+ */
+export const num = (value, decimals = 2) => ({ num: Number(value), decimals });
+
+export const isNumCell = (v) => typeof v === "object" && v !== null && "num" in v;
+
 // Cudzysłów wokół każdego pola + podwojenie cudzysłowów w środku (RFC 4180).
-export const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+export const csvCell = (v) => {
+  const text = isNumCell(v) ? plNumber(v.num, v.decimals) : String(v ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+};
 
 /**
  * @param {string[]} header nagłówki kolumn
@@ -18,9 +36,6 @@ export const buildCsv = (header, rows) => {
   // i poprawnie pokazuje polskie znaki.
   return "﻿" + lines.join("\r\n") + "\r\n";
 };
-
-/** Liczba po polsku — przecinek dziesiętny, inaczej Excel potraktuje ją jak tekst. */
-export const plNumber = (n, decimals = 2) => Number(n).toFixed(decimals).replace(".", ",");
 
 const csvHeaders = (res, filename) => {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");

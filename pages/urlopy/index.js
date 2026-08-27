@@ -11,6 +11,7 @@ import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
+import FormatChoice from "../../components/ui/formatChoice";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
 import { DownloadIcon } from "../../components/ui/icons";
 import { formatDateRange, formatDateTime } from "../../utils";
@@ -75,6 +76,7 @@ export default function Urlopy({ year, balance, absences }) {
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState("csv");
 
   // Ile dni ZEJDZIE — policzone w przeglądarce, zanim wniosek pojedzie na
   // serwer. To jest odpowiedź na pytanie, które pracownik zadaje sobie przy
@@ -264,20 +266,23 @@ export default function Urlopy({ year, balance, absences }) {
           </Button>
         </form>
 
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold uppercase tracking-signage">Historia</h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              // Nawigacja, nie fetch — inaczej nagłówek Content-Disposition
-              // nie ma jak zadziałać i plik nie zaczyna się pobierać.
-              window.location.href = "/api/report/urlopy";
-            }}
-          >
-            <DownloadIcon className="w-4 h-4" />
-            Pobierz CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <FormatChoice value={format} onChange={setFormat} />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                // Nawigacja, nie fetch — inaczej nagłówek Content-Disposition
+                // nie ma jak zadziałać i plik nie zaczyna się pobierać.
+                window.location.href = `/api/report/urlopy?format=${format}`;
+              }}
+            >
+              <DownloadIcon className="w-4 h-4" />
+              Pobierz
+            </Button>
+          </div>
         </div>
 
         {absences.length === 0 ? (

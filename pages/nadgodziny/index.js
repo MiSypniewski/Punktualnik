@@ -10,6 +10,7 @@ import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
+import FormatChoice from "../../components/ui/formatChoice";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeBalance from "../../services/getOvertimeBalance";
@@ -25,7 +26,7 @@ export async function getServerSideProps(ctx) {
   }
 
   // Serwisy wołamy bezpośrednio, bez skoku po HTTP — tak samo jak time/[id].js
-  // i utils/eksport.js. Dane dotyczą zawsze zalogowanego, userID bierzemy
+  // i time/zarzadzaj.js. Dane dotyczą zawsze zalogowanego, userID bierzemy
   // z tokenu, więc nie ma czego podstawić w URL-u.
   return {
     props: {
@@ -45,6 +46,7 @@ export default function Nadgodziny({ balance, requests }) {
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState("csv");
 
   // Odświeżenie danych z getServerSideProps bez pełnego przeładowania strony.
   const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
@@ -216,21 +218,24 @@ export default function Nadgodziny({ balance, requests }) {
           </button>
         </form>
 
-        <div className="mb-4 flex flex-wrap gap-3 items-baseline">
+        <div className="mb-4 flex flex-wrap gap-3 items-center">
           <h2 className="text-sm font-bold uppercase tracking-signage">Historia</h2>
           {requests.length > 0 && (
-            <button
-              onClick={() => {
-                // Nawigacja, nie fetch — przeglądarka zapisze plik wg
-                // Content-Disposition. API i tak zawęzi eksport do własnych
-                // wniosków, bo rola user nie widzi cudzych.
-                window.location.href = "/api/report/nadgodziny";
-              }}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-strong hover:underline"
-            >
-              <DownloadIcon className="w-3.5 h-3.5" />
-              Pobierz CSV
-            </button>
+            <>
+              <FormatChoice value={format} onChange={setFormat} />
+              <button
+                onClick={() => {
+                  // Nawigacja, nie fetch — przeglądarka zapisze plik wg
+                  // Content-Disposition. API i tak zawęzi eksport do własnych
+                  // wniosków, bo rola user nie widzi cudzych.
+                  window.location.href = `/api/report/nadgodziny?format=${format}`;
+                }}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-strong hover:underline"
+              >
+                <DownloadIcon className="w-3.5 h-3.5" />
+                Pobierz
+              </button>
+            </>
           )}
         </div>
         {requests.length === 0 ? (

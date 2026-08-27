@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import getTimesReport from "../../../services/getTimesReport";
 import { canExportTimes } from "../../../services/roles";
-import { buildCsv, sendCsv } from "../../../utils/csv";
+import { isFormat, sendReport } from "../../../utils/report";
 import { visibleSections } from "../../../services/scope";
 
 dayjs.locale("pl");
@@ -31,8 +31,11 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { from, to, userID } = req.query;
+  const { from, to, userID, format = "csv" } = req.query;
 
+  if (!isFormat(format)) {
+    return res.status(400).json({ error: "bad_format", message: "format musi być csv albo xlsx" });
+  }
   if (!DATE_RE.test(from || "") || !DATE_RE.test(to || "")) {
     return res.status(400).json({ error: "bad_date", message: "from/to muszą być w formacie YYYY-MM-DD" });
   }
@@ -73,5 +76,11 @@ export default async (req, res) => {
   ]);
 
   const namePart = userID ? `_user${userID}` : "";
-  return sendCsv(res, `czasy_${from}_${to}${namePart}.csv`, buildCsv(header, lines));
+  return sendReport(res, {
+    format,
+    basename: `czasy_${from}_${to}${namePart}`,
+    sheet: "Czasy pracy",
+    header,
+    rows: lines,
+  });
 };

@@ -14,6 +14,7 @@ import Alert from "../../components/ui/alert";
 import Stat from "../../components/ui/stat";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
+import FormatChoice from "../../components/ui/formatChoice";
 import { TableWrap, Table as UiTable, Th as UiTh, Td as UiTd } from "../../components/ui/table";
 import { PencilIcon, TrashIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
@@ -143,6 +144,7 @@ export default function ZarzadzajZadaniami({
   const [deletingID, setDeletingID] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [format, setFormat] = useState("csv");
 
   // Przy zmianie samego query stringu Next nie montuje komponentu od nowa,
   // więc useState zostałby z poprzednimi wartościami i pola filtrów
@@ -227,7 +229,7 @@ export default function ZarzadzajZadaniami({
   // Nawigacja, nie fetch — przeglądarka sama zapisze plik zgodnie
   // z Content-Disposition, a ciasteczko sesji leci automatycznie.
   const download = (tryb) => {
-    const qs = new URLSearchParams({ tryb });
+    const qs = new URLSearchParams({ tryb, format });
     Object.entries(filters).forEach(([k, v]) => v && qs.set(k, v));
     window.location.href = `/api/report/zadania?${qs.toString()}`;
   };
@@ -479,10 +481,11 @@ export default function ZarzadzajZadaniami({
         <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
           <h2 className="text-sm font-bold uppercase tracking-signage">Wpisy</h2>
           {canExport && (
-            <span className="flex gap-2 flex-wrap">
-              <ExportButton onClick={() => download("wpisy")}>CSV: wpisy</ExportButton>
-              <ExportButton onClick={() => download("projekty")}>CSV: wg projektów</ExportButton>
-              <ExportButton onClick={() => download("porownanie")}>CSV: porównanie</ExportButton>
+            <span className="flex items-center gap-2 flex-wrap">
+              <FormatChoice value={format} onChange={setFormat} />
+              <ExportButton onClick={() => download("wpisy")}>Wpisy</ExportButton>
+              <ExportButton onClick={() => download("projekty")}>Wg projektów</ExportButton>
+              <ExportButton onClick={() => download("porownanie")}>Porównanie</ExportButton>
             </span>
           )}
         </div>
@@ -495,7 +498,7 @@ export default function ZarzadzajZadaniami({
 
         {detail.total > detail.limit && (
           <Alert tone="warn" className="mb-2">
-            Pokazano {detail.limit} z {detail.total} wpisów. Zawęź filtry albo pobierz CSV — eksport obejmuje
+            Pokazano {detail.limit} z {detail.total} wpisów. Zawęź filtry albo pobierz plik — eksport obejmuje
             komplet.
           </Alert>
         )}

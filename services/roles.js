@@ -1,7 +1,7 @@
 // Role w systemie: 'user' | 'editor' | 'manager'.
 //
 //  user    — pracownik: własny czas pracy, własne nadgodziny.
-//  editor  — obsługa kart czasu sekcji (klikanie statusów) + eksport CSV.
+//  editor  — obsługa kart czasu sekcji (klikanie statusów) na wspólnym ekranie.
 //  manager — kierownik: zatwierdza i odrzuca wnioski o nadgodziny,
 //            widzi salda wszystkich pracowników. Ma też dostęp do eksportu.
 //
@@ -19,8 +19,10 @@ export const canApproveOvertime = (role) => role === "manager";
 // czas pracy ma odbijać ten sam sprzęt co wszystkim, a nie własna przeglądarka.
 export const canPunchCards = (role) => role === "editor";
 
-// Eksport czasów pracy do CSV — wyłącznie kierownik. Kiosk stoi na widoku
-// publicznym, więc nie może dawać nikomu pobrania listy z całej sekcji.
+// Eksport czasów pracy — wyłącznie kierownik. Kiosk stoi na widoku publicznym,
+// więc nie może dawać nikomu pobrania listy z całej sekcji. Przycisk siedzi
+// na stronie korekty kart (/time/zarzadzaj), która wisi na canEditTimes —
+// dlatego oba predykaty sprawdza się tam osobno.
 export const canExportTimes = (role) => role === "manager";
 
 // Korekta kart czasu w tabeli Times: poprawa godzin, dopisanie zapomnianej karty
@@ -56,7 +58,7 @@ export const canManageProjects = (role) => role === "manager";
 // sekcyjny nakłada dodatkowo services/scope.js.
 export const canSeeTeamTasks = (role) => role === "manager";
 
-// Eksport wpisów do CSV — jak przy czasach pracy, wyłącznie kierownik.
+// Eksport wpisów — jak przy czasach pracy, wyłącznie kierownik.
 export const canExportTasks = (role) => role === "manager";
 
 // Okno "dziś i wczoraj" (services/workday.js) wiąże PRACOWNIKA — kierownika nie,

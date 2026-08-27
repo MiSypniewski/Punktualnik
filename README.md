@@ -336,6 +336,16 @@ w tabeli jako `popr.`. Okno „dziś i wczoraj", które wiąże pracownika w mod
 zadań, kierownika tu nie dotyczy — odpowiada za poprawność ewidencji, więc musi
 sięgnąć także starszego błędu.
 
+Ta sama strona **wydaje plik z czasami pracy** (`/api/report`) — przycisk stoi
+w nagłówku i bierze dokładnie te trzy filtry, które są nad tabelą. Wcześniej
+eksport miał własną zakładkę `/utils/eksport`; był to drugi formularz do tego
+samego zapytania, więc zniknął. Plik nie ma limitu 500 wierszy, który przycina
+tabelę na ekranie.
+
+> Przycisk wisi na `canExportTimes`, a strona na `canEditTimes` — dwóch
+> ŚWIADOMIE rozdzielonych predykatach z `services/roles.js`. Dziś oba znaczą
+> „kierownik”; gdyby się rozjechały, przycisk zniknie zamiast zwracać 403.
+
 Godziny wpisuje się jako `HH:MM`, a serwer sam przypina je do doby roboczej karty:
 godzina wcześniejsza niż 3:00 należy do następnego dnia kalendarzowego, więc
 zmianę nocną wpisuje się wprost jako `22:00 – 01:00` i wychodzą z niej trzy
@@ -403,7 +413,7 @@ spoza tabeli `Sections`, bo literówka po cichu odcięłaby kierownika od jego l
 Sekcje wyłączone (`isActive = 0`) są dozwolone — kierownik musi widzieć historię
 działu, który już nie przyjmuje nowych pracowników.
 
-Zasięg obejmuje: panel nadgodzin, oba eksporty CSV, `GET /api/time/[id]`,
+Zasięg obejmuje: panel nadgodzin, oba eksporty, `GET /api/time/[id]`,
 stronę kart `/time/[sekcja]` oraz [korektę kart](#korekta--timezarzadzaj).
 Ta ostatnia zawęża się po `Times.section`, czyli po sekcji Z DNIA ZAPISU — tą samą
 regułą, którą składa listę, więc kierownik nigdy nie zobaczy w tabeli wiersza,
@@ -411,17 +421,18 @@ którego nie da się zapisać. Eksport czasów filtruje po `Times.section`,
 czyli po sekcji z dnia zapisu — po zmianie zespołu stare dni zostają
 u poprzedniego kierownika.
 
-### Eksport do CSV
+### Eksport
 
-`/api/report/nadgodziny` — plik CSV z BOM-em i średnikiem, otwiera się wprost
-w polskim Excelu. Przyciski są na stronach: kierownik pobiera z panelu,
-pracownik własną historię z `/nadgodziny`.
+`/api/report/nadgodziny` — CSV albo XLSX (zob. [Formaty plików](#formaty-plików)).
+Przyciski są na stronach: kierownik pobiera z panelu, pracownik własną historię
+z `/nadgodziny`.
 
 | Parametr | Znaczenie |
 |---|---|
 | `tryb=wnioski` (domyślnie) | lista wniosków |
 | `tryb=salda` | zestawienie sald wszystkich aktywnych pracowników (tylko `manager`) |
 | `userID`, `status`, `from`, `to` | filtry listy wniosków |
+| `format=csv` (domyślnie) / `format=xlsx` | format pliku |
 
 Bez roli `manager` parametr `userID` jest ignorowany — eksport zawsze zawęża się
 do własnych wniosków. Wymiar jest w dwóch kolumnach: godziny dziesiętnie
@@ -698,12 +709,16 @@ Endpoint tablicy wyłącznie **czyta** i tak ma zostać — odpytuje go każdy k
 w firmie, a zapis wykonywany przy odczycie to dokładnie ta przyczyna, która
 położyła serwer 21.08.2026 (zob. [Kiedy „aplikacja muli”](#kiedy-aplikacja-muli--co-sprawdzić)).
 
-### Eksport CSV
+### Eksport
 
-`/api/report/urlopy` w dwóch trybach: `nieobecnosci` (domyślny) i `salda`.
+`/api/report/urlopy` w dwóch trybach: `nieobecnosci` (domyślny) i `salda`,
+w formacie `csv` albo `xlsx` (zob. [Formaty plików](#formaty-plików)).
 Salda to cudze dane, więc wyłącznie dla kierownika; nieobecności pracownik
 pobiera w wersji własnej, niezależnie od tego, co poda w `userID`. Eksport
 zawsze zwraca komplet, także gdy widok przyciął listę do 500 pozycji.
+
+> `tryb=salda` nie ma przycisku w interfejsie — moduł nadgodzin taki ma,
+> urlopowy nie. Zostaje wpisanie adresu z ręki.
 
 ### Czego moduł NIE robi
 
@@ -964,10 +979,10 @@ wodząc palcem po każdym wierszu. Formularz poprawki jest ten sam w obu układa
 Podsumowania „wg projektów” i „wg pracowników” zostają tabelami, ale w kontenerze
 przewijanym w poziomie — inaczej rozpychały cały dokument szerzej niż ekran.
 
-### Eksport do CSV
+### Eksport
 
-`/api/report/zadania` — jak eksport nadgodzin: BOM, średnik, przecinek dziesiętny,
-więc plik otwiera się wprost w polskim Excelu. Tylko `manager`, zawsze zawężony do
+`/api/report/zadania` — jak eksport nadgodzin, CSV albo XLSX (zob.
+[Formaty plików](#formaty-plików)). Tylko `manager`, zawsze zawężony do
 jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
 
 | Parametr | Znaczenie |
@@ -978,9 +993,46 @@ jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
 | `from`, `to` | zakres dat (wymagane, `YYYY-MM-DD`) |
 | `projectID`, `userID`, `minMinutes` | filtry, opcjonalne |
 | `q` | fragment nazwy zadania; bez wielkości liter i ogonków, do 100 znaków |
+| `format=csv` (domyślnie) / `format=xlsx` | format pliku |
 
-Czas jest w dwóch kolumnach: godziny dziesiętnie z przecinkiem (`2,50` — do
-sumowania w arkuszu) i tekst `2h 30min` dla człowieka.
+Czas jest w dwóch kolumnach: godziny dziesiętnie (`2,50` — do sumowania
+w arkuszu) i tekst `2h 30min` dla człowieka. Tryb `wpisy` jako jedyny nie ma
+limitu wierszy, więc oba formaty zapisuje STRUMIENIOWO.
+
+## Formaty plików w eksportach
+
+Każdy eksport wydaje ten sam zestaw kolumn w dwóch formatach — wybiera je
+parametr `format`, a w interfejsie przełącznik `Format: CSV | Excel` stojący
+obok przycisku pobierania.
+
+| Format | Co to jest |
+|---|---|
+| `csv` (domyślny) | BOM UTF-8, separator `;`, przecinek dziesiętny — polski Excel i LibreOffice otwierają go wprost, bez kreatora importu |
+| `xlsx` | arkusz Excela: pogrubiony i zamrożony nagłówek, autofiltr, szerokości kolumn |
+
+Różnica, dla której `xlsx` w ogóle powstał: **liczby są w nim liczbami**.
+W CSV każde pole jest tekstem, więc kolumny „Czas [h]”, „Saldo (h)” czy
+„Udział %” trzeba przed zsumowaniem przekonwertować. W XLSX arkusz zsumuje je
+od razu, z formatem `0,0000` albo `0,00` zależnie od kolumny.
+
+**Daty i godziny zostają tekstem** w formacie ISO (`2026-08-27`, `07:12:00`),
+w obu formatach tak samo — reguła [jednego formatu dat](#daty) jest warta
+więcej niż filtrowanie po dacie w Excelu, a tekst ISO i tak sortuje się
+chronologicznie.
+
+Kod: `utils/csv.js` (składanie CSV plus znacznik `num()` dla komórki liczbowej),
+`utils/xlsx.js` (arkusz, zawsze strumieniowo), `utils/report.js` (rozgałęzienie
+po formacie — jedyne miejsce, w którym powstaje nazwa pliku).
+
+Domyślne `format=csv` jest po to, żeby stare linki i zakładki dalej działały.
+Wartość spoza pary daje `400 bad_format`.
+
+> `xlsx` zależy od pakietu **exceljs**, jedynej ciężkiej zależności w projekcie.
+> Jest na liście `externals` w `next.config.js` — razem z `better-sqlite3`,
+> choć z innego powodu: ma ponad 20 MB kodu i przepuszczanie go przez webpacka
+> przy każdym buildzie kosztuje pamięć, której kontener bez swapu nie ma
+> w zapasie. Na serwerze i tak leży w `node_modules`. Wdrożenie tej zmiany
+> wymaga `npm ci` — zmienił się `package.json`.
 
 ## System wizualny
 
@@ -1104,7 +1156,9 @@ pytanie, czy `14.08.26` to nie rok 2014.
 Format ISO wygrał z trzech powodów: dzień nigdy nie myli się z miesiącem, sortuje
 się leksykograficznie i jest **dokładnie tym samym kształtem**, w którym daty
 siedzą w bazie (`Absences.dateFrom`, `Overtime.data`, `TaskEntries.data`) i we
-wszystkich eksportach CSV. To samo dotyczy treści powiadomień — mailowych
+wszystkich eksportach — także w XLSX, gdzie data zostaje TEKSTEM zamiast pójść
+jako numer seryjny Excela (zob. [Formaty plików](#formaty-plików)).
+To samo dotyczy treści powiadomień — mailowych
 i czatowych: mail o zatwierdzonym urlopie ma dać się zestawić z wierszem arkusza
 bez przeliczania w głowie.
 
