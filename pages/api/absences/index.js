@@ -88,6 +88,15 @@ export default async (req, res) => {
       if (!canSeeUser(token, target)) {
         return res.status(403).json({ error: "permission_denied" });
       }
+      // Zasięg sekcyjny nie mówi nic o tym, czy konto jeszcze działa. Do UI nieaktywni
+      // nie trafiają (components/ui/userOptions.js), ale żądanie da się złożyć z pominięciem
+      // formularza — a wpis na koncie, które nie potrafi się zalogować, nikomu nie służy.
+      if (!target.isActive) {
+        return res.status(409).json({
+          error: "user_inactive",
+          message: "Konto pracownika jest nieaktywne — nie można dopisywać mu wpisów.",
+        });
+      }
     } else if (!isSelfService(kind)) {
       // L4 i urlop na żądanie wpisuje kierownik — pierwszy po otrzymaniu
       // zwolnienia, drugi po telefonie. Pracownik nie zgłasza ich sam.

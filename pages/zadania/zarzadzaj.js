@@ -15,6 +15,7 @@ import Stat from "../../components/ui/stat";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
 import FormatChoice from "../../components/ui/formatChoice";
+import UserOptions from "../../components/ui/userOptions";
 import { TableWrap, Table as UiTable, Th as UiTh, Td as UiTd } from "../../components/ui/table";
 import { PencilIcon, TrashIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
@@ -304,11 +305,7 @@ export default function ZarzadzajZadaniami({
                 className="w-full sm:w-auto"
               >
                 <option value="">— wszyscy —</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.surname} {u.name}
-                  </option>
-                ))}
+                <UserOptions users={users} includeInactive />
               </Select>
             </Field>
             <Field label="Zadanie">

@@ -3,7 +3,11 @@ import db from "./db";
 // Lista kont do filtrów (dropdowny na stronach eksportu i panelu kierownika).
 // Bez maskowania haseł — zwracamy tylko pola potrzebne do listy wyboru.
 // Times.userID == Users.id.
-const COLUMNS = `id, name, surname, section`;
+// isActive jedzie razem z listą, bo dropdowny dzielą ją na czynnych i byłych
+// pracowników (components/ui/userOptions.js). Zapytania świadomie NIE filtrują po
+// tej kolumnie: formularze potrzebują samych aktywnych, ale filtry historii muszą
+// widzieć też zwolnionych — ich wpisy nadal są w Times, Absences i TaskEntries.
+const COLUMNS = `id, name, surname, section, isActive`;
 const ORDER = `ORDER BY surname, name`;
 // Konta `editor` to kioski z ekranem dotykowym, nie ludzie — w filtrach
 // „wybierz pracownika" nie mają czego szukać.
