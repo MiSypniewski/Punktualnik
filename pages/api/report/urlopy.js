@@ -10,7 +10,7 @@ import {
 } from "../../../services/absenceKinds";
 import { canApproveLeave } from "../../../services/roles";
 import { visibleSections } from "../../../services/scope";
-import { buildCsv, sendCsv } from "../../../utils/csv";
+import { isFormat, sendReport } from "../../../utils/report";
 import { now as appNow } from "../../../services/workday";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -27,8 +27,20 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { tryb = "nieobecnosci", userID = "", kind = "", status = "", from = "", to = "", year = "" } = req.query;
+  const {
+    tryb = "nieobecnosci",
+    userID = "",
+    kind = "",
+    status = "",
+    from = "",
+    to = "",
+    year = "",
+    format = "csv",
+  } = req.query;
 
+  if (!isFormat(format)) {
+    return res.status(400).json({ error: "bad_format", message: "format musi być csv albo xlsx" });
+  }
   if (!MODES.includes(tryb)) {
     return res.status(400).json({ error: "bad_mode", message: `tryb musi być jednym z: ${MODES.join(", ")}` });
   }
@@ -73,7 +85,7 @@ export default async (req, res) => {
       u.pendingCount || 0,
     ]);
 
-    return sendCsv(res, `urlopy_salda_${rok}.csv`, buildCsv(header, rows));
+    return sendReport(res, { format, basename: `urlopy_salda_${rok}`, sheet: "Salda", header, rows });
   }
 
   // Tryb "nieobecnosci": ta sama zasada co w GET /api/absences — bez uprawnień
@@ -135,5 +147,11 @@ export default async (req, res) => {
   const zakres = from || to ? `_${from || "poczatek"}_${to || "dzis"}` : "";
   const osoba = effectiveUserID ? `_user${effectiveUserID}` : "";
 
-  return sendCsv(res, `urlopy${zakres}${osoba}.csv`, buildCsv(header, lines));
+  return sendReport(res, {
+    format,
+    basename: `urlopy${zakres}${osoba}`,
+    sheet: "Nieobecności",
+    header,
+    rows: lines,
+  });
 };

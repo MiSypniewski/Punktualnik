@@ -17,6 +17,7 @@
     "better-sqlite3": "^12.10.0",
     "classnames": "^2.3.1",
     "dayjs": "^1.11.3",
+    "exceljs": "^4.4.0",
     "joi": "^17.6.0",
     "next": "^12.1.6",
     "next-auth": "^4.3.4",

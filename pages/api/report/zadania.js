@@ -3,7 +3,8 @@ import dayjs from "dayjs";
 import { getByProject, getByUser, getSummary, iterateAllEntries } from "../../../services/entryStats";
 import { sweepStaleEntries } from "../../../services/taskEntries";
 import { canExportTasks } from "../../../services/roles";
-import { buildCsv, sendCsv, streamCsv, plNumber } from "../../../utils/csv";
+import { num } from "../../../utils/csv";
+import { isFormat, sendReport, streamReport } from "../../../utils/report";
 import { formatDuration, timePart, TASK_QUERY_MAX } from "../../../utils";
 import { visibleSections } from "../../../services/scope";
 
@@ -22,7 +23,7 @@ const MODES = ["wpisy", "projekty", "porownanie"];
 const HOURS_DECIMALS = 4;
 
 const hoursPair = (seconds) => [
-  plNumber(seconds / 3600, HOURS_DECIMALS),
+  num(seconds / 3600, HOURS_DECIMALS),
   formatDuration(seconds),
 ];
 
@@ -44,8 +45,11 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { tryb, from, to, projectID, userID, minMinutes, q } = req.query;
+  const { tryb, from, to, projectID, userID, minMinutes, q, format = "csv" } = req.query;
 
+  if (!isFormat(format)) {
+    return res.status(400).json({ error: "bad_format", message: "format musi być csv albo xlsx" });
+  }
   if (!MODES.includes(tryb)) {
     return res.status(400).json({ error: "bad_mode", message: `tryb musi być jednym z: ${MODES.join(", ")}` });
   }
@@ -83,25 +87,30 @@ export default async (req, res) => {
     const rows = getByProject(filters);
     const total = getSummary(filters).seconds || 1;
 
-    const csv = buildCsv(
-      ["Projekt", "Klient", "Liczba osób", "Liczba wpisów", "Czas [h]", "Czas", "Udział %"],
-      rows.map((p) => [
+    return sendReport(res, {
+      format,
+      basename: `zadania_projekty_${stamp}`,
+      sheet: "Projekty",
+      header: ["Projekt", "Klient", "Liczba osób", "Liczba wpisów", "Czas [h]", "Czas", "Udział %"],
+      rows: rows.map((p) => [
         p.name,
         p.client || "",
         p.people,
         p.entries,
         ...hoursPair(p.seconds),
-        plNumber((p.seconds / total) * 100, 1),
-      ])
-    );
-    return sendCsv(res, `zadania_projekty_${stamp}.csv`, csv);
+        num((p.seconds / total) * 100, 1),
+      ]),
+    });
   }
 
   if (tryb === "porownanie") {
     const rows = getByUser(filters);
 
-    const csv = buildCsv(
-      [
+    return sendReport(res, {
+      format,
+      basename: `zadania_porownanie_${stamp}`,
+      sheet: "Porównanie",
+      header: [
         "Nazwisko",
         "Imię",
         "Sekcja",
@@ -113,7 +122,7 @@ export default async (req, res) => {
         "Różnica",
         "Pokrycie %",
       ],
-      rows.map((u) => [
+      rows: rows.map((u) => [
         u.surname,
         u.name,
         u.section,
@@ -121,18 +130,19 @@ export default async (req, res) => {
         ...hoursPair(u.reported),
         // Znak ma zostać widoczny również w wersji liczbowej — inaczej
         // "2,5" nie odróżni nadmiaru od niedoboru.
-        plNumber(u.diff / 3600, HOURS_DECIMALS),
+        num(u.diff / 3600, HOURS_DECIMALS),
         formatDuration(u.diff, { withSign: true }),
         u.coverage === null ? "" : u.coverage,
-      ])
-    );
-    return sendCsv(res, `zadania_porownanie_${stamp}.csv`, csv);
+      ]),
+    });
   }
 
   // Eksport szczegółowy jest jedynym bez górnego ograniczenia liczby wierszy
   // (obiecuje komplet), więc idzie STRUMIENIOWO: wiersze czytane leniwie prosto
   // z bazy i wypychane porcjami, zamiast sklejania całego pliku w pamięci.
   // Przy 1 GB bez swapu to różnica między działającym eksportem a cichym OOM.
+  // Dotyczy obu formatów — `streamReport` nie materializuje generatora ani
+  // przy CSV, ani przy XLSX.
   const toCells = (r) => [
     dayjs(r.data).format("YYYY-MM-DD"),
     r.surname,
@@ -168,5 +178,11 @@ export default async (req, res) => {
     for (const row of iterateAllEntries(filters)) yield toCells(row);
   }
 
-  return streamCsv(res, `zadania_${stamp}.csv`, header, cells());
+  return streamReport(res, {
+    format,
+    basename: `zadania_${stamp}`,
+    sheet: "Wpisy",
+    header,
+    rows: cells(),
+  });
 };

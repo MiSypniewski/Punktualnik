@@ -6,7 +6,8 @@ import getOvertimeBalances from "../../../services/getOvertimeBalances";
 import { canApproveOvertime } from "../../../services/roles";
 import { visibleSections } from "../../../services/scope";
 import { kindLabel, statusLabel, signedMinutes, STATUS_KEYS } from "../../../services/overtimeKinds";
-import { buildCsv, sendCsv, plNumber } from "../../../utils/csv";
+import { num } from "../../../utils/csv";
+import { isFormat, sendReport } from "../../../utils/report";
 import { formatMinutes } from "../../../utils";
 
 dayjs.locale("pl");
@@ -24,8 +25,11 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { tryb = "wnioski", userID, status, from, to } = req.query;
+  const { tryb = "wnioski", userID, status, from, to, format = "csv" } = req.query;
 
+  if (!isFormat(format)) {
+    return res.status(400).json({ error: "bad_format", message: "format musi być csv albo xlsx" });
+  }
   if (tryb !== "wnioski" && tryb !== "salda") {
     return res.status(400).json({ error: "bad_mode" });
   }
@@ -55,12 +59,18 @@ export default async (req, res) => {
       u.surname,
       u.name,
       u.section,
-      plNumber(u.balance / 60), // godziny dziesiętnie — do dalszych obliczeń w Excelu
+      num(u.balance / 60), // godziny dziesiętnie — do dalszych obliczeń w Excelu
       formatMinutes(u.balance, { withSign: true }), // czytelne dla człowieka
       u.pendingCount || 0,
     ]);
 
-    return sendCsv(res, `nadgodziny_salda_${dayjs().format("YYYY-MM-DD")}.csv`, buildCsv(header, rows));
+    return sendReport(res, {
+      format,
+      basename: `nadgodziny_salda_${dayjs().format("YYYY-MM-DD")}`,
+      sheet: "Salda",
+      header,
+      rows,
+    });
   }
 
   // Tryb "wnioski": ta sama zasada co w GET /api/overtime — bez uprawnień
@@ -105,7 +115,7 @@ export default async (req, res) => {
     r.name,
     r.section,
     kindLabel(r.kind),
-    plNumber(signedMinutes(r) / 60),
+    num(signedMinutes(r) / 60),
     formatMinutes(signedMinutes(r), { withSign: true }),
     statusLabel(r.status),
     r.reason,
@@ -117,5 +127,11 @@ export default async (req, res) => {
   const zakres = from || to ? `_${from || "poczatek"}_${to || "dzis"}` : "";
   const osoba = effectiveUserID ? `_user${effectiveUserID}` : "";
 
-  return sendCsv(res, `nadgodziny${zakres}${osoba}.csv`, buildCsv(header, lines));
+  return sendReport(res, {
+    format,
+    basename: `nadgodziny${zakres}${osoba}`,
+    sheet: "Wnioski",
+    header,
+    rows: lines,
+  });
 };

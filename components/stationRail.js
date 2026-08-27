@@ -9,7 +9,6 @@ import ThemeToggle from "./themeToggle";
 import RunningStrip from "./runningStrip";
 import {
   canEditTimes,
-  canExportTimes,
   canApproveOvertime,
   canTrackTasks,
   canManageProjects,
@@ -60,10 +59,12 @@ const navItems = (user) => {
   // tu po zapomnianym odbiciu, nie codziennie. Trasa jest STATYCZNA, więc Next
   // dopasuje ją przed dynamiczną /time/[id] ("Moja sekcja") i obie pozycje
   // podświetlają się niezależnie.
+  //
+  // Tu siedzi też eksport czasów pracy. Osobna pozycja "Eksport"
+  // (/utils/eksport) była drugim formularzem do tego samego zapytania:
+  // te same trzy filtry, te same dane, inny ekran.
   if (canEditTimes(role))
     items.push({ href: "/time/zarzadzaj", match: "/time/zarzadzaj", label: "Karty czasu", secondary: true });
-  if (canExportTimes(role))
-    items.push({ href: "/utils/eksport", match: "/utils/eksport", label: "Eksport", secondary: true });
 
   // Narzędzie doraźne spoza ewidencji czasu, stąd na końcu. Bez kiosku:
   // to konto stoi przy ekranie dotykowym w miejscu publicznym i ma prowadzić

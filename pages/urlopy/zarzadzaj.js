@@ -11,6 +11,7 @@ import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
+import FormatChoice from "../../components/ui/formatChoice";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
 import { TrashIcon } from "../../components/ui/icons";
 import { formatDateRange, formatDateTime } from "../../utils";
@@ -110,6 +111,7 @@ export default function Nieobecnosci({
   const [fStatus, setFStatus] = useState(filters.status);
   const [fFrom, setFFrom] = useState(filters.from);
   const [fTo, setFTo] = useState(filters.to);
+  const [format, setFormat] = useState("csv");
 
   // Przy zmianie samego query stringu Next NIE montuje komponentu od nowa,
   // więc pola filtrów trzeba zsynchronizować ręcznie — inaczej po kliknięciu
@@ -376,20 +378,22 @@ export default function Nieobecnosci({
           <Button variant="ghost" onClick={() => router.push("/urlopy/zarzadzaj")}>
             Wyczyść
           </Button>
+          <FormatChoice value={format} onChange={setFormat} />
           <Button
             variant="secondary"
             onClick={() => {
               const q = new URLSearchParams(window.location.search);
+              q.set("format", format);
               window.location.href = `/api/report/urlopy?${q}`;
             }}
           >
-            Pobierz CSV
+            Pobierz
           </Button>
         </form>
 
         {history.length >= historyLimit && (
           <Alert tone="warn" className="mb-4">
-            Lista jest przycięta do {historyLimit} pozycji — zawęź filtry albo pobierz CSV, który
+            Lista jest przycięta do {historyLimit} pozycji — zawęź filtry albo pobierz plik, który
             zawsze zawiera komplet.
           </Alert>
         )}
