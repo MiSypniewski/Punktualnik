@@ -254,7 +254,6 @@ export default function Zadania({
           running={running}
           projects={projects}
           suggestions={suggestions}
-          descByProject={descByProject}
           busy={busy}
           call={call}
           onError={setErr}
@@ -369,7 +368,7 @@ const AUTOSAVE_MS = 800;
  * dopiero Stop (albo przełączenie zadania) odświeża stronę, a wtedy przychodzi
  * już to, co zapisaliśmy.
  */
-const RunningTimer = ({ running, projects, descByProject, busy, call, onError }) => {
+const RunningTimer = ({ running, projects, suggestions, busy, call, onError }) => {
   const [draft, setDraft] = useState({
     projectID: running.projectID,
     description: running.description,
@@ -556,20 +555,32 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
       <div className="flex items-center gap-2 flex-wrap">
         <ProjectMark color={project?.color} size="lg" />
         {/* Te same pola co przed startem, w tym samym układzie — pasek nie zmienia
-            kształtu po naciśnięciu Start, zmienia się tylko przycisk po prawej. */}
-        <Input
+            kształtu po naciśnięciu Start, zmienia się tylko przycisk po prawej.
+            Ta sama lista podpowiedzi co tam, bo praca zmienia temat w biegu
+            równie często, jak się zaczyna: opis poprawiany w połowie dnia ma
+            trafiać na własne wcześniejsze zadanie razem z jego projektem.
+
+            Enter przez onSubmit, a NIE przez onKeyDown — ten drugi nadpisałby
+            obsługę strzałek w komponencie (components/taskSuggest.js). */}
+        <TaskSuggest
           ref={descInput}
-          type="text"
+          suggestions={suggestions}
           value={draft.description}
-          list={`opisy-${draft.projectID}`}
+          projectID={draft.projectID}
+          onChange={(text) => edit({ description: text })}
+          // Jeden `edit` na oba pola, i to od razu: retag zapisuje opis i projekt
+          // jednym żądaniem, a czekanie z tym na debounce zostawiałoby przez
+          // sekundę wpis podpisany starym projektem.
+          onPick={(pick) =>
+            edit({ description: pick.description, projectID: pick.projectID }, { now: true })
+          }
+          onSubmit={flush}
+          onBlur={flush}
+          openOnFocus={false}
           maxLength={200}
           placeholder="np. Weryfikacja raportów z instalacji"
-          onChange={(e) => edit({ description: e.target.value })}
-          onBlur={flush}
-          onKeyDown={(e) => e.key === "Enter" && flush()}
           className="flex-grow w-auto min-w-[12rem]"
         />
-        <DescriptionOptions descByProject={descByProject} />
 
         <Select
           ref={projectSelect}
@@ -635,7 +646,7 @@ const RunningTimer = ({ running, projects, descByProject, busy, call, onError })
   );
 };
 
-const TimerBar = ({ running, projects, suggestions, descByProject, busy, call, onError }) => {
+const TimerBar = ({ running, projects, suggestions, busy, call, onError }) => {
   // Pusto, a NIE projects[0]. Podstawiony pierwszy projekt alfabetycznie znaczył,
   // że kto nie spojrzy w to pole, ten po cichu raportuje czas na cudzy projekt —
   // a wpis wygląda wtedy tak samo dobrze jak prawdziwy.
@@ -647,7 +658,7 @@ const TimerBar = ({ running, projects, suggestions, descByProject, busy, call, o
       <RunningTimer
         running={running}
         projects={projects}
-        descByProject={descByProject}
+        suggestions={suggestions}
         busy={busy}
         call={call}
         onError={onError}
@@ -673,10 +684,11 @@ const TimerBar = ({ running, projects, suggestions, descByProject, busy, call, o
           bo bywa dłuższy niż nazwa projektu. */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Własna lista podpowiedzi zamiast natywnego <datalist>, który został
-            w trzech pozostałych polach opisu na tej stronie. Różnica jest
-            kierunkowa: tam projekt jest już wybrany i lista filtruje się po nim,
-            a tutaj zaczyna się od tego, CO się robi — więc lista szuka po całej
-            historii i sama ustawia projekt wybranej pozycji.
+            w dwóch pozostałych polach opisu na tej stronie (wpis ręczny i edycja
+            zamkniętego wpisu). Różnica jest kierunkowa: tam projekt jest już
+            wybrany i lista filtruje się po nim, a w obu paskach timera zaczyna
+            się od tego, CO się robi — więc lista szuka po całej historii i sama
+            ustawia projekt wybranej pozycji.
 
             Filtrowanie idzie po tablicy z propsów, bez ani jednego zapytania
             przy pisaniu — powód opisuje components/taskSuggest.js. */}
