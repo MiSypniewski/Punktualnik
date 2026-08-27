@@ -759,14 +759,21 @@ rutyna wypada wyżej niż coś zrobionego raz.
 
 **Dwa różne mechanizmy podpowiedzi, celowo.**
 
-W pasku „Nad czym pracujesz?” działa własna lista (`components/taskSuggest.js`):
-po **dwóch znakach** rozwija się spis wcześniejszych zadań, każde z nazwą projektu
-obok, a wybór wypełnia opis **i ustawia projekt**. Szuka po CAŁEJ historii, także
-gdy projekt nie jest jeszcze wybrany — bo zdanie zaczyna się od tego, co się robi,
-a projekt ma się dobrać sam. Fraza dopasowuje się bez względu na wielkość liter
-i **bez diakrytyków**: „mape” znajduje „Mapę tras”.
+W **obu paskach timera** — „Nad czym pracujesz?” przed startem i „Pracujesz nad”
+w trakcie — działa własna lista (`components/taskSuggest.js`): po **dwóch znakach**
+rozwija się spis wcześniejszych zadań, każde z nazwą projektu obok, a wybór
+wypełnia opis **i ustawia projekt**. Szuka po CAŁEJ historii, także gdy projekt nie
+jest jeszcze wybrany — bo zdanie zaczyna się od tego, co się robi, a projekt ma się
+dobrać sam. Fraza dopasowuje się bez względu na wielkość liter i **bez
+diakrytyków**: „mape” znajduje „Mapę tras”.
 
-Pozostałe trzy pola opisu (biegnący timer, wpis ręczny, edycja wpisu) zostają na
+Jedna różnica między paskami: w biegnącym timerze lista **nie otwiera się na samo
+wejście w pole**, tylko przy pisaniu (albo strzałką w dół). Opis jest tam już
+wpisany, więc otwarcie na fokus zasłaniałoby wpisy pod paskiem przy każdej
+poprawce literówki. W biegnącym pasku wybór pozycji zapisuje się od razu — opis
+i projekt jednym żądaniem `retag`, bez czekania na autozapis.
+
+Pozostałe dwa pola opisu (wpis ręczny, edycja zamkniętego wpisu) zostają na
 natywnym `<datalist>` filtrowanym po wybranym projekcie. Tam projekt jest już
 wskazany, więc zawężenie do niego jest właściwym zachowaniem, a `<datalist>`
 kosztuje zero kodu i działa na tablecie.

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { forwardRef, useMemo, useRef, useState } from "react";
 import classNames from "classnames";
 import { Input } from "./ui/field";
 import { ProjectMark } from "./projectColors";
@@ -9,10 +9,10 @@ import { ProjectMark } from "./projectColors";
 //
 // Dlaczego nie natywny <datalist>, którego reszta strony używa dalej: on nie umie
 // pokazać drugiej etykiety, więc nazwy projektu w liście nie widać wcale, a wybór
-// pozycji projektu nie ustawia. W pozostałych trzech polach opisu na /zadania to
-// nie przeszkadza — tam projekt jest już wybrany i lista filtruje się po nim.
-// Tutaj jest odwrotnie: zaczyna się od tego, CO się robi, a projekt ma się
-// dobrać sam.
+// pozycji projektu nie ustawia. W dwóch pozostałych polach opisu na /zadania
+// (wpis ręczny i edycja zamkniętego wpisu) to nie przeszkadza — tam projekt jest
+// już wybrany i lista filtruje się po nim. W obu paskach timera jest odwrotnie:
+// zaczyna się od tego, CO się robi, a projekt ma się dobrać sam.
 //
 // ---------------------------------------------------------------------------
 // KOSZT: ZERO ZAPYTAŃ PRZY PISANIU. Ta uwaga jest tu po to, żeby przetrwała.
@@ -94,18 +94,24 @@ const match = (suggestions, query, projectID) => {
  * @param {(text: string) => void} onChange
  * @param {(pick: {description: string, projectID: number}) => void} onPick
  * @param {() => void} onSubmit Enter, gdy żadna pozycja nie jest podświetlona
+ * @param {boolean} openOnFocus czy samo wejście w pole ma rozwinąć listę
  */
-const TaskSuggest = ({
+const TaskSuggest = forwardRef(({
   suggestions = [],
   value,
   projectID,
   onChange,
   onPick,
   onSubmit,
+  // Pasek startu zaczyna od pustego pola, więc otwarcie na fokus nic nie zasłania
+  // i skraca drogę do listy. Biegnący timer ma opis JUŻ wpisany, a tam każde
+  // wejście w pole — choćby po to, żeby poprawić literówkę — rozwijałoby listę
+  // na pół ekranu. Tam lista wychodzi dopiero przy pisaniu albo strzałką w dół.
+  openOnFocus = true,
   id = "opis-zadania",
   className,
   ...inputProps
-}) => {
+}, ref) => {
   const [open, setOpen] = useState(false);
   // -1 znaczy „nic nie podświetlone”, i to jest stan POCZĄTKOWY po każdej zmianie
   // tekstu. Gdyby domyślnie świeciła pierwsza pozycja, Enter po dopisaniu znaku
@@ -184,18 +190,26 @@ const TaskSuggest = ({
       }}
     >
       <Input
+        // Ref idzie na SAMO pole, nie na wrapper: wołający ustawia nim kursor
+        // w miejscu, którego brakuje (pages/zadania/index.js, walidacja przed Stop).
+        ref={ref}
         type="text"
         id={id}
         value={value}
         onChange={(e) => change(e.target.value)}
         onKeyDown={onKeyDown}
-        onFocus={() => setOpen(value.length >= MIN_CHARS)}
+        onFocus={() => setOpen(openOnFocus && value.length >= MIN_CHARS)}
         autoComplete="off"
         role="combobox"
         aria-expanded={visible}
         aria-controls={`${id}-lista`}
         aria-autocomplete="list"
         aria-activedescendant={active >= 0 ? `${id}-poz-${active}` : undefined}
+        // UWAGA: propsy z zewnątrz rozwijają się PO tutejszych handlerach, więc
+        // własny onKeyDown wołającego skasowałby całą obsługę strzałek, Enter
+        // i Esc. Do zatwierdzenia służy onSubmit, nie onKeyDown. onBlur jest
+        // bezpieczny: wybór pozycji idzie przez onMouseDown z preventDefault,
+        // więc klik w listę nie wywołuje bluru pola.
         {...inputProps}
       />
 
@@ -237,6 +251,9 @@ const TaskSuggest = ({
       )}
     </div>
   );
-};
+});
+
+// forwardRef gubi nazwę komponentu w React DevTools i w komunikatach ostrzeżeń.
+TaskSuggest.displayName = "TaskSuggest";
 
 export default TaskSuggest;
