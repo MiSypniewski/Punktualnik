@@ -7,6 +7,7 @@
 export const ABSENCE_KINDS = {
   // usesPool  — czy zdejmuje dni z puli urlopu wypoczynkowego
   // selfService — czy PRACOWNIK może to zgłosić sam; kierownik wpisuje wszystko
+  // requiresCertificate — czy pracownik ma jeszcze DONIEŚĆ dokument do kadr
   vacation: { label: "Urlop wypoczynkowy", usesPool: true, selfService: true },
   // Formalnie pracownik ma do niego prawo, ale w praktyce zgłasza go telefonem
   // rano, a wpisuje kierownik po fakcie — stąd selfService: false.
@@ -20,9 +21,14 @@ export const ABSENCE_KINDS = {
   // Zwolnienie od pracy dla honorowego dawcy krwi. Nie jest urlopem i puli
   // wypoczynkowej nie rusza — dzień oddania (a w praktyce także dzień badań)
   // przysługuje niezależnie od niej. Pracownik zgłasza sam, jak urlop
-  // okolicznościowy: termin zna z wyprzedzeniem, a zaświadczenie ze stacji
-  // krwiodawstwa donosi kierownikowi osobno, poza systemem.
-  blood_donation: { label: "Oddanie krwi", usesPool: false, selfService: true },
+  // okolicznościowy: termin zna z wyprzedzeniem.
+  //
+  // requiresCertificate, bo zgoda w Punktualniku to dopiero połowa sprawy —
+  // zaświadczenie ze stacji krwiodawstwa trzeba donieść do działu kadr i bez
+  // niego nieobecność nie zostanie rozliczona. Przypomina o tym mail
+  // (services/notifyMail.js). L4 tej flagi NIE ma i to jest celowe: zwolnienie
+  // wpisuje kierownik już po otrzymaniu dokumentu, więc nie ma o co prosić.
+  blood_donation: { label: "Oddanie krwi", usesPool: false, selfService: true, requiresCertificate: true },
 };
 
 export const ABSENCE_KIND_KEYS = Object.keys(ABSENCE_KINDS);
@@ -52,6 +58,9 @@ export const absenceKindShort = (kind) => SHORT[kind] ?? absenceKindLabel(kind);
 export const usesPool = (kind) => Boolean(ABSENCE_KINDS[kind]?.usesPool);
 
 export const isSelfService = (kind) => Boolean(ABSENCE_KINDS[kind]?.selfService);
+
+/** Czy pracownik musi jeszcze dostarczyć do kadr dokument potwierdzający nieobecność. */
+export const requiresCertificate = (kind) => Boolean(ABSENCE_KINDS[kind]?.requiresCertificate);
 
 // Statusy jak przy nadgodzinach — ten sam obieg, te same etykiety, łącznie
 // z rozdziałem "anulował pracownik" (cancelled) od "cofnął kierownik" (revoked).
