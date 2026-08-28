@@ -443,11 +443,13 @@ Próg to jedna stała — `UNDERTIME_ALERT_MINUTES` w `services/weeklyUndertimeJ
 nieaktywnych, bez konta kiosku, saldo wyłącznie z wniosków zatwierdzonych.
 
 > **Wypisanie urlopu NIE podniesie salda samo.** Moduł urlopów i moduł nadgodzin
-> są rozłączne — pula liczy dni, saldo liczy minuty i nic ich nie łączy. Po
-> wypisaniu urlopu **saldo poprawia kierownik**, dopisując pracownikowi wniosek
-> *zostaję dłużej* na uzgodnioną liczbę godzin. Dopóki tego nie zrobi,
-> przypomnienie wraca w każdy kolejny wtorek — i mail mówi o tym wprost, żeby
-> pracownik, który zrobił swoje, nie uznał, że system się zaciął.
+> są rozłączne — pula liczy dni, saldo liczy minuty i nic ich nie łączy. Kolejność
+> jest taka: pracownik wypisuje urlop, kierownik go zatwierdza, a **potem
+> pracownik zgłasza nadgodziny osobnym wnioskiem** na uzgodnioną liczbę godzin —
+> który kierownik też musi zatwierdzić, bo saldo liczy wyłącznie wnioski
+> zatwierdzone. Dopóki to nie przejdzie, przypomnienie wraca w każdy kolejny
+> wtorek — i mail mówi o tym wprost, żeby pracownik, który zrobił swoje, nie
+> uznał, że system się zaciął.
 
 Zapadka jest tygodniowa: w `JobRuns` ląduje data ostatniego wtorku, więc jedno
 porównanie rozstrzyga naraz „czy już poszło w tym tygodniu" i „czy jest co
@@ -578,7 +580,7 @@ i cofnięcie przez kierownika zostają poza tym kanałem.
 
 | Kiedy | Treść |
 |---|---|
-| **Niedogodziny** — w każdy wtorek 3:00, gdy saldo ≤ −4 h | aktualne saldo, prośba o wypisanie urlopu na pokrycie i informacja, że saldo w Punktualniku poprawia kierownik osobnym wpisem — zob. [Niedogodziny](#niedogodziny--przypomnienie-w-każdy-wtorek) |
+| **Niedogodziny** — w każdy wtorek 3:00, gdy saldo ≤ −4 h | aktualne saldo, prośba o wypisanie urlopu na pokrycie i informacja, że saldo podnosi dopiero osobny wniosek nadgodzinowy — zob. [Niedogodziny](#niedogodziny--przypomnienie-w-każdy-wtorek) |
 
 Jedyne powiadomienie, którego nie wywołuje żadne zdarzenie: nikt niczego nie
 kliknął, po prostu minął wtorek. Dlatego wiadomość musi sama powiedzieć, dlaczego

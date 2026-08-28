@@ -566,9 +566,10 @@ export const notifyTaskEntryChanged = async (entry, action, actor, owner, reason
  * powiedzieć, DLACZEGO przyszła i co zrobić, żeby nie przyszła znowu.
  *
  * To ostatnie zdanie nie jest uprzejmością: Punktualnik nie łączy modułu urlopów
- * z modułem nadgodzin, więc wypisanie urlopu NIE podniesie salda samo. Robi to
- * kierownik osobnym wpisem. Bez tej informacji pracownik, który zrobił wszystko
- * jak trzeba, dostanie za tydzień to samo i uzna, że system się zaciął.
+ * z modułem nadgodzin, więc wypisanie urlopu NIE podniesie salda samo — dopiero
+ * osobny wniosek nadgodzinowy, złożony po zatwierdzeniu urlopu. Bez tej
+ * informacji pracownik, który zrobił wszystko jak trzeba, dostanie za tydzień
+ * to samo i uzna, że system się zaciął.
  */
 export const notifyUndertimeReminder = async (person) => {
   const { to, cc } = recipients(person.id, person.section);
@@ -581,7 +582,7 @@ export const notifyUndertimeReminder = async (person) => {
     ["Saldo nadgodzin", saldo],
     null,
     `Wypisz urlop na pokrycie brakujących godzin i uzgodnij termin z kierownikiem.`,
-    `Saldo w Punktualniku nie podniesie się samo — po wypisaniu urlopu robi to kierownik osobnym wpisem w module nadgodzin. Dopóki saldo zostaje poniżej progu, ta wiadomość wraca w każdy wtorek.`,
+    `Saldo w Punktualniku nie podniesie się samo — po wypisaniu urlopu i zatwierdzeniu przez kierownika, należy zgłosić nadgodziny osobnym wpisem w module nadgodzin. Dopóki saldo zostaje poniżej progu, ta wiadomość wraca w każdy wtorek.`,
     linkLine("/nadgodziny", "Moje nadgodziny"),
     linkLine("/urlopy", "Moje urlopy"),
   ]);
