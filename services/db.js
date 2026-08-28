@@ -439,12 +439,17 @@ const createDb = () => {
       FOREIGN KEY (projectID) REFERENCES Projects(id)
     );
 
-    -- Zapadka zadań uruchamianych raz na dobę (services/nightlyJob.js).
+    -- Zapadki zadań okresowych (services/scheduler.js), po jednym wierszu na zadanie.
     --
     -- Na Mikrusie nie ma crona, a odpalanie zadania z timera w procesie ma jedną
     -- wadę: proces bywa restartowany (deploy, pm2, OOM). Bez zapadki restart
-    -- o 3:05 wysłałby komplet powiadomień DRUGI raz. Trzymamy więc dobę roboczą,
-    -- dla której zadanie już poszło — jedno porównanie rozstrzyga, czy jest co robić.
+    -- o 3:05 wysłałby komplet powiadomień DRUGI raz. Trzymamy więc datę okresu,
+    -- dla którego zadanie już poszło — jedno porównanie rozstrzyga, czy jest co robić.
+    --
+    -- Kolumna lastDay znaczy tyle, ile zadanie w niej zapisze: dla nocnego to doba robocza
+    -- (services/nightlyJob.js), dla tygodniowego data ostatniego wtorku
+    -- (services/weeklyUndertimeJob.js). Kolumna zostaje jedna, bo w obu przypadkach
+    -- porównanie jest to samo — "czy zapisana data jest starsza od bieżącego okresu".
     --
     -- W bazie, a nie w pamięci procesu, właśnie dlatego, że chodzi o przeżycie restartu.
     CREATE TABLE IF NOT EXISTS JobRuns (
@@ -504,16 +509,18 @@ installRuntimeGuards();
 const db = globalForDb.__punktualnikDb || createDb();
 globalForDb.__punktualnikDb = db;
 
-// Budzik zadania nocnego (domykanie zapomnianych kart i timerów, powiadomienia).
+// Budzik zadań okresowych: nocnego (domykanie zapomnianych kart i timerów)
+// i tygodniowego (przypomnienie o niedogodzinach). Oba w services/scheduler.js.
 //
 // Import DYNAMICZNY i dopiero TUTAJ, po przypisaniu `db` — to nie jest ozdobnik.
-// services/nightlyJob.js importuje ten moduł, a przez niego closeOpenCards
-// i taskEntries, które przygotowują swoje zapytania na poziomie modułu. Statyczny
-// import na górze pliku wykonałby je, ZANIM `db` w tym pliku w ogóle powstanie,
-// i aplikacja wywracałaby się przy starcie na ReferenceError. Dynamiczny import
-// rozwiązuje się w kolejnym mikrotasku, czyli po zakończeniu tego modułu.
-import("./nightlyJob")
-  .then(({ installNightlyJob }) => installNightlyJob())
-  .catch((error) => logError("db", error, { phase: "nightly-install" }));
+// services/scheduler.js ciągnie za sobą moduły zadań, a przez nie closeOpenCards,
+// taskEntries i getUndertimeUsers, które przygotowują swoje zapytania na poziomie
+// modułu. Statyczny import na górze pliku wykonałby je, ZANIM `db` w tym pliku
+// w ogóle powstanie, i aplikacja wywracałaby się przy starcie na ReferenceError.
+// Dynamiczny import rozwiązuje się w kolejnym mikrotasku, czyli po zakończeniu
+// tego modułu.
+import("./scheduler")
+  .then(({ installScheduler }) => installScheduler())
+  .catch((error) => logError("db", error, { phase: "scheduler-install" }));
 
 export default db;

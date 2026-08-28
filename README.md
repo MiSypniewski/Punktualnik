@@ -338,8 +338,14 @@ postawić.
 
 **Nie ma tu crona** — na Mikrusie go nie ma, a drugi proces przy tej samej bazie
 SQLite to przyczyna awarii z 21.08.2026. Budzikiem jest `setInterval` wewnątrz
-procesu Next (`services/nightlyJob.js`), a o tym, czy jest co robić, rozstrzyga
+procesu Next (`services/scheduler.js`), a o tym, czy jest co robić, rozstrzyga
 **zapadka w tabeli `JobRuns`**: trzyma dobę roboczą, dla której zadanie już poszło.
+
+Budzik jest **jeden na wszystkie zadania okresowe** i tyka co minutę; zadania są
+tanie, bo każde zaczyna od porównania własnej zapadki. Drugie takie samo
+`setInterval` w drugim pliku byłoby drugim miejscem, w którym da się przeoczyć
+guard na `globalThis`, pominięcie fazy builda albo `unref()`. Obok nocnego chodzi
+[cotygodniowe przypomnienie o niedogodzinach](#nadgodziny).
 
 | Sytuacja | Co się dzieje |
 |---|---|
@@ -351,7 +357,9 @@ procesu Next (`services/nightlyJob.js`), a o tym, czy jest co robić, rozstrzyga
 
 Domykanie nadrabia **wszystkie** zaległe doby (`<= dzień`), powiadomienia idą
 **tylko** o tej, która właśnie się skończyła: mail o karcie sprzed trzech tygodni
-nie ma już czego naprawić.
+nie ma już czego naprawić. Zadanie tygodniowe ma to odwrotnie i celowo —
+przypomnienie o niedogodzinach po przestoju **nadrabia się**, bo saldo nadal jest
+ujemne i wiadomość niczego nie straciła.
 
 ### Korekta — `/time/zarzadzaj`
 
@@ -421,6 +429,31 @@ Zasady:
   po pół roku nie da się odróżnić „rozmyślił się” od „kierownik wycofał zgodę”.
 - Rodzaje wniosków definiuje `services/overtimeKinds.js` — dodanie nowego rodzaju
   (wraz ze znakiem) wymaga zmiany tylko w tym pliku.
+
+### Niedogodziny — przypomnienie w każdy wtorek
+
+Saldo bywa ujemne i dotąd nikt się o tym nie dowiadywał, dopóki sam nie zajrzał
+na `/nadgodziny`. W **każdy wtorek o 3:00** pracownik, którego saldo wynosi
+**−4 h lub mniej**, dostaje mail z prośbą o wypisanie urlopu na pokrycie;
+komplet kierowników jego sekcji dostaje kopię w `DW`.
+
+Próg to jedna stała — `UNDERTIME_ALERT_MINUTES` w `services/weeklyUndertimeJob.js`
+(w minutach, bo w minutach jest cała ewidencja). Listę adresatów składa
+`services/getUndertimeUsers.js` tą samą regułą co panel kierownika: bez kont
+nieaktywnych, bez konta kiosku, saldo wyłącznie z wniosków zatwierdzonych.
+
+> **Wypisanie urlopu NIE podniesie salda samo.** Moduł urlopów i moduł nadgodzin
+> są rozłączne — pula liczy dni, saldo liczy minuty i nic ich nie łączy. Po
+> wypisaniu urlopu **saldo poprawia kierownik**, dopisując pracownikowi wniosek
+> *zostaję dłużej* na uzgodnioną liczbę godzin. Dopóki tego nie zrobi,
+> przypomnienie wraca w każdy kolejny wtorek — i mail mówi o tym wprost, żeby
+> pracownik, który zrobił swoje, nie uznał, że system się zaciął.
+
+Zapadka jest tygodniowa: w `JobRuns` ląduje data ostatniego wtorku, więc jedno
+porównanie rozstrzyga naraz „czy już poszło w tym tygodniu" i „czy jest co
+nadrobić po przestoju". Nadrabianie jest tu **pożądane**, inaczej niż przy
+[zadaniu nocnym](#domykanie-o-300). Pierwsze uruchomienie na nowej bazie zakłada
+zapadkę w ciszy — pierwsze przypomnienia idą dopiero w najbliższy wtorek.
 
 ### Kto czyje dane widzi
 
@@ -508,7 +541,7 @@ z jej nieobecnością. Kierownik będący jednocześnie bohaterem sprawy dostaje
 wiadomość raz, nie dwa. **Wyjątkiem są powiadomienia „do rozpatrzenia"** — te
 idą wyłącznie do kierowników (niżej).
 
-Dziesięć powiadomień w czterech grupach:
+Jedenaście powiadomień w pięciu grupach:
 
 **Do rozpatrzenia** — jedyne powiadomienia idące WYŁĄCZNIE do kierowników, w polu
 `To`. Adresatem jest tu osoba, która ma coś zrobić, a pracownik przed sekundą sam
@@ -528,7 +561,7 @@ się niezależnie (`GCHAT_WEBHOOK_URL` kontra `email_login`).
 
 | Kiedy | Treść |
 |---|---|
-| **Zatwierdzony urlop** | rodzaj, termin, dni robocze, kto zatwierdził **i przypomnienie o obowiązku wypisania urlopu w systemie Comarch** |
+| **Zatwierdzony urlop** | rodzaj, termin, dni robocze, kto zatwierdził **i przypomnienie o obowiązku wypisania urlopu w systemie Comarch** — a przy oddaniu krwi zamiast niego prośba o [zaświadczenie do kadr](#rodzaje) |
 | **Zatwierdzone nadgodziny / wcześniejsze wyjście** | rodzaj, wymiar ze znakiem, data, kto zatwierdził, saldo po tej decyzji |
 
 Wyłącznie przy **zatwierdzeniu**. Odrzucenie, anulowanie przez pracownika
@@ -541,6 +574,16 @@ i cofnięcie przez kierownika zostają poza tym kanałem.
 | **Brak odbicia wyjścia** — karta domknięta o 3:00 | dzień, godzina wejścia, wpisana godzina wyjścia z zaznaczeniem, że jest ZAŁOŻONA, link do korekty |
 | **Niezakończone zadanie** — timer domknięty o 3:00 | projekt, opis, start, wymiar po domknięciu, link do `/zadania` |
 
+**Zadanie tygodniowe** — `To` = pracownik, `Cc` = kierownicy sekcji.
+
+| Kiedy | Treść |
+|---|---|
+| **Niedogodziny** — w każdy wtorek 3:00, gdy saldo ≤ −4 h | aktualne saldo, prośba o wypisanie urlopu na pokrycie i informacja, że saldo w Punktualniku poprawia kierownik osobnym wpisem — zob. [Niedogodziny](#niedogodziny--przypomnienie-w-każdy-wtorek) |
+
+Jedyne powiadomienie, którego nie wywołuje żadne zdarzenie: nikt niczego nie
+kliknął, po prostu minął wtorek. Dlatego wiadomość musi sama powiedzieć, dlaczego
+przyszła i co zrobić, żeby nie przyszła znowu.
+
 **Kierownik zmienił cudzą ewidencję** — `To` = pracownik, `Cc` = kierownicy sekcji.
 
 Wspólny mianownik: pracownik nie klikał, nie składał wniosku i **bez maila nie ma
@@ -549,7 +592,7 @@ musiałby sam zajrzeć, albo wpis w logu serwera, którego nie widzi w ogóle.
 
 | Kiedy | Treść |
 |---|---|
-| **Nieobecność wpisana przez kierownika** (L4, urlop na żądanie, urlop zgłoszony telefonicznie) | rodzaj, termin, dni robocze, kto wpisał, adnotacja że wpis jest już zatwierdzony |
+| **Nieobecność wpisana przez kierownika** (L4, urlop na żądanie, urlop zgłoszony telefonicznie) | rodzaj, termin, dni robocze, kto wpisał, adnotacja że wpis jest już zatwierdzony, a przy oddaniu krwi także prośba o [zaświadczenie do kadr](#rodzaje) |
 | **Zmiana puli urlopowej** | rok, zmiana ze znakiem (bywa ujemna — to korekta), kto wpisał, uwagi |
 | **Karta czasu: dopisana / poprawiona / usunięta** | dzień, godziny, przy korekcie **„było → jest"**, kto i co zrobił |
 | **Wpis zadania: poprawiony / usunięty cudzy** | dzień, projekt, opis, godziny, wymiar, kto, powód usunięcia |
@@ -647,8 +690,16 @@ ponownie (kontrola nakładania patrzy tylko na *Oczekuje* i *Zatwierdzony*).
 
 Oddanie krwi **nie jest urlopem** i puli wypoczynkowej nie rusza — dzień oddania
 przysługuje niezależnie od niej. Pracownik zgłasza je sam, jak urlop
-okolicznościowy: termin zna z wyprzedzeniem, a zaświadczenie ze stacji
-krwiodawstwa donosi kierownikowi osobno, poza systemem.
+okolicznościowy: termin zna z wyprzedzeniem.
+
+**Zgoda w Punktualniku to jednak dopiero połowa sprawy.** Zaświadczenie ze stacji
+krwiodawstwa trzeba donieść do **działu kadr** i to jak najszybciej — bez niego
+nieobecność nie zostanie rozliczona. Mail przypomina o tym wprost, obojętne, czy
+wpis założył pracownik, czy kierownik; przy oddaniu krwi to zdanie **zastępuje**
+przypomnienie o Comarchu, bo rozliczają je kadry na podstawie zaświadczenia.
+Wiedza „ten rodzaj wymaga dokumentu" siedzi w jednej fladze `requiresCertificate`
+w `services/absenceKinds.js`. L4 tej flagi **nie ma** i to jest celowe: zwolnienie
+wpisuje kierownik już po otrzymaniu dokumentu, więc nie ma o co prosić.
 
 Rodzaje, których pracownik nie zgłasza sam, wpisuje kierownik po fakcie —
 telefon rano albo zwolnienie na biurku. **Taki wpis zapisuje się od razu jako

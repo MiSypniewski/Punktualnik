@@ -7,18 +7,13 @@ import { logError, logInfo } from "./log";
 
 // Zadanie uruchamiane raz na dobę, na granicy doby roboczej (3:00).
 //
-// Na Mikrusie nie ma crona, a osobny proces przy tej samej bazie SQLite to
-// dokładnie ta przyczyna, która 21.08.2026 położyła aplikację (services/db.js).
-// Zostaje timer WEWNĄTRZ procesu Next — tego samego, którego pilnuje pm2.
-//
-// Timer nie jest jednak niczym więcej niż budzikiem: o tym, CZY jest co robić,
-// rozstrzyga zapadka w bazie (tabela JobRuns). Bez niej restart procesu o 3:05
-// wysłałby komplet powiadomień drugi raz, a restart o 2:59 — ani razu.
+// Budzik jest wspólny dla wszystkich zadań okresowych i siedzi w
+// services/scheduler.js — tam też jest powód, dla którego to timer w procesie
+// Next, a nie cron. Tutaj zostaje sama odpowiedź na pytanie, CZY jest co robić:
+// rozstrzyga ją zapadka w bazie (tabela JobRuns). Bez niej restart procesu
+// o 3:05 wysłałby komplet powiadomień drugi raz, a restart o 2:59 — ani razu.
 
 const JOB = "nightly";
-const TICK_MS = 60_000;
-
-const globalForNightly = globalThis;
 
 const stmtLatch = db.prepare(`SELECT lastDay FROM JobRuns WHERE job = ?`);
 const stmtSetLatch = db.prepare(`
@@ -108,46 +103,3 @@ export const tickNightly = (moment = appNow()) => {
   runOnce(previousWorkDay(moment)).catch((error) => logError("nightly", error, { day: today }));
   return true;
 };
-
-/**
- * Podpięcie budzika. Wołane z services/db.js — ten moduł wchodzi do każdego
- * bundla serwerowego i nigdy do klienta, a rejestracja jest idempotentna
- * (flaga na globalThis, jak w services/runtime.js).
- */
-export const installNightlyJob = () => {
-  if (globalForNightly.__punktualnikNightlyReady) return;
-  globalForNightly.__punktualnikNightlyReady = true;
-
-  // `next build` otwiera tę samą bazę (komentarz przy busy_timeout w db.js),
-  // a jego workery odziedziczyłyby zapadkę razem z prawem do wysyłki. Build
-  // uruchomiony akurat po 3:00 rozesłałby powiadomienia zamiast serwera —
-  // formalnie raz, ale z procesu, który za chwilę znika. Budujemy w ciszy.
-  if (process.env.NEXT_PHASE === "phase-production-build") {
-    return;
-  }
-
-  // Pierwsze sprawdzenie od razu przy starcie — to ono nadrabia dobę, w której
-  // proces nie żył. Owinięte w try, bo leci w trakcie ładowania modułu bazy.
-  try {
-    tickNightly();
-  } catch (error) {
-    logError("nightly", error, { phase: "install" });
-  }
-
-  const handle = setInterval(() => {
-    try {
-      tickNightly();
-    } catch (error) {
-      // Wyjątek w callbacku setInterval kończy proces. Ta gałąź jest ostatnią
-      // linią obrony przed tym, żeby sprzątanie kart położyło całą aplikację.
-      logError("nightly", error, { phase: "tick" });
-    }
-  }, TICK_MS);
-
-  // Budzik nie może być powodem, dla którego proces nie chce się zamknąć.
-  handle.unref();
-
-  logInfo("nightly", "budzik uruchomiony", { tickMs: TICK_MS });
-};
-
-export default installNightlyJob;

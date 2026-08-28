@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import db from "./db";
 import { sendMail, appUrl, mailEnabled } from "./mailer";
-import { absenceKindLabel } from "./absenceKinds";
+import { absenceKindLabel, requiresCertificate } from "./absenceKinds";
 import { kindLabel, signedMinutes } from "./overtimeKinds";
 import getOvertimeBalance from "./getOvertimeBalance";
 import { formatMinutes, formatDuration, formatDate, formatDateRange } from "../utils";
@@ -120,6 +120,19 @@ const linkLine = (path, label) => {
 const dzien = formatDate;
 const godzina = (stamp) => dayjs(stamp).format("HH:mm");
 
+/**
+ * Zdanie dla rodzajów nieobecności, przy których zgoda w Punktualniku to dopiero
+ * połowa sprawy (services/absenceKinds.js, flaga requiresCertificate).
+ *
+ * Dziś dotyczy wyłącznie oddania krwi i dlatego mówi wprost o stacji
+ * krwiodawstwa: komunikat "dostarcz odpowiedni dokument" jest tak ogólny, że
+ * nikt się nim nie przejmie. Gdyby flagę dostał kiedyś drugi rodzaj, to zdanie
+ * rozdzieli się na dwa — nie odwrotnie.
+ */
+const CERTIFICATE_NOTE =
+  "WAŻNE: zaświadczenie ze stacji krwiodawstwa dostarcz do działu kadr jak najszybciej. " +
+  "Bez niego nieobecność nie zostanie rozliczona.";
+
 // --- 1. brak odbicia wyjścia ------------------------------------------------
 
 /**
@@ -208,7 +221,12 @@ export const notifyAbsenceApproved = async (absence, user) => {
     ...(absence.decidedByName ? [["Zatwierdził", absence.decidedByName]] : []),
     ...(absence.decisionNote ? [["Uwagi", absence.decisionNote]] : []),
     null,
-    `UWAGA: urlop trzeba dodatkowo wypisać w systemie Comarch. Zgoda w Punktualniku nie przenosi się tam sama — bez wpisu w Comarchu urlop nie jest rozliczony.`,
+    // Zdanie zamiast, nie obok: oddanie krwi NIE jest urlopem, więc odsyłanie
+    // do Comarcha byłoby myleniem pracownika dwoma obowiązkami naraz. Rozliczy
+    // to dział kadr — na podstawie zaświadczenia, o które prosimy tu wprost.
+    requiresCertificate(absence.kind)
+      ? CERTIFICATE_NOTE
+      : `UWAGA: urlop trzeba dodatkowo wypisać w systemie Comarch. Zgoda w Punktualniku nie przenosi się tam sama — bez wpisu w Comarchu urlop nie jest rozliczony.`,
     linkLine("/urlopy", "Moje wnioski"),
   ]);
 
@@ -376,6 +394,11 @@ export const notifyAbsenceRecorded = async (absence, owner, actor) => {
     ["Wpisał", kto(actor)],
     ...(absence.reason ? [["Powód", absence.reason]] : []),
     null,
+    // Zdanie o zatwierdzeniu jest prawdziwe i zostaje. Nieprawdziwe było
+    // wrażenie, które zostawiało samo: że sprawa jest zamknięta. Przy oddaniu
+    // krwi nie jest — dlatego prośba o zaświadczenie idzie PRZED nim, żeby nie
+    // zginęła jako dopisek na końcu.
+    ...(requiresCertificate(absence.kind) ? [CERTIFICATE_NOTE] : []),
     `Wpis jest już zatwierdzony — nie trzeba go składać jako wniosku. Jeśli termin albo rodzaj się nie zgadza, odezwij się do kierownika.`,
     linkLine("/urlopy", "Moje nieobecności"),
   ]);
@@ -529,6 +552,45 @@ export const notifyTaskEntryChanged = async (entry, action, actor, owner, reason
     cc,
     subject: `Punktualnik: ${opis.temat} — ${formatDate(entry.data)}`,
     kind: `zadanie-${action}`,
+    ...body,
+  });
+};
+
+// --- 7. cotygodniowe przypomnienie o niedogodzinach -------------------------
+
+/**
+ * Ujemne saldo nadgodzin poniżej progu (services/weeklyUndertimeJob.js).
+ *
+ * Jedyne powiadomienie w tym module, którego nie wywołuje żadne zdarzenie —
+ * nikt niczego nie kliknął, po prostu minął wtorek. Dlatego wiadomość musi sama
+ * powiedzieć, DLACZEGO przyszła i co zrobić, żeby nie przyszła znowu.
+ *
+ * To ostatnie zdanie nie jest uprzejmością: Punktualnik nie łączy modułu urlopów
+ * z modułem nadgodzin, więc wypisanie urlopu NIE podniesie salda samo. Robi to
+ * kierownik osobnym wpisem. Bez tej informacji pracownik, który zrobił wszystko
+ * jak trzeba, dostanie za tydzień to samo i uzna, że system się zaciął.
+ */
+export const notifyUndertimeReminder = async (person) => {
+  const { to, cc } = recipients(person.id, person.section);
+  const saldo = formatMinutes(person.balance, { withSign: true });
+
+  const body = compose([
+    `Twoje saldo nadgodzin jest na minusie i wymaga pokrycia urlopem.`,
+    null,
+    ["Pracownik", `${person.name} ${person.surname}`],
+    ["Saldo nadgodzin", saldo],
+    null,
+    `Wypisz urlop na pokrycie brakujących godzin i uzgodnij termin z kierownikiem.`,
+    `Saldo w Punktualniku nie podniesie się samo — po wypisaniu urlopu robi to kierownik osobnym wpisem w module nadgodzin. Dopóki saldo zostaje poniżej progu, ta wiadomość wraca w każdy wtorek.`,
+    linkLine("/nadgodziny", "Moje nadgodziny"),
+    linkLine("/urlopy", "Moje urlopy"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: niedogodziny do pokrycia — ${saldo}`,
+    kind: "niedogodziny-przypomnienie",
     ...body,
   });
 };
