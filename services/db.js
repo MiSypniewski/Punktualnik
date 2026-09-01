@@ -205,6 +205,25 @@ const migrateTimesAudit = (db) => {
   }
 };
 
+/**
+ * Users dostaje kolumnę resumeTiles (liczba kafelków "Wznów", 6..18).
+ *
+ * CREATE TABLE IF NOT EXISTS nie rusza tabeli, która już istnieje, więc bazy
+ * sprzed tej zmiany — deweloperska i produkcyjna — potrzebują ALTER-a. NOT NULL
+ * z wartością domyślną jest w SQLite dozwolone przy ADD COLUMN i wypełnia
+ * istniejące wiersze: każdy dostaje sześć kafelków, czyli dokładnie to, co
+ * widział przed zmianą (stała RESUME_TILES w pages/zadania/index.js).
+ *
+ * Idempotentna i sterowana STANEM SCHEMATU, jak migracje wyżej.
+ */
+const migrateUserResumeTiles = (db) => {
+  const columns = db.prepare(`PRAGMA table_info(Users)`).all().map((c) => c.name);
+
+  if (!columns.includes("resumeTiles")) {
+    db.exec(`ALTER TABLE Users ADD COLUMN resumeTiles INTEGER NOT NULL DEFAULT 6`);
+  }
+};
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -240,7 +259,14 @@ const createDb = () => {
       passwordHash TEXT    NOT NULL,
       passwordSalt TEXT    NOT NULL,
       role         TEXT    NOT NULL DEFAULT 'user',
-      isActive     INTEGER NOT NULL DEFAULT 0
+      isActive     INTEGER NOT NULL DEFAULT 0,
+      -- Ile kafelków "Wznów" widzi pracownik na /zadania (6..18). Ustawienie
+      -- WIDOKU w tabeli danych osobowych — świadomie, w odróżnieniu od
+      -- przełącznika grupowania listy, który siedzi w localStorage. Powód jest
+      -- ten sam co przy ResumeTiles niżej: liczba i przypięcia są jednym
+      -- ustawieniem, a rozdzielenie ich na dwa magazyny dałoby panel
+      -- z dwiema różnymi prawdami. Zakres pilnuje services/resumeTiles.js.
+      resumeTiles  INTEGER NOT NULL DEFAULT 6
     );
 
     -- Słownik sekcji (działów). Do sierpnia 2026 sekcja nie miała własnej tabeli
@@ -439,6 +465,33 @@ const createDb = () => {
       FOREIGN KEY (projectID) REFERENCES Projects(id)
     );
 
+    -- Przypięte kafelki "Wznów" na /zadania. Kafelek to para projekt + opis,
+    -- czyli dokładnie to, co podsuwa services/entrySuggestions.js — z jedną
+    -- różnicą: tamto wylicza się z historii i zmienia razem z nią, a to
+    -- pracownik ustawił sobie sam i ma stać.
+    --
+    -- Dlatego w BAZIE, a nie w localStorage jak przełącznik grupowania listy:
+    -- to nie jest ustawienie widoku, tylko TREŚĆ. Ma jechać za człowiekiem
+    -- z komputera na telefon i przeżyć wyczyszczenie przeglądarki. Przy okazji
+    -- serwer zna ją w chwili renderu, więc nie ma mrugnięcia po hydratacji.
+    --
+    -- position jest GĘSTE (0..n-1) i przepisywane w całości przy każdym zapisie
+    -- (services/resumeTiles.js) — nie ma dziur do interpretowania ani wierszy
+    -- osieroconych po zmniejszeniu liczby kafelków.
+    --
+    -- projectID jest OBOWIĄZKOWY, w odróżnieniu od TaskEntries: tam timer wolno
+    -- odpalić, jeszcze nie wiedząc na co, a kafelek istnieje wyłącznie po to,
+    -- żeby wystartować GOTOWĄ parę jednym kliknięciem.
+    CREATE TABLE IF NOT EXISTS ResumeTiles (
+      userID      INTEGER NOT NULL,
+      position    INTEGER NOT NULL,
+      projectID   INTEGER NOT NULL,
+      description TEXT    NOT NULL,
+      PRIMARY KEY (userID, position),
+      FOREIGN KEY (userID)    REFERENCES Users(id),
+      FOREIGN KEY (projectID) REFERENCES Projects(id)
+    );
+
     -- Zapadki zadań okresowych (services/scheduler.js), po jednym wierszu na zadanie.
     --
     -- Na Mikrusie nie ma crona, a odpalanie zadania z timera w procesie ma jedną
@@ -490,6 +543,7 @@ const createDb = () => {
   migrateEntrySeconds(db);
   migrateEntryProjectOptional(db);
   migrateTimesAudit(db);
+  migrateUserResumeTiles(db);
 
   // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
   // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do

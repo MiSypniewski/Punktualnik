@@ -96,8 +96,8 @@ npm run admin -- section-off stary_dzial       # historia i eksporty zostają ni
 Aplikacja korzysta z **lokalnej bazy SQLite** (`better-sqlite3`) — jeden plik na dysku,
 bez osobnego procesu serwera bazy. Schemat (tabele `Users`, `Times`, `Overtime`,
 `Sections`, `ManagerSections`, `Projects`, `ProjectSections`, `TaskEntries`,
-`Absences`, `LeaveAllowance`) tworzony jest automatycznie przy pierwszym
-uruchomieniu.
+`ResumeTiles`, `Absences`, `LeaveAllowance`) tworzony jest automatycznie przy
+pierwszym uruchomieniu.
 
 - Domyślna ścieżka: `./data/punktualnik.sqlite` (katalog `data/` jest w `.gitignore`).
 - Ścieżkę można nadpisać zmienną `SQLITE_PATH` (zob. `.env.local`).
@@ -883,6 +883,47 @@ dowolnym tekstem, a aplikacja podpowiada wcześniejsze opisy z historii i pozwal
 wznowić poprzednie zadanie jednym kliknięciem. Podpowiedzi buduje
 `services/entrySuggestions.js` i sortuje je po **liczbie użyć**, więc codzienna
 rutyna wypada wyżej niż coś zrobionego raz.
+
+**Kafelki „Wznów” pracownik ustawia sobie sam.** Domyślnie jest ich sześć, ale
+w panelu „Ustaw kafelki” (przy nagłówku, nad samymi kafelkami) da się wybrać
+dowolną liczbę **od 6 do 18** — a niektóre z nich **przypiąć**. Kafelek przypięty
+stoi zawsze na początku, w kolejności ustawionej strzałkami, i nie znika, choćby
+tego zadania nie było w historii ani razu: opis i projekt wpisuje się ręcznie,
+więc da się przypiąć czynność, którą się dopiero zaczyna robić. Pozostałe miejsca
+dopełniają podpowiedzi z historii, z pominięciem par już przypiętych — bez tego
+ten sam kafelek stałby na liście dwa razy. Kłódka na kafelku przypina i odpina
+jednym kliknięciem; panel jest do porządkowania kolejności i do par, których
+w historii nie ma.
+
+Ustawienia siedzą **w bazie, nie w przeglądarce** (`Users.resumeTiles` na liczbę,
+tabela `ResumeTiles` na przypięcia) — inaczej niż przełącznik „Grupuj takie same
+zadania”, który jest w `localStorage`. Różnica jest zamierzona: liczba i kolejność
+kafelków to TREŚĆ, którą pracownik ustawił, więc ma jechać za nim z komputera na
+telefon i przeżyć wyczyszczenie przeglądarki. Przy okazji serwer zna ją w chwili
+renderu, więc nie ma mrugnięcia po hydratacji.
+
+Reguł pilnuje serwer (`services/resumeTiles.js` i `pages/api/entries/tiles.js`),
+nie tylko formularz: liczba poza zakresem 6–18 to `422`, więcej przypięć niż
+miejsc — `422 too_many_pins`, ta sama para projekt + opis dwa razy (bez względu
+na wielkość liter i spacje) — `422 duplicate_pin`, a projekt spoza swojej sekcji
+— `403 project_out_of_scope`. Cały panel zapisuje się JEDNYM żądaniem `PUT`,
+które podmienia komplet ustawień; pozycje w tabeli są gęste (0, 1, 2…) i
+przepisywane za każdym razem, więc nie ma dziur ani wierszy osieroconych po
+zmniejszeniu liczby kafelków.
+
+Kafelek, którego **projekt zarchiwizowano** (albo przeniesiono do cudzej sekcji),
+zostaje na ekranie **wyszarzony i nieklikalny**, z wyjaśnieniem w dymku, zamiast
+zniknąć po cichu albo wywalić się dopiero po kliknięciu — `/api/entries` i tak by
+go odrzuciło. W panelu jego projekt widnieje jako „— niedostępny”, więc wiadomo,
+co poprawić; zapisu takiego kafelka serwer nie przyjmie (`422 project_archived`).
+Podpowiedź w tym samym stanie po prostu odpada z listy: jej nikt nie wybierał,
+więc nie ma czego tłumaczyć.
+
+Na **telefonie kafelek zajmuje całą szerokość ekranu** i mieści opis oraz nazwę
+projektu w jednej linii; od `sm` w górę kafelki układają się w siatkę (2, 3 i 4
+kolumny) o równych szerokościach, a nazwa projektu schodzi pod opis. Wcześniej
+był to `flex-wrap`, w którym każdy kafelek miał szerokość swojego napisu, przez
+co rzędy się strzępiły — przy osiemnastu kafelkach byłoby to nie do czytania.
 
 **Dwa różne mechanizmy podpowiedzi, celowo.**
 
