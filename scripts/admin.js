@@ -56,7 +56,8 @@ db.exec(`
     passwordHash TEXT    NOT NULL,
     passwordSalt TEXT    NOT NULL,
     role         TEXT    NOT NULL DEFAULT 'user',
-    isActive     INTEGER NOT NULL DEFAULT 0
+    isActive     INTEGER NOT NULL DEFAULT 0,
+    resumeTiles  INTEGER NOT NULL DEFAULT 6
   );
 
   CREATE TABLE IF NOT EXISTS ManagerSections (

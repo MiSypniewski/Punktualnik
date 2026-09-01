@@ -9,8 +9,16 @@ import BaseLayout from "../../components/baseLayout";
 import { ProjectMark } from "../../components/projectColors";
 import LiveDot from "../../components/liveDot";
 import Button, { IconButton } from "../../components/ui/button";
-import { PlayIcon, PencilIcon, TrashIcon } from "../../components/ui/icons";
-import { Input, Select, Checkbox } from "../../components/ui/field";
+import {
+  PlayIcon,
+  PencilIcon,
+  TrashIcon,
+  LockIcon,
+  LockOpenIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+} from "../../components/ui/icons";
+import { Input, Select, Checkbox, Field } from "../../components/ui/field";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
@@ -18,21 +26,20 @@ import EmptyState from "../../components/ui/emptyState";
 import { listProjects, projectScope } from "../../services/projects";
 import { getEntriesForUser, getRunningEntry, sweepStaleEntries } from "../../services/taskEntries";
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
+import { getTilePrefs } from "../../services/resumeTiles";
 import TaskSuggest from "../../components/taskSuggest";
 import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
 import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
 import { groupEntries } from "../../utils/groupEntries";
+// Z utils/, nie z services/resumeTiles: te trzy rzeczy są potrzebne TAKŻE
+// w przeglądarce (pole "ile kafelków", stan kłódki), a import z services
+// wciągnąłby do bundla klienta better-sqlite3 razem z `fs`.
+import { buildTiles, tileKey, MIN_TILES, MAX_TILES } from "../../utils/resumeTiles";
 
 dayjs.locale("pl");
 
 const HISTORY_DAYS = 14;
-
-// Ile kafelków "Wznów" pod paskiem. Do tej zmiany liczba siedziała w
-// getServerSideProps jako `.slice(0, 6)` — teraz serwer przysyła komplet
-// podpowiedzi (potrzebuje go lista w pasku startu), więc cięcie przenosi się
-// do renderu i dostaje nazwę. Sześć mieści się w dwóch rzędach na laptopie.
-const RESUME_TILES = 6;
 
 export async function getServerSideProps(ctx) {
   const token = await getToken({ req: ctx.req });
@@ -52,18 +59,21 @@ export async function getServerSideProps(ctx) {
 
   const today = workDay();
   const suggestions = getSuggestions(token.userID);
+  const projects = listProjects({ sections: projectScope(token) });
+  const tilePrefs = getTilePrefs(token.userID);
 
   return {
     props: {
-      projects: listProjects({ sections: projectScope(token) }),
+      projects,
       running: getRunningEntry(token.userID) ?? null,
       entries: getEntriesForUser({
         userID: token.userID,
         from: dayjs(today).subtract(HISTORY_DAYS, "day").format("YYYY-MM-DD"),
         to: today,
       }),
-      // KOMPLET podpowiedzi, nie sześć: listy w pasku startu (components/taskSuggest.js)
-      // szuka po całej historii, a kafelki "Wznów" tną ją w miejscu renderu.
+      // KOMPLET podpowiedzi, nie tyle, ile jest kafelków: lista w pasku startu
+      // (components/taskSuggest.js) szuka po całej historii. Kafelki mają własny
+      // props `tiles` niżej i biorą z tej samej tablicy tylko wierzchołek.
       // Odchudzone do pól, których potrzebuje przeglądarka — `uses` i `lastUsed`
       // służą wyłącznie do sortowania w SQL i nie mają po co jechać na klienta.
       suggestions: suggestions.map(({ projectID, description, projectName, projectColor }) => ({
@@ -73,6 +83,21 @@ export async function getServerSideProps(ctx) {
         projectColor,
       })),
       descByProject: suggestionsByProject(suggestions),
+      // Kafelki "Wznów" składa SERWER, nie render: reguła kolejności (przypięte
+      // przodem, potem historia bez powtórzeń) siedzi w jednym miejscu
+      // — services/resumeTiles.js — i tam daje się sprawdzić bez przeglądarki.
+      // Do tej zmiany cięcie robił `.slice(0, RESUME_TILES)` w komponencie.
+      //
+      // Zbiór dostępnych projektów bierzemy z listy, którą strona i tak ma:
+      // kafelek na projekcie zarchiwizowanym albo przeniesionym do cudzej sekcji
+      // ma być widocznie wyłączony, a nie wywalać się dopiero po kliknięciu.
+      tiles: buildTiles({
+        pins: tilePrefs.pins,
+        suggestions,
+        count: tilePrefs.count,
+        usableProjectIDs: projects.map((p) => p.id),
+      }),
+      tilePrefs,
       today,
       minEditable: minEditableDay(),
       // Kierownik poprawia i dopisuje wpisy z dowolnego dnia — także tu, na
@@ -90,6 +115,7 @@ const ERRORS = {
   already_running: "Masz już uruchomiony timer.",
   project_out_of_scope: "Ten projekt nie jest dla twojej sekcji.",
   project_not_found: "Wybranego projektu już nie ma.",
+  project_archived: "Ten projekt jest zarchiwizowany — wybierz inny albo odepnij kafelek.",
   bad_project: "Wybierz projekt.",
   not_found: "Tego wpisu już nie ma — odśwież stronę.",
   incomplete: "Uzupełnij projekt i opis, zanim zamkniesz zadanie.",
@@ -175,6 +201,8 @@ export default function Zadania({
   entries,
   suggestions,
   descByProject,
+  tiles,
+  tilePrefs,
   today,
   minEditable,
   editAnyDay,
@@ -229,6 +257,14 @@ export default function Zadania({
       return body;
     });
 
+  /**
+   * Zapis ustawień kafelków — jedno żądanie na komplet (liczba + przypięcia).
+   * Woła je i kłódka na kafelku, i panel; `call` sam odświeża stronę, więc nowa
+   * kolejność przyjeżdża prosto z bazy, a nie z lokalnego stanu.
+   */
+  const saveTiles = (payload) =>
+    call("/api/entries/tiles", { method: "PUT", body: JSON.stringify(payload) });
+
   // Wpisy pogrupowane po dobie roboczej; kolejność z SQL (malejąco) zachowana.
   // Biegnący wpis odsiewamy, bo pokazuje go pasek timera na górze — inaczej
   // dzisiejsza grupa pojawiałaby się pusta, z sumą 0h, zanim cokolwiek zamknięto.
@@ -271,11 +307,21 @@ export default function Zadania({
           </Alert>
         )}
 
-        {/* Podpowiedzi zostają na ekranie TAKŻE przy biegnącym timerze — to jedyne
-            miejsce, z którego da się jednym kliknięciem przejść na inne zadanie. */}
-        {suggestions.length > 0 && (
-          <Resume suggestions={suggestions.slice(0, RESUME_TILES)} running={running} busy={busy} onResume={resume} />
-        )}
+        {/* Kafelki zostają na ekranie TAKŻE przy biegnącym timerze — to jedyne
+            miejsce, z którego da się jednym kliknięciem przejść na inne zadanie.
+            I także wtedy, gdy nie ma ani jednego kafelka: bez tego nowo założone
+            konto nie miałoby jak dojść do ustawień i przypiąć pierwszej pary,
+            bo historii jeszcze nie ma. */}
+        <Resume
+          tiles={tiles}
+          prefs={tilePrefs}
+          projects={projects}
+          descByProject={descByProject}
+          running={running}
+          busy={busy}
+          onResume={resume}
+          onSaveTiles={saveTiles}
+        />
 
         <ManualForm
           projects={projects}
@@ -757,41 +803,315 @@ const DescriptionOptions = ({ descByProject }) => (
 
 // --- wznawianie -------------------------------------------------------------
 
-const Resume = ({ suggestions, running, busy, onResume }) => (
-  <div className="mt-8">
-    {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
-        bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
-    <h2 className="mb-2 text-xs font-bold uppercase tracking-signage text-muted">
-      {running ? "Przełącz na" : "Wznów"}
-    </h2>
-    <div className="flex gap-2 flex-wrap">
-      {suggestions.map((s) => (
-        // Nazwa projektu pod opisem, a nie sam kolorowy kwadracik. Kolorów jest
-        // siedem (components/projectColors.js) i nic nie pilnuje ich unikalności,
-        // więc ta sama czynność w dwóch projektach ("wystawia zlecenia" w ESL
-        // i w Namiotach) dawała dwa kafelki nie do odróżnienia. Dwie linie,
-        // a nie "opis · projekt" w jednej: kafelek zostaje wąski, a przy sześciu
-        // podpowiedziach szerokie kafelki zawijały rząd na trzy linie.
-        <button
-          key={`${s.projectID}-${s.description}`}
-          disabled={busy}
-          title={`${s.description} · ${s.projectName} — ${
-            running ? "zamknij bieżące zadanie i zacznij to" : "zacznij to zadanie"
-          }`}
-          onClick={() => onResume(s)}
-          className="flex items-start gap-2 max-w-[16rem] py-1.5 px-3 border border-line rounded bg-surface text-sm text-left hover:bg-raised disabled:opacity-50"
-        >
-          <ProjectMark color={s.projectColor} size="sm" className="mt-1.5" />
-          <span className="min-w-0">
-            <span className="block truncate">{s.description}</span>
-            <span className="block truncate text-xs text-muted">{s.projectName}</span>
-          </span>
-          <PlayIcon className="w-3.5 h-3.5 shrink-0 mt-1 text-muted" />
-        </button>
-      ))}
+/**
+ * Kafelki "Wznów" — przypięte przodem, dalej podpowiedzi z historii. Kolejność
+ * i liczbę rozstrzyga serwer (services/resumeTiles.js); tutaj zostaje render
+ * i dwa sposoby zmiany ustawień: kłódka na kafelku (przypnij / odepnij jednym
+ * kliknięciem) oraz panel, w którym da się wpisać parę spoza historii.
+ */
+const Resume = ({ tiles, prefs, projects, descByProject, running, busy, onResume, onSaveTiles }) => {
+  const [editing, setEditing] = useState(false);
+
+  const pinned = useMemo(
+    () => new Set(prefs.pins.map((p) => tileKey(p.projectID, p.description))),
+    [prefs.pins]
+  );
+
+  // Kłódka wysyła KOMPLET ustawień, a nie różnicę — endpoint jest jeden i
+  // podmienia całość (patrz pages/api/entries/tiles.js). Dzięki temu panel
+  // i kłódka robią dokładnie to samo żądanie i nie ma dwóch dróg do rozjechania.
+  const togglePin = (tile) => {
+    const key = tileKey(tile.projectID, tile.description);
+    const current = prefs.pins.map(({ projectID, description }) => ({ projectID, description }));
+    const next = pinned.has(key)
+      ? current.filter((p) => tileKey(p.projectID, p.description) !== key)
+      : [...current, { projectID: tile.projectID, description: tile.description }];
+
+    onSaveTiles({ count: prefs.count, pins: next });
+  };
+
+  return (
+    <div className="mt-8">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
+            bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
+        <h2 className="text-xs font-bold uppercase tracking-signage text-muted">
+          {running ? "Przełącz na" : "Wznów"}
+        </h2>
+        <Button variant="ghost" size="sm" onClick={() => setEditing(!editing)}>
+          {editing ? "Zwiń ustawienia" : "Ustaw kafelki"}
+        </Button>
+      </div>
+
+      {/* Panel STOI PRZY KAFELKACH, a nie w profilu czy na osobnej podstronie —
+          z tego samego powodu co przełącznik grupowania nad listą dni: po
+          ustawienie, do którego trzeba iść gdzie indziej, nikt nie idzie.
+          Montuje się przy otwarciu, więc zawsze startuje od stanu z bazy. */}
+      {editing && (
+        <TileSettings
+          prefs={prefs}
+          projects={projects}
+          descByProject={descByProject}
+          busy={busy}
+          onSave={(payload) => onSaveTiles(payload).then((ok) => ok && setEditing(false))}
+          onClose={() => setEditing(false)}
+        />
+      )}
+
+      {tiles.length === 0 ? (
+        <EmptyState
+          title="Nie ma czego wznawiać"
+          description="Kafelki robią się same z twojej historii — po kilku zamkniętych zadaniach pojawią się tutaj. Możesz też przypiąć własny kafelek w ustawieniach powyżej."
+        />
+      ) : (
+        // Siatka, nie `flex-wrap`: kafelki mają w rzędzie równą szerokość, więc
+        // rzędy przestają się strzępić. Na telefonie JEDNA kolumna na pełną
+        // szerokość — kciukiem trafia się w cały pasek, a nie w kafelek szeroki
+        // na tyle, ile akurat ma znaków opis.
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {tiles.map((tile) => (
+            <Tile
+              key={tileKey(tile.projectID, tile.description)}
+              tile={tile}
+              running={running}
+              busy={busy}
+              onResume={onResume}
+              onTogglePin={togglePin}
+            />
+          ))}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
+
+/**
+ * Pojedynczy kafelek: wznowienie po lewej, kłódka po prawej.
+ *
+ * DWA przyciski w jednej ramce, a nie jeden z ikoną w środku — przycisk
+ * w przycisku jest niepoprawnym HTML-em i w przeglądarce zachowuje się losowo.
+ */
+const Tile = ({ tile, running, busy, onResume, onTogglePin }) => {
+  const action = running ? "zamknij bieżące zadanie i zacznij to" : "zacznij to zadanie";
+
+  return (
+    <div className="flex items-stretch rounded border border-line bg-surface overflow-hidden">
+      <button
+        disabled={busy || !tile.usable}
+        title={
+          tile.usable
+            ? `${tile.description} · ${tile.projectName} — ${action}`
+            : `${tile.description} · ${tile.projectName} — projekt zarchiwizowany albo spoza twojej sekcji, popraw kafelek w ustawieniach`
+        }
+        onClick={() => onResume(tile)}
+        className="flex-1 min-w-0 flex items-start gap-2 py-1.5 px-3 text-sm text-left hover:bg-raised disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <ProjectMark color={tile.projectColor} size="sm" className="mt-1.5" />
+        {/* Nazwa projektu obok opisu, a nie sam kolorowy kwadracik. Kolorów jest
+            siedem (components/projectColors.js) i nic nie pilnuje ich
+            unikalności, więc ta sama czynność w dwóch projektach ("wystawia
+            zlecenia" w ESL i w Namiotach) dawała kafelki nie do odróżnienia.
+            Na telefonie obie informacje mieszczą się w JEDNEJ linii, bo kafelek
+            zajmuje całą szerokość; w wąskiej komórce siatki (od `sm`) wracają
+            do dwóch linii, inaczej urwałyby się oba napisy naraz. */}
+        <span className="min-w-0 flex-1 flex items-baseline justify-between gap-x-2 sm:block">
+          <span className="block min-w-0 truncate">{tile.description}</span>
+          {/* Nazwa projektu ma sufit szerokości TYLKO w układzie jednoliniowym:
+              bez niego długa nazwa ("Nowe i remontowane sklepy") zjadała połowę
+              paska i ucinała opis, czyli tę informację, po którą się tu patrzy.
+              W układzie dwuliniowym (od `sm`) sufit znika — nazwa ma wtedy
+              własną linię i nie konkuruje z niczym. */}
+          <span className="block min-w-0 max-w-[45%] truncate text-xs text-muted sm:max-w-none">
+            {tile.projectName}
+          </span>
+        </span>
+        <PlayIcon className="w-3.5 h-3.5 shrink-0 mt-1 text-muted" />
+      </button>
+
+      <button
+        type="button"
+        disabled={busy}
+        title={
+          tile.pinned
+            ? "Odepnij — kafelek wróci do kolejki z historii"
+            : "Przypnij — kafelek zostanie na stałe, na początku listy"
+        }
+        aria-label={tile.pinned ? "Odepnij kafelek" : "Przypnij kafelek"}
+        aria-pressed={tile.pinned}
+        onClick={() => onTogglePin(tile)}
+        className={classNames(
+          "shrink-0 px-2 border-l border-line transition-colors hover:bg-raised disabled:opacity-50 disabled:cursor-not-allowed",
+          tile.pinned ? "text-accent-strong" : "text-faint hover:text-body"
+        )}
+      >
+        {tile.pinned ? <LockIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+};
+
+/**
+ * Panel ustawień kafelków: liczba miejsc i lista przypięć.
+ *
+ * Stan trzyma lokalnie i wysyła CAŁOŚĆ jednym "Zapisz". Zapis po każdym znaku
+ * w opisie oznaczałby żądanie na literę, a baza jest synchroniczna i obsługuje
+ * całą firmę jednym procesem — patrz uwaga o podpowiedziach w README.
+ */
+const TileSettings = ({ prefs, projects, descByProject, busy, onSave, onClose }) => {
+  const [count, setCount] = useState(prefs.count);
+  const [pins, setPins] = useState(
+    prefs.pins.map(({ projectID, description, projectName }) => ({
+      projectID: String(projectID),
+      description,
+      projectName,
+    }))
+  );
+
+  // Projekt zarchiwizowany albo przeniesiony do cudzej sekcji WYPADA z listy
+  // `projects` — bez tej dostawki wiersz pokazywałby "— wybierz projekt —"
+  // i wyglądał na uszkodzony, a pracownik nie miałby jak zobaczyć, na czym
+  // właściwie stoi jego kafelek. Opcja jest zablokowana: zapisać się jej nie da
+  // (serwer zwraca project_archived), ma tylko nazwać stan rzeczy.
+  const projectOptions = (pin) =>
+    pin.projectID && !projects.some((p) => String(p.id) === pin.projectID) ? (
+      <option value={pin.projectID} disabled>
+        {pin.projectName} — niedostępny
+      </option>
+    ) : null;
+
+  const patch = (index, change) =>
+    setPins(pins.map((pin, i) => (i === index ? { ...pin, ...change } : pin)));
+
+  const move = (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= pins.length) return;
+    const next = [...pins];
+    [next[index], next[target]] = [next[target], next[index]];
+    setPins(next);
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    onSave({
+      count: Number(count),
+      pins: pins.map((pin) => ({ projectID: Number(pin.projectID), description: pin.description })),
+    });
+  };
+
+  return (
+    <form onSubmit={submit} className="mb-3 p-3 border border-line rounded bg-raised">
+      <Field
+        label="Ile kafelków"
+        htmlFor="tiles-count"
+        hint={`Od ${MIN_TILES} do ${MAX_TILES}. Na telefonie każdy kafelek zajmuje osobny rząd.`}
+        className="max-w-sm"
+      >
+        <Input
+          id="tiles-count"
+          type="number"
+          min={MIN_TILES}
+          max={MAX_TILES}
+          step={1}
+          required
+          value={count}
+          onChange={(e) => setCount(e.target.value)}
+          className="!w-24"
+        />
+      </Field>
+
+      <h3 className="mt-4 mb-1 text-xs font-bold uppercase tracking-signage text-muted">Przypięte</h3>
+      <p className="mb-2 text-sm text-muted">
+        Przypięty kafelek stoi zawsze na początku i nie znika, choćbyś nie robił tego zadania od miesiąca.
+        Opis wpisujesz sam — także taki, którego nie ma jeszcze w historii.
+      </p>
+
+      {pins.length === 0 && <p className="mb-2 text-sm text-faint">Nic nie jest przypięte.</p>}
+
+      <ul className="flex flex-col gap-2">
+        {pins.map((pin, index) => (
+          // Klucz po POZYCJI, nie po treści: wiersz jest edytowany w miejscu,
+          // a klucz zmieniający się przy każdym znaku kasowałby pole i wyrzucał
+          // z niego kursor.
+          <li key={index} className="flex flex-wrap items-center gap-2">
+            <Select
+              required
+              value={pin.projectID}
+              onChange={(e) => patch(index, { projectID: e.target.value })}
+              className="w-full sm:!w-56"
+              aria-label={`Projekt kafelka ${index + 1}`}
+            >
+              <option value="">— wybierz projekt —</option>
+              {projectOptions(pin)}
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+            <Input
+              required
+              maxLength={200}
+              placeholder="Opis zadania"
+              value={pin.description}
+              onChange={(e) => patch(index, { description: e.target.value })}
+              list={`opisy-${pin.projectID}`}
+              className="flex-1 !w-auto min-w-[10rem]"
+              aria-label={`Opis kafelka ${index + 1}`}
+            />
+            <span className="flex gap-1 ml-auto">
+              <IconButton
+                label="Wyżej"
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+              >
+                <ArrowUpIcon />
+              </IconButton>
+              <IconButton
+                label="Niżej"
+                disabled={index === pins.length - 1}
+                onClick={() => move(index, 1)}
+              >
+                <ArrowDownIcon />
+              </IconButton>
+              <IconButton label="Odepnij" onClick={() => setPins(pins.filter((_, i) => i !== index))}>
+                <TrashIcon />
+              </IconButton>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={pins.length >= Number(count) || projects.length === 0}
+          title={
+            pins.length >= Number(count)
+              ? "Wszystkie miejsca są zajęte — zwiększ liczbę kafelków albo odepnij któryś."
+              : undefined
+          }
+          onClick={() => setPins([...pins, { projectID: "", description: "" }])}
+        >
+          + Przypnij kafelek
+        </Button>
+        <span className="text-sm text-muted">
+          {pins.length} z {count} miejsc
+        </span>
+        <span className="flex gap-2 ml-auto">
+          <Button type="submit" size="sm" disabled={busy}>
+            Zapisz
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Anuluj
+          </Button>
+        </span>
+      </div>
+
+      <DescriptionOptions descByProject={descByProject} />
+    </form>
+  );
+};
 
 // --- formularz ręczny -------------------------------------------------------
 
