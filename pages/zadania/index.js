@@ -906,24 +906,30 @@ const Tile = ({ tile, running, busy, onResume, onTogglePin }) => {
         onClick={() => onResume(tile)}
         className="flex-1 min-w-0 flex items-start gap-2 py-1.5 px-3 text-sm text-left hover:bg-raised disabled:opacity-50 disabled:cursor-not-allowed"
       >
+        {/* mt-1.5, a nie wyrównanie do środka: przy opisie na dwie linie znacznik
+            ma stać przy PIERWSZEJ z nich, a nie dryfować do połowy wysokości.
+            Ten sam zabieg co w wierszu listy dnia niżej. */}
         <ProjectMark color={tile.projectColor} size="sm" className="mt-1.5" />
-        {/* Nazwa projektu obok opisu, a nie sam kolorowy kwadracik. Kolorów jest
-            siedem (components/projectColors.js) i nic nie pilnuje ich
-            unikalności, więc ta sama czynność w dwóch projektach ("wystawia
-            zlecenia" w ESL i w Namiotach) dawała kafelki nie do odróżnienia.
-            Na telefonie obie informacje mieszczą się w JEDNEJ linii, bo kafelek
-            zajmuje całą szerokość; w wąskiej komórce siatki (od `sm`) wracają
-            do dwóch linii, inaczej urwałyby się oba napisy naraz. */}
-        <span className="min-w-0 flex-1 flex items-baseline justify-between gap-x-2 sm:block">
-          <span className="block min-w-0 truncate">{tile.description}</span>
-          {/* Nazwa projektu ma sufit szerokości TYLKO w układzie jednoliniowym:
-              bez niego długa nazwa ("Nowe i remontowane sklepy") zjadała połowę
-              paska i ucinała opis, czyli tę informację, po którą się tu patrzy.
-              W układzie dwuliniowym (od `sm`) sufit znika — nazwa ma wtedy
-              własną linię i nie konkuruje z niczym. */}
-          <span className="block min-w-0 max-w-[45%] truncate text-xs text-muted sm:max-w-none">
-            {tile.projectName}
-          </span>
+        {/* Opis ZAWIJA SIĘ, a nie urywa w pół słowa, i to na każdej szerokości —
+            `truncate` ustawia `white-space: nowrap`, więc opis nie tylko się nie
+            łamał, ale i wypychał nazwę projektu, bo flex woli zawinąć albo
+            ścisnąć sąsiada niż złamać element, który sam zadeklarował, że się nie
+            łamie. Dokładnie ta sama pułapka i ta sama naprawa co w EntryRow.
+
+            Dwie linie, nie dowolna liczba: kafelki są siatką SKRÓTÓW, a siatka
+            wyrównuje wysokość całego rzędu do najwyższego kafelka — bez sufitu
+            jeden rozbudowany opis rozpychałby cały rząd. Pełna treść zostaje
+            w dymku `title` wyżej i w panelu ustawień.
+
+            Nazwa projektu ma WŁASNĄ linię i nie jest ucinana. W jednej linii
+            z opisem (tak było do tej zmiany na telefonie) zawsze przegrywała
+            — a bez niej kafelek bywa nie do odróżnienia od innego, bo kolorów
+            jest siedem (components/projectColors.js) i nic nie pilnuje ich
+            unikalności: ta sama czynność w dwóch projektach ("wystawia zlecenia"
+            w ESL i w Namiotach) daje dwa identyczne kwadraciki. */}
+        <span className="min-w-0 flex-1">
+          <span className="break-words line-clamp-2">{tile.description}</span>
+          <span className="block text-xs text-muted">{tile.projectName}</span>
         </span>
         <PlayIcon className="w-3.5 h-3.5 shrink-0 mt-1 text-muted" />
       </button>

@@ -41,6 +41,25 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+        {/* Manifest — to on robi z tej strony rzecz, którą telefon potrafi
+            zainstalować: ikona na ekranie i uruchamianie bez paska adresu.
+            Service workera świadomie NIE MA: do instalacji nie jest potrzebny,
+            a dokładałby własny cykl życia (i klasyczny błąd "ludzie widzą starą
+            wersję po wdrożeniu") w zamian za tryb offline, którego aplikacja
+            czytająca i pisząca do bazy na serwerze i tak by nie obsłużyła.
+            Rozszerzenie .webmanifest, nie .json — dzięki niemu serwer podaje
+            typ application/manifest+json bez dokładania nagłówków. */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+
+        {/* Metatagi Apple dublują to, co dla reszty świata mówi manifest.
+            iOS starszy niż 16.4 manifestu nie czyta i bez tej pierwszej linijki
+            po prostu otwierałby Safari z paskiem adresu. Pasek stanu zostaje
+            "default" (nieprzezroczysty): "black-translucent" wpuszcza treść pod
+            zegarek systemowy, a nagłówek aplikacji nie ma na to zapasu. */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Punktualnik" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="language" content="Polish" />
         <meta httpEquiv="content-language" content="pl" />
       </Head>
