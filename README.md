@@ -1187,6 +1187,56 @@ Wartość spoza pary daje `400 bad_format`.
 > w zapasie. Na serwerze i tak leży w `node_modules`. Wdrożenie tej zmiany
 > wymaga `npm ci` — zmienił się `package.json`.
 
+## Instalacja na telefonie
+
+Punktualnik da się dodać do telefonu jako **osobną aplikację**: własna ikona na
+ekranie, uruchamianie bez paska adresu i zakładek. To wciąż ta sama strona i ten
+sam serwer — zmienia się opakowanie, nie zawartość.
+
+**Android (Chrome):** menu przeglądarki `⋮` → **Zainstaluj aplikację**.
+**iPhone (Safari):** **Udostępnij** → **Dodaj do ekranu początkowego**.
+
+Przypomina o tym dyskretny pasek w stopce (`components/installHint.js`), widoczny
+wyłącznie na ekranie dotykowym, wyłącznie gdy aplikacja nie jest jeszcze
+zainstalowana, i znikający na dobre po zamknięciu krzyżykiem. Bez niego nikt by
+tej możliwości nie znalazł: przeglądarka nie mówi o niej głośno, a na iPhonie
+instalacja jest schowana pod „Udostępnij”.
+
+Na Androidzie przytrzymanie ikony daje trzy skróty prosto do **zadań**,
+**nadgodzin** i **urlopów** (`shortcuts` w manifeście).
+
+### Co trzeba wiedzieć
+
+- **iPhone, logowanie.** Zainstalowana aplikacja ma na iOS własny magazyn
+  ciasteczek, osobny od Safari, kopiowany jednorazowo w chwili dodawania do
+  ekranu. Praktycznie: zaloguj się w Safari **przed** dodaniem albo zaloguj się
+  drugi raz już w aplikacji. Na Androidzie ciasteczka są wspólne i problemu nie ma.
+- **iPhone, ustawienia lokalne.** Motyw i przełącznik „grupuj takie same zadania”
+  siedzą w `localStorage`, a iOS potrafi go wyczyścić po tygodniu nieużywania.
+  Wracają wtedy wartości domyślne — dane w bazie są nietknięte.
+- **Bez zasięgu aplikacja nie działa.** Świadomie nie ma service workera, więc
+  nie ma też trybu offline: bez sieci telefon pokaże błąd połączenia. Powód
+  w następnym akapicie.
+- **Eksporty XLSX i CSV** w trybie pełnoekranowym na iPhonie bywają nieporęczne.
+  To narzędzie kierownika — najwygodniej robić je z przeglądarki albo komputera.
+
+### Dlaczego bez service workera
+
+Do instalacji nie jest potrzebny — wystarczy manifest, ikony 192 i 512 px,
+`start_url`, `display` i HTTPS; Chrome zdjął ten wymóg dla instalacji z menu
+w wersji 108 na telefonach. Tryb offline byłby w tej aplikacji fikcją: każdy
+ekran czyta bazę na serwerze, a kolejka zapisów z telefonu musiałaby po fakcie
+rozstrzygać reguły, których pilnuje sama baza — jeden biegnący timer na osobę
+(UNIQUE INDEX), zakaz nachodzenia wpisów, okno edycji „dziś i wczoraj”. Efektem
+byłby albo cicho zgubiony czas pracy, albo dopisany podwójnie. Service worker
+dołożyłby za to własny cykl życia i klasyczny błąd „ludzie widzą starą wersję po
+wdrożeniu”, na serwerze, który już raz przestał odbierać połączenia.
+
+Jedyna cena tej decyzji jest widoczna w interfejsie: jednoklikowy przycisk
+„Zainstaluj” wymaga zdarzenia `beforeinstallprompt`, a Chrome wystawia je nadal
+tylko stronom z service workerem. Dlatego pasek podaje **instrukcję**, a przycisk
+pojawia się sam, jeśli przeglądarka mimo wszystko to zdarzenie poda.
+
 ## System wizualny
 
 Wygląd aplikacji jest jeden i nazywa się **„tablica odjazdów”**. Punkt odniesienia
