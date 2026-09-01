@@ -919,11 +919,22 @@ co poprawić; zapisu takiego kafelka serwer nie przyjmie (`422 project_archived`
 Podpowiedź w tym samym stanie po prostu odpada z listy: jej nikt nie wybierał,
 więc nie ma czego tłumaczyć.
 
-Na **telefonie kafelek zajmuje całą szerokość ekranu** i mieści opis oraz nazwę
-projektu w jednej linii; od `sm` w górę kafelki układają się w siatkę (2, 3 i 4
-kolumny) o równych szerokościach, a nazwa projektu schodzi pod opis. Wcześniej
-był to `flex-wrap`, w którym każdy kafelek miał szerokość swojego napisu, przez
-co rzędy się strzępiły — przy osiemnastu kafelkach byłoby to nie do czytania.
+Na **telefonie kafelek zajmuje całą szerokość ekranu**; od `sm` w górę kafelki
+układają się w siatkę (2, 3 i 4 kolumny) o równych szerokościach. Wcześniej był
+to `flex-wrap`, w którym każdy kafelek miał szerokość swojego napisu, przez co
+rzędy się strzępiły — przy osiemnastu kafelkach byłoby to nie do czytania.
+
+**Opis zadania zawija się na dwie linie**, nadmiar ucina wielokropek (pełna treść
+zostaje w dymku i w panelu ustawień), a **nazwa projektu ma własną linię i nie
+jest ucinana nigdy** — na każdej szerokości ekranu. Wcześniej opis stał na
+`truncate`, czyli `white-space: nowrap`: nie tylko urywał się w pół słowa, ale
+i wypychał nazwę projektu, bo flex woli ścisnąć sąsiada niż złamać element, który
+sam zadeklarował, że się nie łamie. Ta sama pułapka i ta sama naprawa co
+w wierszach listy dnia niżej. Dwie linie, a nie dowolna liczba, bo siatka
+wyrównuje wysokość całego rzędu do najwyższego kafelka — bez sufitu jeden
+rozbudowany opis rozpychałby cały rząd. Ucinanie robi klasa `.line-clamp-2`
+z `styles/globals.css`: Tailwind jest tu w wersji 3.1, a `line-clamp-*` weszło
+do rdzenia dopiero w 3.3.
 
 **Dwa różne mechanizmy podpowiedzi, celowo.**
 

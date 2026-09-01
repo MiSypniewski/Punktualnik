@@ -276,3 +276,25 @@
     }
   }
 }
+
+@layer utilities {
+  /* Ucięcie tekstu PO DWÓCH LINIACH — dla opisu na kafelku „Wznów”
+     (pages/zadania/index.js). Tailwind w tym projekcie to 3.1, a `line-clamp-*`
+     weszło do rdzenia dopiero w 3.3; wtyczka @tailwindcss/line-clamp nie jest
+     tu warta zależności dla jednej klasy, tak samo jak biblioteka ikon nie była
+     warta jej dla sześciu ikon (components/ui/icons.js).
+
+     Prefiksy `-webkit-` nie są zaszłością do posprzątania: to JEST dzisiejsza
+     składnia tej własności i tak samo generuje ją Tailwind 3.3.
+
+     UWAGA: `display: -webkit-box` ZASTĘPUJE `display: block`, więc element z tą
+     klasą nie może dostać jednocześnie `block` — o zwycięzcy decyduje kolejność
+     reguł w arkuszu, a nie kolejność w atrybucie `class` (ta sama pułapka, którą
+     components/ui/field.js opisuje przy `!w-24`). */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+}
