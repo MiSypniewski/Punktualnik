@@ -32,12 +32,23 @@
 //       console.log(n, Number(process.hrtime.bigint()-t)/1e6|0, "ms");
 //     }'
 //
-// Kryterium: jeden hash <= 200 ms. Powyżej — zejść do 120 000, co i tak jest
-// ~14x więcej pracy niż stan sprzed tej zmiany. Wynik pomiaru wraz z datą wpisać
-// niżej, żeby następna osoba nie zgadywała, skąd ta liczba.
+// Kryterium: jeden hash <= 200 ms.
 //
-// Zmierzone: (jeszcze nie zmierzono na produkcji — patrz README, "Hasła")
-const PBKDF2_ITERATIONS = 210000;
+// ZMIERZONE NA MIKRUSIE 02.09.2026:
+//   100 000 ->  64 ms
+//   150 000 -> 140 ms
+//   210 000 -> 286 ms   <- zalecenie OWASP NIE MIEŚCI SIĘ na tej maszynie
+//
+// Stąd 120 000: ~110 ms z interpolacji, czyli zapas do progu. To 14x więcej pracy
+// HMAC niż stan sprzed sierpnia 2026 (2137 iteracji x 4 bloki = 8548 rund).
+//
+// Uwaga do przyszłych pomiarów: koszt JEDNOSTKOWY rośnie z długością liczenia
+// (0,64 -> 0,93 -> 1,36 ms na 1000 iteracji), a PBKDF2 jest liniowe. To znaczy,
+// że współdzielony vCPU jest dławiony tym mocniej, im dłużej się liczy — więc
+// pomiar pojedynczego hasha na spokojnej maszynie ZANIŻA koszt przy gwałcie
+// logowań o 7:00. Przy podnoszeniu tej liczby mierzyć pod obciążeniem
+// (scripts/loadtest.js), nie w izolacji.
+const PBKDF2_ITERATIONS = 120000;
 
 // BAJTY, nie bity. 64 B to dokładnie jeden blok SHA-512, czyli jedno przejście
 // pętli PBKDF2. Poprzednie 256 B kazało liczyć cztery bloki — czterokrotny koszt

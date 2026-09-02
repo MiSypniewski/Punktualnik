@@ -43,8 +43,13 @@ const rehashPassword = db.prepare(
 // inny adres = świeży kubełek). Timer nie kosztuje ani procesora, ani wątku
 // threadpoola — kosztuje otwarte gniazdo, a tę cenę limituje już limiter.
 //
-// Wartość ma być ~2x czas jednego hasha na docelowej maszynie; przy 210 000
-// iteracji na Mikrusie to ok. 150 ms, stąd 400 ms z zapasem.
+// Wartość ma być WIĘKSZA niż najdłuższa ścieżka porażki, czyli niż jeden hash.
+// Zmierzone na Mikrusie 02.09.2026: przy 120 000 iteracji ok. 110 ms, więc 400 ms
+// daje ~3,5x zapasu — potrzebny, bo współdzielony vCPU jest dławiony tym mocniej,
+// im dłużej liczy (patrz komentarz przy PBKDF2_ITERATIONS).
+//
+// Gdyby hash kiedyś przekroczył tę wartość, podłoga przestaje maskować różnicę
+// i wyrocznia czasowa wraca. Przy podnoszeniu iteracji podnieść i to.
 const FAILURE_FLOOR_MS = 400;
 
 const settleFailure = async (startedAt, result = null) => {
