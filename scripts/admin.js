@@ -15,6 +15,7 @@
  *   node scripts/admin.js section    <email|id> <slugSekcji>
  *   node scripts/admin.js sections   <email|id> [sekcja1,sekcja2]
  *   node scripts/admin.js passwd     <email|id> <noweHaslo>
+ *   node scripts/admin.js passwd-audit
  *   node scripts/admin.js user-delete <email|id> [--force | --scal-z <email|id>]
  *   node scripts/admin.js section-list [--all]
  *   node scripts/admin.js section-add   <slug> [Etykieta]
@@ -37,6 +38,12 @@ require("@next/env").loadEnvConfig(process.cwd(), false, { info() {}, error: con
 // Ta sama domyślna ścieżka co w services/db.js — musi pozostać zgodna.
 const dbPath = process.env.SQLITE_PATH || path.join(process.cwd(), "data", "punktualnik.sqlite");
 
+// Parametry hashowania haseł — TEN SAM plik, który czyta aplikacja. Wcześniej
+// były tu przepisane cztery liczby z services/password.js, bo ten skrypt jest
+// CommonJS-em i nie zaimportuje modułu ESM. Rozjazd którejkolwiek z nich oznaczał
+// konto, do którego nie da się zalogować, wykrywane dopiero przez użytkownika.
+const PW = require("../services/passwordParams.cjs");
+
 const Database = require("better-sqlite3");
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
@@ -57,7 +64,8 @@ db.exec(`
     passwordSalt TEXT    NOT NULL,
     role         TEXT    NOT NULL DEFAULT 'user',
     isActive     INTEGER NOT NULL DEFAULT 0,
-    resumeTiles  INTEGER NOT NULL DEFAULT 6
+    resumeTiles  INTEGER NOT NULL DEFAULT 6,
+    passwordParams TEXT NOT NULL DEFAULT '${PW.LEGACY_PARAMS}'
   );
 
   CREATE TABLE IF NOT EXISTS ManagerSections (
@@ -88,6 +96,19 @@ if (db.prepare("SELECT COUNT(*) AS n FROM Sections").get().n === 0) {
     );
   `);
 }
+
+// Lustrzane wobec migrateUserPasswordParams w services/db.js. Osobna kopia jest
+// tu konieczna, bo ten skrypt bywa uruchamiany na bazie, której NOWA wersja
+// aplikacji jeszcze nie otwierała — przy bootstrapie pierwszego konta albo po
+// nieudanym deployu. CREATE TABLE IF NOT EXISTS wyżej nie ruszy tabeli, która
+// już istnieje, więc bez tego `passwd` próbowałby zapisać do nieistniejącej kolumny.
+const ensurePasswordParams = () => {
+  const columns = db.prepare(`PRAGMA table_info(Users)`).all().map((c) => c.name);
+  if (!columns.includes("passwordParams")) {
+    db.exec(`ALTER TABLE Users ADD COLUMN passwordParams TEXT NOT NULL DEFAULT '${PW.LEGACY_PARAMS}'`);
+    console.log(`Dodano kolumnę Users.passwordParams (domyślnie ${PW.LEGACY_PARAMS}).`);
+  }
+};
 
 const ROLES = ["user", "editor", "manager"];
 
@@ -399,18 +420,53 @@ switch (cmd) {
   case "passwd": {
     const u = findUser(selector);
     if (!extra) die("podaj nowe hasło.");
-    // Te same parametry co w services/password.js — inaczej logowanie nie zadziała.
-    // Ten skrypt jest CommonJS-em odpalanym ręcznie, więc nie zaimportuje tamtego
-    // modułu ESM i wariant `Sync` niczemu tu nie przeszkadza (żaden serwer nie czeka).
-    // Przy zmianie parametrów po TAMTEJ stronie trzeba poprawić i tutaj.
-    const passwordSalt = crypto.randomBytes(256).toString("hex");
-    const passwordHash = crypto.pbkdf2Sync(extra, passwordSalt, 2137, 256, "sha512").toString("hex");
-    db.prepare("UPDATE Users SET passwordHash = ?, passwordSalt = ? WHERE id = ?").run(
-      passwordHash,
-      passwordSalt,
-      u.id
+    // Ta sama reguła co w formularzach — inaczej ścieżka administracyjna omijałaby
+    // minimum nałożone na użytkowników.
+    if (extra.length < 10) die("hasło musi mieć co najmniej 10 znaków.");
+    ensurePasswordParams();
+    // Parametry z services/passwordParams.cjs, czyli z TEGO SAMEGO pliku, który
+    // czyta aplikacja — wcześniej były tu przepisane ręcznie. Wariant `Sync` jest
+    // tu w porządku: skrypt odpala się ręcznie i żaden serwer na niego nie czeka.
+    const passwordSalt = crypto.randomBytes(PW.SALT_BYTES).toString("hex");
+    const passwordHash = crypto
+      .pbkdf2Sync(extra, passwordSalt, PW.PBKDF2_ITERATIONS, PW.PBKDF2_KEYLEN, PW.PBKDF2_DIGEST)
+      .toString("hex");
+    db.prepare(
+      "UPDATE Users SET passwordHash = ?, passwordSalt = ?, passwordParams = ? WHERE id = ?"
+    ).run(passwordHash, passwordSalt, PW.CURRENT_PARAMS, u.id);
+    console.log(`Zmieniono hasło użytkownika #${u.id} <${u.email}> (${PW.CURRENT_PARAMS}).`);
+    break;
+  }
+
+  // Kto wciąż ma hasło policzone starymi parametrami.
+  //
+  // Konta przechodzą na nowe SAME, przy pierwszym udanym logowaniu (jedyny moment,
+  // w którym aplikacja widzi hasło jawne). Ta komenda odpowiada na pytanie, kogo
+  // to jeszcze nie dotyczy — czyli komu po dłuższym czasie warto wymusić zmianę.
+  case "passwd-audit": {
+    ensurePasswordParams();
+    const rows = db
+      .prepare(
+        `SELECT id, name, surname, email, section, role, isActive, passwordParams,
+                length(passwordSalt) AS saltHex
+           FROM Users
+          WHERE COALESCE(NULLIF(passwordParams, ''), ?) <> ?
+          ORDER BY isActive DESC, id`
+      )
+      .all(PW.LEGACY_PARAMS, PW.CURRENT_PARAMS);
+    const total = db.prepare("SELECT COUNT(*) AS n FROM Users").get().n;
+
+    console.log(`Bieżące parametry: ${PW.CURRENT_PARAMS}`);
+    if (rows.length === 0) {
+      console.log(`Wszystkie ${total} ${odmien(total, "konto", "konta", "kont")} na bieżących parametrach.`);
+      break;
+    }
+    console.log(`Na STARYCH parametrach: ${rows.length} z ${total}\n`);
+    rows.forEach((r) =>
+      console.log(`${fmt(r)}\n     ${r.passwordParams}  sól=${r.saltHex / 2}B`)
     );
-    console.log(`Zmieniono hasło użytkownika #${u.id} <${u.email}>.`);
+    console.log("\nKonto przechodzi na nowe parametry samo przy pierwszym udanym logowaniu.");
+    console.log("Wymuszenie: npm run admin -- passwd <email> <noweHaslo>");
     break;
   }
 

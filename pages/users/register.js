@@ -17,6 +17,10 @@ export const getServerSideProps = async () => ({
 // Kody błędów z API po ludzku; nieznany kod pokazujemy jak leci.
 const ERROR_MESSAGES = {
   email_taken: "Konto z tym adresem e-mail już istnieje.",
+  // Kody z Joi w services/createUser.js. Bez tych wpisów formularz wyświetliłby
+  // je dosłownie — patrz `|| body.error` niżej.
+  password_too_short: "Hasło musi mieć co najmniej 10 znaków.",
+  password_too_long: "Hasło jest za długie (maksymalnie 200 znaków).",
   unknown_section: "Wybrany dział nie istnieje. Odśwież stronę i spróbuj ponownie.",
 };
 
@@ -77,8 +81,15 @@ export default function CreateUser({ sections }) {
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Hasło" htmlFor="password">
-            <Input type="password" id="password" name="password" autoComplete="new-password" required />
+          <Field label="Hasło" htmlFor="password" hint="Co najmniej 10 znaków.">
+            <Input
+              type="password"
+              id="password"
+              name="password"
+              autoComplete="new-password"
+              minLength={10}
+              required
+            />
           </Field>
           <Field label="Powtórz hasło" htmlFor="passwordConfirm">
             <Input

@@ -23,7 +23,8 @@ zmiany widać od razu po odświeżeniu strony.
 | `npm run admin -- pending` | tylko konta czekające na aktywację |
 | `npm run admin -- activate <email\|id>` | aktywuje konto (dopiero wtedy można się zalogować) |
 | `npm run admin -- deactivate <email\|id>` | blokuje konto, nie kasując danych |
-| `npm run admin -- passwd <email\|id> <noweHaslo>` | ustawia nowe hasło |
+| `npm run admin -- passwd <email\|id> <noweHaslo>` | ustawia nowe hasło (min. 10 znaków) |
+| `npm run admin -- passwd-audit` | kto ma jeszcze hasło policzone starymi parametrami ([szczegóły](#hasła)) |
 | `npm run admin -- section <email\|id> <slug>` | przenosi pracownika do innej sekcji |
 | `npm run admin -- user-delete <email\|id>` | liczy wpisy konta; z `--force` kasuje je razem z kontem, z `--scal-z <email\|id>` przepina na inne konto ([szczegóły](#usuwanie-konta)) |
 
@@ -125,6 +126,20 @@ Produkcja stoi na **Mikrusie 2.1** (1 GB RAM, 10 GB dysku).
 Nowe tabele powstają same przy pierwszym starcie — nie ma osobnego kroku
 migracyjnego. Po zmianie ról pamiętaj, że **rola siedzi w JWT**: użytkownik musi
 się wylogować i zalogować, żeby zobaczyć nowe pozycje w menu.
+
+> **Uwaga przy wdrożeniu ze zmianą parametrów haseł** (sierpień 2026 i każde
+> kolejne podniesienie iteracji — patrz [Hasła](#hasła)). Migracja schematu jest
+> zgodna w obie strony: stary kod nowej kolumny nie zauważy. **Punkt bez powrotu
+> przychodzi z pierwszym udanym logowaniem** — od tej chwili istnieją hasła
+> policzone nowymi parametrami, których stary kod nie zweryfikuje. Dlatego przed
+> `pm2 restart` zrób kopię (`sqlite3 "$SQLITE_PATH" ".backup kopia.sqlite"`), a po
+> starcie sprawdź w logu wpis `[db] migracja: dodano Users.passwordParams`.
+> Cofnięcie wersji po tym momencie wymaga albo odtworzenia kopii, albo
+> `admin.js passwd` dla kont z `passwd-audit`.
+>
+> Migracja wykona się prawdopodobnie już przy `npm run build` — workery Next
+> otwierają bazę (patrz komentarz przy `globalForDb` w `services/db.js`). To jest
+> bezpieczne: `ALTER TABLE ADD COLUMN` nie przepisuje wierszy.
 
 ### pm2 — konfiguracja i logi
 
@@ -232,6 +247,61 @@ Typowy flow nowego pracownika: formularz `/users/register` → `pending` →
 /api/users` bez sesji odpowiada 401, bo inaczej dowolna osoba z internetu
 wsypywałaby wiersze do tabeli `Users` i listy „do aktywacji”. Konto pierwsze
 oraz konta zakładane hurtem robi się i tak z linii poleceń.
+
+### Hasła
+
+Hasła nie są przechowywane — w `Users` leżą wyłącznie `passwordHash`, `passwordSalt`
+i `passwordParams`. Hash liczy **PBKDF2-HMAC-SHA512**, parametry siedzą w JEDNYM
+pliku: `services/passwordParams.cjs`.
+
+| Kolumna | Co zawiera |
+|---|---|
+| `passwordHash` | wynik PBKDF2, hex (przy bieżących parametrach 128 znaków) |
+| `passwordSalt` | losowa sól, hex (bieżąco 32 znaki = 16 B), inna dla każdego zapisu hasła |
+| `passwordParams` | czym policzono hash W TYM wierszu, np. `pbkdf2-sha512:210000:64` |
+
+**Po co `passwordParams`.** Hash jest funkcją (hasło, sól, iteracje, długość,
+algorytm), więc zmiana któregokolwiek parametru unieważnia wszystkie istniejące
+hasła naraz. Zapisanie parametrów przy wierszu sprawia, że stare konta weryfikują
+się po staremu, a przechodzą na nowe **same, przy pierwszym udanym logowaniu** —
+to jedyny moment, w którym aplikacja widzi hasło jawne. Konta, które długo się nie
+logują, zostają na starych parametrach bezterminowo; pokazuje je `passwd-audit`.
+
+Wynika z tego reguła: **przy zmianie parametrów nie wolno nadpisać starej wartości
+`LEGACY_PARAMS`** w `services/passwordParams.cjs` — jest zamrożona, bo opisuje
+wiersze leżące w bazie, a nie ustawienie do strojenia.
+
+**Kalibracja.** Domyślne 210 000 iteracji to zalecenie OWASP, ale liczbę trzeba
+sprawdzić na docelowej maszynie — kryterium: jeden hash **do 200 ms**. Na Mikrusie:
+
+```bash
+node -e 'const c=require("crypto");
+  for (const n of [100000,150000,210000]) {
+    const t=process.hrtime.bigint();
+    c.pbkdf2Sync("test","0123456789abcdef",n,64,"sha512");
+    console.log(n, Number(process.hrtime.bigint()-t)/1e6|0, "ms");
+  }'
+```
+
+Powyżej 200 ms zejść do 120 000 (nadal ~14x więcej pracy niż przed sierpniem 2026).
+Wynik pomiaru wpisać w komentarz przy `PBKDF2_ITERATIONS`.
+
+**Minimalna długość hasła to 10 znaków** — przy zakładaniu konta, przy zmianie
+hasła i w `admin.js passwd`. Nie dotyczy haseł już istniejących: kto ma krótsze,
+zaloguje się nim i będzie mógł je zmienić.
+
+**Limit prób logowania** (`services/loginRateLimit.js`): 5 nieudanych prób na adres
+e-mail i 30 na adres IP w oknie 15 minut, potem 15 minut blokady. Licznik siedzi
+w pamięci procesu (pm2 chodzi w jednej instancji), więc restart go kasuje. Nieudane
+próby nie zaśmiecają logu — wpis pojawia się dopiero, gdy limiter zadziała:
+
+```bash
+pm2 logs Punktualnik | grep '\[login\]'
+```
+
+Ile kluczy limiter trzyma i ile jest zablokowanych, pokazuje `/api/health` w polu
+`login`. Adres e-mail nigdy nie trafia do logu — jest tam ośmioznakowy `emailTag`,
+który pozwala skorelować próby bez zapisywania adresu.
 
 ### Usuwanie konta
 

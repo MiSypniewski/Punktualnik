@@ -28,11 +28,16 @@ export default NextAuth({
         email: { label: "Email", type: "text", placeholder: "jsmith" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        // Add logic here to look up the user from the credentials supplied
+      async authorize(credentials, req) {
+        // Drugi argument to { query, body, headers, method } (next-auth 4.24,
+        // core/routes/callback.js). NIE MA tu gniazda, więc adres klienta da się
+        // wziąć wyłącznie z nagłówków — czyli jest podrabialny. Limiter po IP jest
+        // z tego powodu tylko warstwą dodatkową; obroną właściwą jest kubełek po
+        // adresie e-mail. Szczegóły w services/loginRateLimit.js.
         const user = await authorizeUser({
           email: credentials.email,
           password: credentials.password,
+          headers: req?.headers,
         });
 
         if (user) {

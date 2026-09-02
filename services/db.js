@@ -3,6 +3,10 @@ import fs from "fs";
 import Database from "better-sqlite3";
 import { installRuntimeGuards } from "./runtime";
 import { logInfo, logError } from "./log";
+// Parametry haseł czytamy WPROST z .cjs, a nie przez services/password.js —
+// db.js wchodzi do każdego bundla serwerowego i nie ma powodu ciągnąć za sobą
+// modułu liczącego PBKDF2 tylko po jedną stałą.
+import { LEGACY_PARAMS } from "./passwordParams.cjs";
 
 // Lokalna baza SQLite. Ścieżkę można nadpisać zmienną SQLITE_PATH
 // (przydatne na Mikrusie, np. na wolumenie trwałym poza katalogiem aplikacji).
@@ -225,6 +229,33 @@ const migrateUserResumeTiles = (db) => {
   }
 };
 
+/**
+ * Users dostaje passwordParams — zapis parametrów, którymi policzono hash w danym
+ * wierszu. Bez niej podniesienie iteracji PBKDF2 z 2137 na 210 000 unieważniłoby
+ * hasła wszystkich użytkowników w jednej chwili, bo weryfikacja liczyłaby hash
+ * innymi parametrami niż zapis.
+ *
+ * NOT NULL DEFAULT, a nie kolumna dopuszczająca NULL: SQLite wypełnia istniejące
+ * wiersze wartością domyślną w jednym kroku, więc po migracji KAŻDY wiersz opisuje
+ * sam siebie. Nikt czytający bazę z konsoli nie musi wiedzieć, że NULL coś znaczy.
+ *
+ * Wartość domyślna to opis stanu sprzed migracji — jest ZAMROŻONA i nie zmienia
+ * się razem z parametrami bieżącymi (services/passwordParams.cjs, LEGACY_PARAMS).
+ *
+ * Idempotentna i sterowana STANEM SCHEMATU, jak migracje wyżej.
+ */
+const migrateUserPasswordParams = (db) => {
+  const columns = db.prepare(`PRAGMA table_info(Users)`).all().map((c) => c.name);
+
+  if (!columns.includes("passwordParams")) {
+    // ALTER TABLE ADD COLUMN nie przepisuje wierszy — wartość domyślna jest
+    // doklejana przy odczycie, więc operacja jest natychmiastowa niezależnie od
+    // liczby kont.
+    db.exec(`ALTER TABLE Users ADD COLUMN passwordParams TEXT NOT NULL DEFAULT '${LEGACY_PARAMS}'`);
+    logInfo("db", "migracja: dodano Users.passwordParams", { default: LEGACY_PARAMS });
+  }
+};
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -269,7 +300,13 @@ const createDb = () => {
       -- magazyny dałoby panel z dwiema różnymi prawdami. Zerem sekcję się
       -- CHOWA, a nie kasuje — przypięcia zostają w ResumeTiles nietknięte.
       -- Zakresu pilnuje services/resumeTiles.js.
-      resumeTiles  INTEGER NOT NULL DEFAULT 6
+      resumeTiles  INTEGER NOT NULL DEFAULT 6,
+      -- Parametry, którymi policzono hash W TYM wierszu (np.
+      -- 'pbkdf2-sha512:210000:64'). Bez tej kolumny podniesienie kosztu PBKDF2
+      -- unieważniałoby WSZYSTKIE hasła naraz, bo hash jest funkcją także iteracji,
+      -- długości i algorytmu. Wartość domyślna opisuje stan sprzed sierpnia 2026
+      -- i jest zamrożona — patrz LEGACY_PARAMS w services/passwordParams.cjs.
+      passwordParams TEXT NOT NULL DEFAULT 'pbkdf2-sha512:2137:256'
     );
 
     -- Słownik sekcji (działów). Do sierpnia 2026 sekcja nie miała własnej tabeli
@@ -547,6 +584,7 @@ const createDb = () => {
   migrateEntryProjectOptional(db);
   migrateTimesAudit(db);
   migrateUserResumeTiles(db);
+  migrateUserPasswordParams(db);
 
   // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
   // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do
