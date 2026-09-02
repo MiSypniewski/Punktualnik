@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
-import { mutate } from "swr";
+import useSWR, { mutate } from "swr";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
 import dayjs from "dayjs";
@@ -32,10 +32,13 @@ import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
 import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
 import { groupEntries } from "../../utils/groupEntries";
-// Z utils/, nie z services/resumeTiles: te trzy rzeczy są potrzebne TAKŻE
+// Z utils/, nie z services/resumeTiles: te rzeczy są potrzebne TAKŻE
 // w przeglądarce (pole "ile kafelków", stan kłódki), a import z services
 // wciągnąłby do bundla klienta better-sqlite3 razem z `fs`.
-import { buildTiles, tileKey, MIN_TILES, MAX_TILES } from "../../utils/resumeTiles";
+import { buildTiles, tileKey, clampTileCount, MIN_TILES, MAX_TILES, TILES_OFF } from "../../utils/resumeTiles";
+// Ten sam klucz, fetcher i interwał co pasek stacyjny i tytuł karty — powód
+// przy TIMER_POLL_MS w utils/live.js.
+import { fetchLive, TIMER_POLL_MS } from "../../utils/live";
 
 dayjs.locale("pl");
 
@@ -180,6 +183,103 @@ const useGrouping = () => {
   return [grouped, choose];
 };
 
+// Jak długo po odświeżeniu strony nie odświeżamy jej znowu z samego powrotu
+// na kartę. Ten sam argument co przy focusThrottleInterval w pages/_app.js:
+// ktoś przeskakujący między zakładkami nie ma prawa generować renderów po
+// stronie serwera w tempie kliknięć. Rozjazd biegnącego timera (niżej) tego
+// progu NIE dotyczy — tam odświeżamy natychmiast, bo ekran kłamie.
+const RETURN_REFRESH_MS = 60_000;
+
+/**
+ * Pilnuje, żeby propsy tej strony nie kłamały po powrocie do aplikacji.
+ *
+ * Problem bierze się stąd, że strona ma DWA źródła prawdy o biegnącym timerze
+ * i tylko jedno z nich samo się odświeża:
+ *
+ *  - pasek "W toku" (components/runningStrip.js) jedzie na SWR, więc powrót do
+ *    aplikacji dociąga mu świeży stan,
+ *  - sekcja "Pracujesz nad" jedzie na propsach z getServerSideProps, a te
+ *    odświeża wyłącznie akcja wykonana NA TEJ karcie.
+ *
+ * Objaw z produkcji: timer wystartowany na telefonie i podmieniony przy
+ * komputerze zostawiał na telefonie pasek z NOWYM zadaniem i sekcję ze STARYM,
+ * odliczającą czas wpisu, którego już nie ma (licznik tyka lokalnie od
+ * running.startedAt, więc nie miał jak się o tym dowiedzieć).
+ *
+ * Detektorem jest `id` biegnącego wpisu — jedyna rzecz, którą znają obie strony
+ * (odpowiedź /api/entries/timer nie ma ani wersji, ani ETagu). Klucz SWR jest
+ * ten sam co w pasku, więc TO NIE JEST dodatkowe zapytanie: dedupingInterval
+ * z pages/_app.js zlewa je w jedno.
+ *
+ * @param {number|null} propsID id biegnącego wpisu z propsów (null = nie ma)
+ * @param {boolean} busy trwa własne żądanie tej karty
+ * @param {() => Promise<*>} refresh dociągnięcie propsów (router.replace)
+ */
+const useFreshProps = (propsID, busy, refresh) => {
+  const { data: live } = useSWR("/api/entries/timer", fetchLive, {
+    refreshInterval: TIMER_POLL_MS,
+  });
+  const liveID = live?.running?.id ?? null;
+
+  // Znacznik ostatniego odświeżenia trzymany RAZEM przez obie ścieżki: powrót
+  // na kartę potrafi zbiec się z wykryciem rozjazdu i bez wspólnego licznika
+  // strona odświeżyłaby się dwa razy pod rząd.
+  //
+  // Startuje od chwili zamontowania, a nie od zera: wejście na stronę to też
+  // świeże propsy, więc przełączenie karty tam i z powrotem tuż po nim nie ma
+  // czego odświeżać. (Ref nic nie renderuje, więc Date.now() nie rozjedzie
+  // renderu serwera z pierwszym renderem klienta.)
+  const refreshedAt = useRef(Date.now());
+  const run = useCallback(() => {
+    refreshedAt.current = Date.now();
+    refresh();
+  }, [refresh]);
+
+  // 1. Rozjazd z serwerem. Porównanie obejmuje też null: zatrzymanie timera przy
+  //    komputerze ma zdjąć sekcję "Pracujesz nad" z telefonu, nie tylko podmienić
+  //    jej treść.
+  const asked = useRef(propsID);
+  useEffect(() => {
+    if (live === undefined) return; // jeszcze nic nie wiemy
+    // W trakcie własnej akcji propsy i tak przyjadą z call() — a w połowie
+    // Start/Stop obie wartości są chwilowo różne bez niczyjej winy.
+    if (busy) return;
+    if (liveID === propsID) {
+      asked.current = propsID;
+      return;
+    }
+    // O ten konkretny stan już prosiliśmy. Bez tego nieudany albo powolny
+    // router.replace zamieniłby się w pętlę żądań.
+    if (asked.current === liveID) return;
+    asked.current = liveID;
+    run();
+  }, [live, liveID, propsID, busy, run]);
+
+  // 2. Powrót do aplikacji odświeża CAŁĄ stronę, nie tylko timer: wpis dopisany
+  //    ręcznie przy komputerze nie zmienia biegnącego id, więc pierwsza ścieżka
+  //    go nie zauważy, a lista dni jest równie stara.
+  //
+  //    `pageshow` z `persisted` obok visibilitychange — na iPhonie aplikacja
+  //    wznowiona z ekranu głównego bywa przywracana z bfcache i wtedy
+  //    visibilitychange potrafi nie paść.
+  useEffect(() => {
+    const back = () => {
+      if (busy) return;
+      if (Date.now() - refreshedAt.current < RETURN_REFRESH_MS) return;
+      run();
+    };
+    const onVisibility = () => document.visibilityState === "visible" && back();
+    const onPageShow = (e) => e.persisted && back();
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [busy, run]);
+};
+
 /**
  * Etykieta dnia: "dziś", "wczoraj", inaczej data słownie.
  *
@@ -208,12 +308,21 @@ export default function Zadania({
   editAnyDay,
 }) {
   const router = useRouter();
-  const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
+  // useCallback, bo useFreshProps trzyma to w zależnościach efektów — funkcja
+  // tworzona na nowo przy każdym renderze przepinałaby nasłuchy bez powodu.
+  const refresh = useCallback(
+    () => router.replace(router.asPath, undefined, { scroll: false }),
+    [router]
+  );
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [grouped, setGrouped] = useGrouping();
+
+  // Sekcja "Pracujesz nad" i lista dni jadą na propsach, więc bez tego zostają
+  // takie, jak w chwili wejścia na stronę — patrz komentarz przy useFreshProps.
+  useFreshProps(running?.id ?? null, busy, refresh);
 
   /** @returns {object|false} odpowiedź serwera albo false, gdy żądanie się nie udało */
   const call = async (url, options) => {
@@ -230,13 +339,17 @@ export default function Zadania({
         setErr(errorText(body, "Nie udało się zapisać."));
         return false;
       }
-      await refresh();
       // Timer w pasku karty (components/timerTitle.js) ma zareagować na Start,
       // Stop i przełączenie zadania od razu, a nie po cyklu pollingu. Świadomie
       // NIE robimy tego w autosave opisu — poprawka napisu w tytule może poczekać
       // do najbliższego odświeżenia, a mutate na każdą pauzę w pisaniu mnożyłoby
       // żądania.
-      mutate("/api/entries/timer");
+      //
+      // PRZED refresh(), a nie po: useFreshProps porównuje ten stan z propsami,
+      // więc odwrotna kolejność zostawiałaby chwilę, w której propsy są już nowe,
+      // a SWR jeszcze stare — czyli pozorny rozjazd i drugie, zbędne żądanie SSR.
+      await mutate("/api/entries/timer");
+      await refresh();
       return body;
     } finally {
       setBusy(false);
@@ -812,6 +925,12 @@ const DescriptionOptions = ({ descByProject }) => (
 const Resume = ({ tiles, prefs, projects, descByProject, running, busy, onResume, onSaveTiles }) => {
   const [editing, setEditing] = useState(false);
 
+  // Kafelki wyłączone (liczba miejsc = 0). Warunek stoi na USTAWIENIU, a nie na
+  // pustej liście: brak kafelków przy sześciu miejscach znaczy "nie ma czego
+  // wznawiać" i dalej ma pokazywać EmptyState — to dwa różne stany i dwa różne
+  // komunikaty.
+  const off = prefs.count === TILES_OFF;
+
   const pinned = useMemo(
     () => new Set(prefs.pins.map((p) => tileKey(p.projectID, p.description))),
     [prefs.pins]
@@ -831,14 +950,29 @@ const Resume = ({ tiles, prefs, projects, descByProject, running, busy, onResume
   };
 
   return (
-    <div className="mt-8">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+    // Ciaśniej, gdy kafelków nie ma: odstęp `mt-8` oddziela od paska timera
+    // SEKCJĘ, a sam przycisk ustawień sekcją nie jest.
+    <div className={off ? "mt-3" : "mt-8"}>
+      {/* Przy wyłączonych kafelkach zostaje SAM przycisk ustawień — dosunięty do
+          prawej, bez nagłówka, bez siatki i bez pustego stanu. Zostać musi:
+          inaczej wpisanie zera byłoby ustawieniem nieodwracalnym z poziomu
+          interfejsu, bo panel jest jedynym miejscem, z którego da się je cofnąć.
+          Ten sam powód, dla którego sekcja renderuje się także wtedy, gdy nie ma
+          ani jednego kafelka do pokazania. */}
+      <div
+        className={classNames(
+          "flex flex-wrap items-baseline justify-between gap-2",
+          off && !editing ? "mb-0" : "mb-2"
+        )}
+      >
         {/* Nagłówek mówi, co kliknięcie ZROBI: przy biegnącym timerze zamknie
             bieżące zadanie, więc "Wznów" byłoby wtedy niepełną prawdą. */}
-        <h2 className="text-xs font-bold uppercase tracking-signage text-muted">
-          {running ? "Przełącz na" : "Wznów"}
-        </h2>
-        <Button variant="ghost" size="sm" onClick={() => setEditing(!editing)}>
+        {!off && (
+          <h2 className="text-xs font-bold uppercase tracking-signage text-muted">
+            {running ? "Przełącz na" : "Wznów"}
+          </h2>
+        )}
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setEditing(!editing)}>
           {editing ? "Zwiń ustawienia" : "Ustaw kafelki"}
         </Button>
       </div>
@@ -858,7 +992,7 @@ const Resume = ({ tiles, prefs, projects, descByProject, running, busy, onResume
         />
       )}
 
-      {tiles.length === 0 ? (
+      {off ? null : tiles.length === 0 ? (
         <EmptyState
           title="Nie ma czego wznawiać"
           description="Kafelki robią się same z twojej historii — po kilku zamkniętych zadaniach pojawią się tutaj. Możesz też przypiąć własny kafelek w ustawieniach powyżej."
@@ -956,6 +1090,17 @@ const Tile = ({ tile, running, busy, onResume, onTogglePin }) => {
   );
 };
 
+// "1 przypięty", "2 przypięte", "5 przypiętych" — licznik czytany jest jako
+// zdanie, a nie jako komórka tabeli, więc musi się odmieniać. Poza tym miejscem
+// aplikacja liczb nie odmienia: wszędzie indziej stoją przy rzeczowniku, który
+// odmiany nie potrzebuje ("6 miejsc", "0h 50min").
+const pinnedLabel = (n) => {
+  if (n === 1) return "1 przypięty";
+  const teens = n % 100 >= 12 && n % 100 <= 14;
+  const few = !teens && n % 10 >= 2 && n % 10 <= 4;
+  return `${n} ${few ? "przypięte" : "przypiętych"}`;
+};
+
 /**
  * Panel ustawień kafelków: liczba miejsc i lista przypięć.
  *
@@ -996,10 +1141,21 @@ const TileSettings = ({ prefs, projects, descByProject, busy, onSave, onClose })
     setPins(next);
   };
 
+  // Liczba miejsc pilnowana też tutaj, bo pole liczbowe z min=0 przepuszcza
+  // 1, 2 i 3 — wartości, których serwer nie przyjmie (bad_count). clampTileCount
+  // podciąga je do MIN_TILES, więc zamiast odmowy pracownik dostaje najbliższe
+  // sensowne ustawienie. Zero przechodzi nietknięte: to nie pomyłka, tylko
+  // "schowaj kafelki".
+  // Puste pole to nie jest zero: tak wygląda chwila między skasowaniem starej
+  // liczby a wpisaniem nowej. Etykiety pokazują wtedy stan zapisany, a wysłania
+  // i tak pilnuje `required` na polu.
+  const slots = String(count).trim() === "" ? prefs.count : clampTileCount(count);
+  const off = slots === TILES_OFF;
+
   const submit = (e) => {
     e.preventDefault();
     onSave({
-      count: Number(count),
+      count: slots,
       pins: pins.map((pin) => ({ projectID: Number(pin.projectID), description: pin.description })),
     });
   };
@@ -1009,13 +1165,13 @@ const TileSettings = ({ prefs, projects, descByProject, busy, onSave, onClose })
       <Field
         label="Ile kafelków"
         htmlFor="tiles-count"
-        hint={`Od ${MIN_TILES} do ${MAX_TILES}. Na telefonie każdy kafelek zajmuje osobny rząd.`}
+        hint={`0 chowa kafelki całkiem — przypięcia zostają zapisane i wrócą, gdy znów wpiszesz liczbę. Poza tym od ${MIN_TILES} do ${MAX_TILES}; na telefonie każdy kafelek zajmuje osobny rząd.`}
         className="max-w-sm"
       >
         <Input
           id="tiles-count"
           type="number"
-          min={MIN_TILES}
+          min={TILES_OFF}
           max={MAX_TILES}
           step={1}
           required
@@ -1091,9 +1247,12 @@ const TileSettings = ({ prefs, projects, descByProject, busy, onSave, onClose })
         <Button
           variant="secondary"
           size="sm"
-          disabled={pins.length >= Number(count) || projects.length === 0}
+          // Przy zerze limit miejsc nie obowiązuje — tak samo jak na serwerze
+          // (saveTilePrefs). Kafelki są wtedy schowane, więc nie ma czego
+          // przepełnić, a przypiąć parę "na zapas" wolno.
+          disabled={(!off && pins.length >= slots) || projects.length === 0}
           title={
-            pins.length >= Number(count)
+            !off && pins.length >= slots
               ? "Wszystkie miejsca są zajęte — zwiększ liczbę kafelków albo odepnij któryś."
               : undefined
           }
@@ -1102,7 +1261,7 @@ const TileSettings = ({ prefs, projects, descByProject, busy, onSave, onClose })
           + Przypnij kafelek
         </Button>
         <span className="text-sm text-muted">
-          {pins.length} z {count} miejsc
+          {off ? `${pinnedLabel(pins.length)} · kafelki ukryte` : `${pins.length} z ${slots} miejsc`}
         </span>
         <span className="flex gap-2 ml-auto">
           <Button type="submit" size="sm" disabled={busy}>

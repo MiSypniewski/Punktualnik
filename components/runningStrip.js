@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import LiveDot from "./liveDot";
 import { formatClock } from "../utils";
+import { fetchLive, TIMER_POLL_MS } from "../utils/live";
 
 // Druga linia paska stacyjnego: biegnące zadanie widoczne z KAŻDEJ strony.
 //
@@ -10,21 +11,12 @@ import { formatClock } from "../utils";
 // (components/timerTitle.js) — czyli widziało go się tylko wtedy, gdy patrzyło
 // się na inną zakładkę. Tu jest ten sam stan, ale na stronie.
 //
-// Klucz SWR jest CELOWO ten sam co w timerTitle.js: SWR dedupikuje po kluczu,
-// więc dwa komponenty to dalej jedno zapytanie na cykl, nie dwa.
-const POLL_MS = 60_000;
-
-// Świadomie nie jsonFetcher z utils/ — tamten nie sprawdza res.ok, więc 401 po
-// wygaśnięciu sesji wróciłby jako poprawne dane i pasek zgasłby tak samo jak
-// przy zatrzymanym timerze.
-const fetchTimer = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
+// Klucz SWR jest CELOWO ten sam co w timerTitle.js i na stronie /zadania: SWR
+// dedupikuje po kluczu, więc trzy miejsca to dalej jedno zapytanie na cykl.
+// Fetcher i interwał są wspólne (utils/live.js) właśnie dlatego, że dzielą klucz.
 
 export default function RunningStrip() {
-  const { data } = useSWR("/api/entries/timer", fetchTimer, { refreshInterval: POLL_MS });
+  const { data } = useSWR("/api/entries/timer", fetchLive, { refreshInterval: TIMER_POLL_MS });
   const running = data?.running ?? null;
 
   // Sekundy dorobione lokalnie od chwili odbioru danych, liczone RÓŻNICOWO,

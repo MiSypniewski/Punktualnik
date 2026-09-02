@@ -1,6 +1,6 @@
 import Joi from "joi";
 import db from "./db";
-import { MIN_TILES, MAX_TILES, DEFAULT_TILES, clampTileCount, tileKey } from "../utils/resumeTiles";
+import { MIN_TILES, MAX_TILES, TILES_OFF, DEFAULT_TILES, clampTileCount, tileKey } from "../utils/resumeTiles";
 
 // Kafelki "Wznów" pod paskiem timera na /zadania — ich LICZBA i PRZYPIĘCIA.
 //
@@ -8,7 +8,7 @@ import { MIN_TILES, MAX_TILES, DEFAULT_TILES, clampTileCount, tileKey } from "..
 // para projekt + opis wyliczona z własnej historii, sortowana po liczbie użyć.
 // Ten moduł dokłada do tego dwie rzeczy, których z historii wyliczyć się nie da:
 //
-//  - ile kafelków w ogóle pokazać (6..18, Users.resumeTiles),
+//  - ile kafelków w ogóle pokazać (0 = wcale, poza tym 4..20 — Users.resumeTiles),
 //  - które pary mają stać NA STAŁE, niezależnie od tego, co robiono w tym
 //    tygodniu (tabela ResumeTiles).
 //
@@ -66,13 +66,19 @@ const fail = (code, message) => {
   throw err;
 };
 
-// Opis WYMAGANY i ucięty do 200 znaków — te same granice co descRequiredSchema
-// w services/taskEntries.js. Kafelek startuje wpis, więc nie wolno mu pozwolić
-// zapisać czegoś, czego wpis by nie przyjął.
+const COUNT_MESSAGE = `Kafelków może być 0 (wtedy sekcja jest ukryta) albo od ${MIN_TILES} do ${MAX_TILES}.`;
+
+// Opis przypięcia WYMAGANY i ucięty do 200 znaków — te same granice co
+// descRequiredSchema w services/taskEntries.js. Kafelek startuje wpis, więc nie
+// wolno mu pozwolić zapisać czegoś, czego wpis by nie przyjął.
 const schema = Joi.object({
-  count: Joi.number().integer().min(MIN_TILES).max(MAX_TILES).required().messages({
-    "number.min": `Kafelków może być od ${MIN_TILES} do ${MAX_TILES}.`,
-    "number.max": `Kafelków może być od ${MIN_TILES} do ${MAX_TILES}.`,
+  // Dolna granica schematu to TILES_OFF, nie MIN_TILES — dziurę 1..MIN_TILES-1
+  // domyka jawny warunek w saveTilePrefs. Joi umie to zapisać alternatywami,
+  // ale wtedy odmowa wraca jako "nie pasuje do żadnego z wariantów" i nie da się
+  // jej pokazać człowiekowi.
+  count: Joi.number().integer().min(TILES_OFF).max(MAX_TILES).required().messages({
+    "number.min": COUNT_MESSAGE,
+    "number.max": COUNT_MESSAGE,
   }),
   pins: Joi.array()
     .items(
@@ -103,10 +109,18 @@ const schema = Joi.object({
 export const saveTilePrefs = (userID, payload) => {
   const { count, pins } = Joi.attempt(payload ?? {}, schema);
 
+  if (count !== TILES_OFF && count < MIN_TILES) {
+    fail("bad_count", COUNT_MESSAGE);
+  }
+
   // Więcej przypięć niż slotów to nie jest stan do cichego ucięcia: ucięty
   // kafelek zniknąłby bez śladu, a pracownik dowiedziałby się o tym dopiero
   // wtedy, gdy zacznie go szukać.
-  if (pins.length > count) {
+  //
+  // Przy zerze ta reguła NIE obowiązuje — i to jest sedno wyłączania kafelków.
+  // Gdyby obowiązywała, ukrycie sekcji wymagałoby najpierw odpięcia wszystkiego,
+  // czyli skasowania ustawień, których pracownik nie chce stracić, tylko schować.
+  if (count !== TILES_OFF && pins.length > count) {
     fail(
       "too_many_pins",
       `Przypiętych kafelków (${pins.length}) jest więcej niż miejsc (${count}). Odepnij któryś albo zwiększ liczbę kafelków.`

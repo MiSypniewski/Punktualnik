@@ -20,6 +20,21 @@
 export const LIVE_POLL_MS = 45_000;
 
 /**
+ * Co ile odpytujemy WŁASNY biegnący timer (/api/entries/timer).
+ *
+ * Osobna stała od LIVE_POLL_MS, choć liczby są tego samego rzędu: tamta rządzi
+ * tablicami sekcyjnymi (kiosk, "Teraz w toku"), a ta jedną wartością, którą
+ * czytają trzy miejsca naraz — tytuł karty (components/timerTitle.js), pasek
+ * stacyjny (components/runningStrip.js) i strona /zadania, która tym samym
+ * zapytaniem sprawdza, czy jej propsy nie są przeterminowane.
+ *
+ * Klucz SWR jest we wszystkich trzech ten sam, a dedupingInterval z
+ * pages/_app.js zlewa je w JEDNO zapytanie na cykl — dlatego rozjazd wartości
+ * między tymi plikami byłby błędem i stała jest tu, a nie przy komponentach.
+ */
+export const TIMER_POLL_MS = 60_000;
+
+/**
  * Fetcher dla SWR, który traktuje odpowiedź 4xx/5xx jako BŁĄD.
  *
  * Świadomie nie używamy jsonFetcher z utils/index.js — tamten nie sprawdza
