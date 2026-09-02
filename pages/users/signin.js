@@ -17,6 +17,20 @@ const ERROR_MESSAGES = {
   // Rzucane przez services/authorizeUser.js, gdy nie udało się odczytać konta
   // z bazy. Hasło użytkownika może być poprawne — problem jest po naszej stronie.
   server_error: "Serwer chwilowo nie odpowiada. Odczekaj chwilę i spróbuj ponownie.",
+  // Rzucane przez services/loginRateLimit.js po serii nieudanych prób.
+  //
+  // Komunikat jest ODRĘBNY świadomie i NIE jest wyrocznią enumeracyjną — pod
+  // jednym warunkiem, który musi zostać spełniony w limiterze: porażki dla
+  // adresów NIEISTNIEJĄCYCH lądują w tym samym kubełku co dla istniejących.
+  // Wtedy to zdanie mówi wyłącznie "ten adres był ostatnio wielokrotnie
+  // próbowany", czyli powtarza atakującemu jego własne działanie. Gdyby ktoś
+  // kiedyś przestał liczyć te porażki, komunikat natychmiast zacznie zdradzać,
+  // które konta istnieją.
+  //
+  // Za odrębnym zdaniem przemawia koszt obsługi: bez niego pracownik, który
+  // pomylił hasło pięć razy, przez kwadrans widzi "niepoprawny e-mail lub hasło"
+  // mimo wpisywania poprawnego — i dzwoni do kierownika, że aplikacja jest zepsuta.
+  too_many_attempts: "Za dużo nieudanych prób logowania. Odczekaj 15 minut i spróbuj ponownie.",
   // Configuration to najczęściej rozjechany NEXTAUTH_URL albo brak NEXTAUTH_SECRET
   // na serwerze — użytkownik nie ma jak tego naprawić, ale musi wiedzieć, że to
   // nie jego wina i że warto to komuś zgłosić.

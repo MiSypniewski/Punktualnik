@@ -1,6 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import db from "../../services/db";
 import { maxEventLoopLag } from "../../services/runtime";
+import { loginLimiterStats } from "../../services/loginRateLimit";
 
 // Stan procesu — do zajrzenia, gdy ktoś zgłasza, że "aplikacja muli".
 //
@@ -46,5 +47,9 @@ export default async (req, res) => {
     eventLoop: { maxLagMs: maxEventLoopLag() },
     // Ile trwało pojedyncze zapytanie do bazy w chwili sprawdzenia.
     db: { probeMs: dbProbeMs, runningEntries: running },
+    // Limiter logowania: ile kluczy trzyma w pamięci i ile z nich jest aktualnie
+    // zablokowanych. `emails`/`ips` mają po kwadransie ciszy SPADAĆ — inaczej
+    // przemiatanie map przestało działać i rosną w kontenerze bez swapu.
+    login: loginLimiterStats(),
   });
 };

@@ -46,6 +46,9 @@ export const getServerSideProps = async (context) => {
 // Kody błędów z API po ludzku; nieznany kod pokazujemy jak leci.
 const ERROR_MESSAGES = {
   wrong_old_password: "Stare hasło się nie zgadza.",
+  // Kody z Joi w services/updateUserPassowrd.js — dotyczą wyłącznie NOWEGO hasła.
+  password_too_short: "Nowe hasło musi mieć co najmniej 10 znaków.",
+  password_too_long: "Nowe hasło jest za długie (maksymalnie 200 znaków).",
   user_not_found: "Nie znaleziono konta. Zaloguj się ponownie.",
 };
 
@@ -132,8 +135,19 @@ export default function UserData({ userData, id }) {
             required
           />
         </Field>
-        <Field label="Nowe hasło" htmlFor="newPassword">
-          <Input type="password" id="newPassword" name="newPassword" autoComplete="new-password" required />
+        {/* minLength tylko tutaj. Na polu "Stare hasło" byłoby błędem: konta sprzed
+            wprowadzenia minimum mają hasła krótsze niż 10 znaków, a przeglądarka
+            nie pozwoliłaby ich wpisać — czyli odebrałaby tym osobom jedyną drogę
+            do ustawienia dłuższego. */}
+        <Field label="Nowe hasło" htmlFor="newPassword" hint="Co najmniej 10 znaków.">
+          <Input
+            type="password"
+            id="newPassword"
+            name="newPassword"
+            autoComplete="new-password"
+            minLength={10}
+            required
+          />
         </Field>
         <Field label="Potwierdź nowe hasło" htmlFor="passwordConfirm">
           <Input

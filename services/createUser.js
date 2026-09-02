@@ -1,7 +1,7 @@
 import db from "./db";
 import Joi from "joi";
 import { getSection } from "./sections";
-import { hashPassword, makeSalt } from "./password";
+import { makePasswordRecord } from "./password";
 
 const schema = Joi.object({
   email: Joi.string().email().required(),
@@ -9,13 +9,26 @@ const schema = Joi.object({
   surname: Joi.string().required(),
   section: Joi.string().required(),
   location: Joi.string().required(),
-  password: Joi.string().required(),
+  // Do sierpnia 2026 nie było tu ŻADNEGO minimum — przechodziło hasło "1".
+  // Żaden algorytm hashujący tego nie naprawi, więc długość jest tu ważniejsza
+  // niż liczba iteracji PBKDF2. Bez wymogów na klasy znaków: przy wymuszonej
+  // długości produkują głównie "Haslo123!" i karteczki pod klawiaturą.
+  //
+  // Komunikat to KOD, nie zdanie — składa je strona (pages/users/register.js),
+  // tak samo jak przy email_taken. Bez tego użytkownik zobaczyłby angielski
+  // tekst Joi, bo formularz wyświetla nieznany kod dosłownie.
+  password: Joi.string().min(10).max(200).required().messages({
+    "string.min": "password_too_short",
+    "string.max": "password_too_long",
+  }),
 });
 
 const findByEmail = db.prepare(`SELECT id FROM Users WHERE email = ?`);
 const insertUser = db.prepare(
-  `INSERT INTO Users (name, surname, section, location, email, passwordHash, passwordSalt, role, isActive)
-   VALUES (@name, @surname, @section, @location, @email, @passwordHash, @passwordSalt, 'user', 0)`
+  `INSERT INTO Users (name, surname, section, location, email,
+                      passwordHash, passwordSalt, passwordParams, role, isActive)
+   VALUES (@name, @surname, @section, @location, @email,
+           @passwordHash, @passwordSalt, @passwordParams, 'user', 0)`
 );
 
 const checkEmail = (email) => {
@@ -43,8 +56,10 @@ const createUser = async (payload) => {
   }
   const sectionSlug = found.slug;
 
-  const passwordSalt = makeSalt();
-  const passwordHash = await hashPassword(password, passwordSalt);
+  // Komplet hash + sól + parametry z jednego wywołania. Składanie tego ręcznie
+  // pozwalałoby zapisać hash BEZ parametrów, czyli wiersz, którego po następnej
+  // zmianie parametrów nie dałoby się już zweryfikować.
+  const record = await makePasswordRecord(password);
 
   const info = insertUser.run({
     name,
@@ -52,8 +67,7 @@ const createUser = async (payload) => {
     section: sectionSlug,
     location,
     email,
-    passwordHash,
-    passwordSalt,
+    ...record,
   });
 
   return {
