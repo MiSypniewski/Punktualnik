@@ -271,8 +271,23 @@ Wynika z tego reguła: **przy zmianie parametrów nie wolno nadpisać starej war
 `LEGACY_PARAMS`** w `services/passwordParams.cjs` — jest zamrożona, bo opisuje
 wiersze leżące w bazie, a nie ustawienie do strojenia.
 
-**Kalibracja.** Domyślne 210 000 iteracji to zalecenie OWASP, ale liczbę trzeba
-sprawdzić na docelowej maszynie — kryterium: jeden hash **do 200 ms**. Na Mikrusie:
+**Kalibracja.** Liczba iteracji jest dobrana do maszyny, kryterium: jeden hash
+**do 200 ms**. Zmierzone na Mikrusie 02.09.2026:
+
+| iteracje | czas |
+|---|---|
+| 100 000 | 64 ms |
+| 120 000 | **~110 ms — wartość używana** |
+| 150 000 | 140 ms |
+| 210 000 | 286 ms (zalecenie OWASP, nie mieści się na tym CPU) |
+
+Koszt jednostkowy rośnie z długością liczenia (0,64 → 0,93 → 1,36 ms na 1000
+iteracji), choć PBKDF2 jest liniowe — współdzielony vCPU jest dławiony tym
+mocniej, im dłużej pracuje. Pomiar pojedynczego hasha na spokojnej maszynie
+**zaniża** więc koszt przy porannym gwałcie logowań; przy podnoszeniu tej liczby
+mierz pod obciążeniem (`scripts/loadtest.js`), nie w izolacji.
+
+Powtórzenie pomiaru:
 
 ```bash
 node -e 'const c=require("crypto");
@@ -283,8 +298,11 @@ node -e 'const c=require("crypto");
   }'
 ```
 
-Powyżej 200 ms zejść do 120 000 (nadal ~14x więcej pracy niż przed sierpniem 2026).
-Wynik pomiaru wpisać w komentarz przy `PBKDF2_ITERATIONS`.
+Wynik wpisać w komentarz przy `PBKDF2_ITERATIONS` w `services/passwordParams.cjs`
+— razem z datą, żeby następna osoba nie zgadywała, skąd ta liczba. Podnosząc
+iteracje, podnieś też `FAILURE_FLOOR_MS` w `services/authorizeUser.js`: podłoga
+czasowa maskuje różnicę między nieznanym adresem a złym hasłem tylko dopóki jest
+dłuższa niż jeden hash.
 
 **Minimalna długość hasła to 10 znaków** — przy zakładaniu konta, przy zmianie
 hasła i w `admin.js passwd`. Nie dotyczy haseł już istniejących: kto ma krótsze,
