@@ -886,7 +886,7 @@ rutyna wypada wyżej niż coś zrobionego raz.
 
 **Kafelki „Wznów” pracownik ustawia sobie sam.** Domyślnie jest ich sześć, ale
 w panelu „Ustaw kafelki” (przy nagłówku, nad samymi kafelkami) da się wybrać
-dowolną liczbę **od 6 do 18** — a niektóre z nich **przypiąć**. Kafelek przypięty
+dowolną liczbę **od 4 do 20** — a niektóre z nich **przypiąć**. Kafelek przypięty
 stoi zawsze na początku, w kolejności ustawionej strzałkami, i nie znika, choćby
 tego zadania nie było w historii ani razu: opis i projekt wpisuje się ręcznie,
 więc da się przypiąć czynność, którą się dopiero zaczyna robić. Pozostałe miejsca
@@ -894,6 +894,19 @@ dopełniają podpowiedzi z historii, z pominięciem par już przypiętych — be
 ten sam kafelek stałby na liście dwa razy. Kłódka na kafelku przypina i odpina
 jednym kliknięciem; panel jest do porządkowania kolejności i do par, których
 w historii nie ma.
+
+**Kafelków można też nie chcieć w ogóle — wtedy wpisuje się `0`.** Sekcja znika
+w całości: nie ma nagłówka, siatki ani pustego stanu, zostaje sam przycisk „Ustaw
+kafelki”, bo bez niego ustawienia nie dałoby się cofnąć. Zero jest WARTOŚCIĄ tego
+samego pola, a nie osobnym przełącznikiem obok: kafelki są jednym ustawieniem —
+ile ich i które przypięte — a drugi magazyn na „czy w ogóle” dawałby panel
+z dwiema prawdami do pogodzenia. **Wyłączenie niczego nie kasuje**: przypięcia
+zostają w bazie i wracają w tej samej kolejności, gdy ktoś wpisze z powrotem
+liczbę. Dlatego przy zerze nie obowiązuje reguła „nie więcej przypięć niż miejsc”
+— inaczej schowanie sekcji wymagałoby najpierw odpięcia wszystkiego, czyli
+skasowania dokładnie tego, czego pracownik nie chce stracić, tylko schować.
+Powstało to z obserwacji, że jedna osoba trzyma tam swoje skróty, a druga nie
+chce ich widzieć wcale.
 
 Ustawienia siedzą **w bazie, nie w przeglądarce** (`Users.resumeTiles` na liczbę,
 tabela `ResumeTiles` na przypięcia) — inaczej niż przełącznik „Grupuj takie same
@@ -903,8 +916,9 @@ telefon i przeżyć wyczyszczenie przeglądarki. Przy okazji serwer zna ją w ch
 renderu, więc nie ma mrugnięcia po hydratacji.
 
 Reguł pilnuje serwer (`services/resumeTiles.js` i `pages/api/entries/tiles.js`),
-nie tylko formularz: liczba poza zakresem 6–18 to `422`, więcej przypięć niż
-miejsc — `422 too_many_pins`, ta sama para projekt + opis dwa razy (bez względu
+nie tylko formularz: liczba spoza zakresu (dozwolone jest `0` albo 4–20) to
+`422 bad_count`, więcej przypięć niż miejsc (przy zerze reguła nie obowiązuje)
+— `422 too_many_pins`, ta sama para projekt + opis dwa razy (bez względu
 na wielkość liter i spacje) — `422 duplicate_pin`, a projekt spoza swojej sekcji
 — `403 project_out_of_scope`. Cały panel zapisuje się JEDNYM żądaniem `PUT`,
 które podmienia komplet ustawień; pozycje w tabeli są gęste (0, 1, 2…) i
@@ -922,7 +936,7 @@ więc nie ma czego tłumaczyć.
 Na **telefonie kafelek zajmuje całą szerokość ekranu**; od `sm` w górę kafelki
 układają się w siatkę (2, 3 i 4 kolumny) o równych szerokościach. Wcześniej był
 to `flex-wrap`, w którym każdy kafelek miał szerokość swojego napisu, przez co
-rzędy się strzępiły — przy osiemnastu kafelkach byłoby to nie do czytania.
+rzędy się strzępiły — przy dwudziestu kafelkach byłoby to nie do czytania.
 
 **Opis zadania zawija się na dwie linie**, nadmiar ucina wielokropek (pełna treść
 zostaje w dymku i w panelu ustawień), a **nazwa projektu ma własną linię i nie
@@ -992,6 +1006,22 @@ więcej, osobno od managerskiego `/api/entries/running`. Sekundy liczy serwer
 i odświeża stan raz na minutę; Start i Stop widać w tytule natychmiast. Karta
 schowana w tle nie odpytuje serwera — tytuł tyka lokalnie, a timer zatrzymany
 w innej karcie poprawia się przy powrocie do tej.
+
+**Strona `/zadania` sama zauważa, że jej dane się zestarzały.** Sekcja „Pracujesz
+nad” i lista dni jadą na propsach z `getServerSideProps`, a te odświeża tylko
+akcja wykonana na tej karcie — pasek „W toku” tymczasem dociąga swój stan z SWR
+przy każdym powrocie do aplikacji. Rozjazd był widoczny gołym okiem: timer
+wystartowany na telefonie i podmieniony przy komputerze zostawiał na telefonie
+pasek z NOWYM zadaniem i sekcję ze STARYM, odliczającą czas wpisu, którego już
+nie ma. Strona odpytuje więc `/api/entries/timer` tym samym kluczem SWR co pasek
+(czyli **bez dodatkowego ruchu** — `dedupingInterval` zlewa je w jedno zapytanie)
+i gdy `id` biegnącego wpisu rozjedzie się z propsami, cicho dociąga świeże przez
+`router.replace`. Osobno, nie częściej niż raz na minutę, powrót na kartę
+(`visibilitychange` oraz `pageshow` z `persisted` — na iPhonie aplikacja wraca
+z bfcache i to pierwsze potrafi nie paść) odświeża stronę w całości, bo wpis
+dopisany ręcznie gdzie indziej nie zmienia żadnego `id`. Pisanie w opisie jest
+przy tym bezpieczne: `router.replace` nie odmontowuje komponentów, a szkic resetuje
+się dopiero przy zmianie `running.id`.
 
 **„Wznów zadanie” przy biegnącym timerze przełącza się na nowe zadanie**: zamyka
 bieżący wpis i startuje kolejny jedną transakcją, tym samym znacznikiem czasu —
@@ -1225,6 +1255,10 @@ Na Androidzie przytrzymanie ikony daje trzy skróty prosto do **zadań**,
 - **iPhone, ustawienia lokalne.** Motyw i przełącznik „grupuj takie same zadania”
   siedzą w `localStorage`, a iOS potrafi go wyczyścić po tygodniu nieużywania.
   Wracają wtedy wartości domyślne — dane w bazie są nietknięte.
+- **Aplikacja wznowiona z tła dociąga dane sama.** Wcześniej wracała z ekranem
+  sprzed uśpienia i trzeba było odświeżyć ją ręcznie; `/zadania` robi to teraz
+  bez pytania (szczegóły w module zadań wyżej). Na pozostałych ekranach — raporty
+  i zestawienia czytane z filtrów w adresie — dalej obowiązuje odświeżenie ręczne.
 - **Bez zasięgu aplikacja nie działa.** Świadomie nie ma service workera, więc
   nie ma też trybu offline: bez sieci telefon pokaże błąd połączenia. Powód
   w następnym akapicie.

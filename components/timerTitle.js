@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { formatClock } from "../utils";
+import { fetchLive, TIMER_POLL_MS } from "../utils/live";
 
 // Timer biegnącego zadania w pasku karty przeglądarki: "1:21:35 · Opis — Punktualnik".
 //
@@ -15,24 +16,12 @@ import { formatClock } from "../utils";
 // Zegar jest osobnym formatem (formatClock, nie formatDuration): tytuł karty jest
 // ucinany po kilkunastu znakach i "1h 21min 35s" zjadłoby miejsce na opis.
 
-const POLL_MS = 60_000;
-
 // Tytuł spoza timera — ten sam, który ustawia <Head> w pages/_app.js.
 const BASE_TITLE = "Punktualnik";
 
-// Świadomie NIE jsonFetcher z utils/ — tamten nie sprawdza res.ok, więc 401 po
-// wygaśnięciu sesji wróciłoby do SWR jako poprawne dane (`{error: ...}`) i tytuł
-// zgasłby tak samo jak przy zatrzymanym timerze. Ten sam argument co
-// w components/liveBoard.js.
-const fetchTimer = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
 export default function TimerTitle() {
-  const { data } = useSWR("/api/entries/timer", fetchTimer, {
-    refreshInterval: POLL_MS,
+  const { data } = useSWR("/api/entries/timer", fetchLive, {
+    refreshInterval: TIMER_POLL_MS,
     // refreshWhenHidden zostaje domyślnie wyłączone: karta w tle nie odpytuje
     // serwera, bo tytuł tyka z lokalnego driftu, a revalidateOnFocus poprawi stan
     // w chwili powrotu do zakładki. Timer zatrzymany w INNEJ karcie zostaje więc

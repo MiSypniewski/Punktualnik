@@ -9,18 +9,34 @@
 // resolve 'fs'" przy pierwszym wejściu na stronę. Ten sam zabieg co
 // utils/groupEntries.js.
 
-// Zakres liczby kafelków. Dolna granica to dotychczasowa stała RESUME_TILES,
-// czyli stan sprzed tej zmiany; górna bierze się z ekranu, nie z bazy —
-// osiemnaście kafelków to na telefonie osiemnaście rzędów i dalej lista
-// przestaje być listą skrótów.
-export const MIN_TILES = 6;
-export const MAX_TILES = 18;
+// Zakres liczby kafelków — oraz ZERO, czyli "nie pokazuj ich wcale".
+//
+// Górna granica bierze się z ekranu, nie z bazy: dwadzieścia kafelków to na
+// telefonie dwadzieścia rzędów i dalej lista przestaje być listą skrótów.
+// (Podpowiedzi z historii jest najwyżej pięćdziesiąt — services/entrySuggestions.js
+// — więc do MAX_TILES jest jeszcze zapas.)
+//
+// TILES_OFF jest WARTOŚCIĄ TEGO SAMEGO POLA, a nie osobnym przełącznikiem obok
+// niego. Kafelki są jednym ustawieniem — ile ich i które przypięte — a dołożenie
+// drugiego magazynu na "czy w ogóle" dałoby panel z dwiema prawdami do
+// pogodzenia. Wyłączenie NIE rusza przypięć: wpisanie z powrotem 6 przywraca
+// dokładnie to, co było (patrz saveTilePrefs w services/resumeTiles.js, gdzie
+// przy zerze nie obowiązuje limit miejsc).
+export const MIN_TILES = 4;
+export const MAX_TILES = 20;
 export const DEFAULT_TILES = 6;
+export const TILES_OFF = 0;
 
 export const clampTileCount = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return DEFAULT_TILES;
-  return Math.min(MAX_TILES, Math.max(MIN_TILES, Math.round(n)));
+  const rounded = Math.round(n);
+  // Wszystko poniżej jedynki to "wyłączone" — kafelka nie da się pokazać
+  // pół. Wartości 1..MIN_TILES-1 podciągamy do dolnej granicy: to clamp
+  // obronny (kolumnę da się przestawić z konsoli sqlite3), a nie walidacja
+  // — tej pilnuje Joi w services/resumeTiles.js.
+  if (rounded <= 0) return TILES_OFF;
+  return Math.min(MAX_TILES, Math.max(MIN_TILES, rounded));
 };
 
 // Tożsamość kafelka: para projekt + opis, bez wielkości liter i bez otaczających

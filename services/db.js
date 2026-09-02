@@ -206,7 +206,8 @@ const migrateTimesAudit = (db) => {
 };
 
 /**
- * Users dostaje kolumnę resumeTiles (liczba kafelków "Wznów", 6..18).
+ * Users dostaje kolumnę resumeTiles (liczba kafelków "Wznów": 0 = ukryte,
+ * poza tym 4..20).
  *
  * CREATE TABLE IF NOT EXISTS nie rusza tabeli, która już istnieje, więc bazy
  * sprzed tej zmiany — deweloperska i produkcyjna — potrzebują ALTER-a. NOT NULL
@@ -260,12 +261,14 @@ const createDb = () => {
       passwordSalt TEXT    NOT NULL,
       role         TEXT    NOT NULL DEFAULT 'user',
       isActive     INTEGER NOT NULL DEFAULT 0,
-      -- Ile kafelków "Wznów" widzi pracownik na /zadania (6..18). Ustawienie
-      -- WIDOKU w tabeli danych osobowych — świadomie, w odróżnieniu od
-      -- przełącznika grupowania listy, który siedzi w localStorage. Powód jest
-      -- ten sam co przy ResumeTiles niżej: liczba i przypięcia są jednym
-      -- ustawieniem, a rozdzielenie ich na dwa magazyny dałoby panel
-      -- z dwiema różnymi prawdami. Zakres pilnuje services/resumeTiles.js.
+      -- Ile kafelków "Wznów" widzi pracownik na /zadania: 0 znaczy "wcale",
+      -- poza tym 4..20. Ustawienie WIDOKU w tabeli danych osobowych —
+      -- świadomie, w odróżnieniu od przełącznika grupowania listy, który siedzi
+      -- w localStorage. Powód jest ten sam co przy ResumeTiles niżej: liczba,
+      -- zero i przypięcia są jednym ustawieniem, a rozdzielenie ich na dwa
+      -- magazyny dałoby panel z dwiema różnymi prawdami. Zerem sekcję się
+      -- CHOWA, a nie kasuje — przypięcia zostają w ResumeTiles nietknięte.
+      -- Zakresu pilnuje services/resumeTiles.js.
       resumeTiles  INTEGER NOT NULL DEFAULT 6
     );
 
