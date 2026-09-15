@@ -28,6 +28,17 @@ export const APP_TZ = process.env.APP_TZ || "Europe/Warsaw";
  */
 export const now = () => dayjs().tz(APP_TZ);
 
+/**
+ * Znacznik Z OFFSETEM (Times.startTime/endTime, decidedAt) → tekst w strefie
+ * aplikacji. Gołe dayjs(stamp).format() formatuje w strefie PROCESU, czyli na
+ * Mikrusie w UTC — stąd mail "wejście 06:07" przy karcie odbitej o 8:07.
+ *
+ * NIE dla znaczników TaskEntries ('YYYY-MM-DD HH:mm:ss', bez offsetu): tamte są
+ * już czasem lokalnym, więc przeliczenie przesunęłoby je o kolejne dwie godziny.
+ * Do nich jest hhmm z utils/index.js.
+ */
+export const appTime = (stamp, format = "HH:mm") => dayjs(stamp).tz(APP_TZ).format(format);
+
 // Doba robocza zaczyna się o 3:00, nie o północy — i ta granica nie jest tu nowa:
 // pages/time/[id].js przypina `data` w Times do godziny 3:00 z dokładnie tego samego
 // powodu. Zmiana kończąca się o 1:00 należy do dnia, w którym się zaczęła, a nie do

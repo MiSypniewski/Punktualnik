@@ -5,14 +5,17 @@ import getTimesReport from "../../../services/getTimesReport";
 import { canExportTimes } from "../../../services/roles";
 import { isFormat, sendReport } from "../../../utils/report";
 import { visibleSections } from "../../../services/scope";
+import { appTime } from "../../../services/workday";
 
 dayjs.locale("pl");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Godziny kart w strefie APLIKACJI, nie procesu — serwer chodzi w UTC i bez
+// tego eksport do kadr pokazywał wejście o 6:07 zamiast o 8:07.
 const fmtTime = (v) => {
   const d = dayjs(v);
-  return d.isValid() ? d.format("HH:mm:ss") : String(v ?? "");
+  return d.isValid() ? appTime(v, "HH:mm:ss") : String(v ?? "");
 };
 
 // eslint-disable-next-line import/no-anonymous-default-export
