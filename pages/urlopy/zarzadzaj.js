@@ -30,7 +30,7 @@ import {
 import { countWorkingDays, isWorkingDay } from "../../services/workingDays";
 import { canApproveLeave } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
-import { now as appNow } from "../../services/workday";
+import { now as appNow, workDay } from "../../services/workday";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -60,8 +60,23 @@ export async function getServerSideProps(ctx) {
   const balanceYear = /^\d{4}$/.test(year) ? Number(year) : currentYear;
   const sections = visibleSections(token);
 
+  // Kogo dziś nie ma. Doba robocza z services/workday.js — ta sama, którą kiosk
+  // pyta o nieobecności (services/sectionBoard.js), więc panel i hala mówią to
+  // samo. Inaczej niż na kiosku pokazujemy też wnioski OCZEKUJĄCE: kierownik
+  // planuje dzień i musi wiedzieć, że ktoś może nie przyjść, zanim to rozstrzygnie.
+  const today = workDay();
+  const todayAbsences = getAbsences({ from: today, to: today, sections })
+    .filter((a) => a.status === "approved" || a.status === "pending")
+    .sort(
+      (a, b) =>
+        (a.status === "pending") - (b.status === "pending") ||
+        `${a.surname} ${a.name}`.localeCompare(`${b.surname} ${b.name}`, "pl")
+    );
+
   return {
     props: {
+      today,
+      todayAbsences,
       pending: getAbsences({ status: "pending", sections }),
       balances: getLeaveBalances(sections, balanceYear),
       history: getAbsences({ ...filters, sections }),
@@ -84,6 +99,8 @@ const nextWorkingDay = () => {
 };
 
 export default function Nieobecnosci({
+  today,
+  todayAbsences,
   pending,
   balances,
   history,
@@ -220,6 +237,9 @@ export default function Nieobecnosci({
             {err}
           </Alert>
         )}
+
+        {/* 0. DZIŚ NIEOBECNI ------------------------------------------------- */}
+        <TodayAbsences day={today} absences={todayAbsences} />
 
         {/* 1. DO ROZPATRZENIA ------------------------------------------------ */}
         <h2 className="mb-3 text-sm font-bold uppercase tracking-signage">
@@ -500,6 +520,54 @@ export default function Nieobecnosci({
     </BaseLayout>
   );
 }
+
+// --- dziś nieobecni ---------------------------------------------------------
+
+/**
+ * Odpowiedź na pierwsze poranne pytanie kierownika: kogo dziś nie ma. Historia
+ * niżej ma tę informację, ale rozmytą w setkach wierszy — tu jest sam dzień.
+ */
+const TodayAbsences = ({ day, absences }) => (
+  <>
+    <h2 className="mb-3 text-sm font-bold uppercase tracking-signage">
+      Dziś nieobecni ({absences.length}) · <span className="font-mono tabular-nums">{day}</span>
+    </h2>
+
+    {absences.length === 0 ? (
+      <EmptyState className="mb-10" title="Wszyscy obecni" description="Na dziś nie ma żadnej nieobecności." />
+    ) : (
+      <TableWrap className="mb-10">
+        <Table>
+          <thead>
+            <Tr>
+              <Th>Pracownik</Th>
+              <Th>Rodzaj</Th>
+              <Th>Termin</Th>
+              <Th>Status</Th>
+            </Tr>
+          </thead>
+          <tbody>
+            {absences.map((a) => (
+              <Tr key={a.id}>
+                <Td>
+                  {a.surname} {a.name}
+                  <span className="block text-xs text-muted">{a.section}</span>
+                </Td>
+                <Td>{absenceKindLabel(a.kind)}</Td>
+                <Td className="font-mono tabular-nums whitespace-nowrap">
+                  {formatDateRange(a.dateFrom, a.dateTo)}
+                </Td>
+                <Td>
+                  <AbsenceBadge status={a.status} />
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </TableWrap>
+    )}
+  </>
+);
 
 // --- wpis za pracownika -----------------------------------------------------
 
