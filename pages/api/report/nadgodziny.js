@@ -9,6 +9,7 @@ import { kindLabel, statusLabel, signedMinutes, STATUS_KEYS } from "../../../ser
 import { num } from "../../../utils/csv";
 import { isFormat, sendReport } from "../../../utils/report";
 import { formatMinutes } from "../../../utils";
+import { appTime } from "../../../services/workday";
 
 dayjs.locale("pl");
 
@@ -120,7 +121,7 @@ export default async (req, res) => {
     statusLabel(r.status),
     r.reason,
     r.decidedByName,
-    r.decidedAt ? dayjs(r.decidedAt).format("YYYY-MM-DD HH:mm") : "",
+    r.decidedAt ? appTime(r.decidedAt, "YYYY-MM-DD HH:mm") : "",
     r.decisionNote,
   ]);
 

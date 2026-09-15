@@ -1,5 +1,4 @@
 import { getToken } from "next-auth/jwt";
-import dayjs from "dayjs";
 import { getAbsences } from "../../../services/getAbsences";
 import { getLeaveBalances } from "../../../services/leaveBalance";
 import {
@@ -11,7 +10,7 @@ import {
 import { canApproveLeave } from "../../../services/roles";
 import { visibleSections } from "../../../services/scope";
 import { isFormat, sendReport } from "../../../utils/report";
-import { now as appNow } from "../../../services/workday";
+import { now as appNow, appTime } from "../../../services/workday";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MODES = ["nieobecnosci", "salda"];
@@ -140,7 +139,7 @@ export default async (req, res) => {
     // przy własnym wniosku ta kolumna powtarzałaby nazwisko z kolumny obok.
     r.createdBy !== r.userID ? r.createdByName : "",
     r.decidedByName,
-    r.decidedAt ? dayjs(r.decidedAt).format("YYYY-MM-DD HH:mm") : "",
+    r.decidedAt ? appTime(r.decidedAt, "YYYY-MM-DD HH:mm") : "",
     r.decisionNote,
   ]);
 
