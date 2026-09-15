@@ -199,8 +199,8 @@ export const notifyUnfinishedTask = async (entry) => {
 // --- 3. zatwierdzony urlop --------------------------------------------------
 
 /**
- * Wołane WYŁĄCZNIE po zatwierdzeniu. Odrzucenie, anulowanie i cofnięcie zostają
- * poza tym kanałem — użytkownik wymienił akceptacje i tylko one mają iść mailem.
+ * Wołane po zatwierdzeniu. Odrzucenie ma własną wiadomość (notifyAbsenceRejected
+ * niżej); anulowanie i cofnięcie zostają poza tym kanałem.
  *
  * Przypomnienie o Comarchu jest tu SEDNEM wiadomości, nie dopiskiem: Punktualnik
  * nie rozmawia z systemem kadrowym, więc zatwierdzony tutaj urlop nadal nie
@@ -239,6 +239,41 @@ export const notifyAbsenceApproved = async (absence, user) => {
   });
 };
 
+/**
+ * Odrzucony wniosek urlopowy.
+ *
+ * Wcześniej odrzucenie nie szło mailem wcale i pracownik dowiadywał się o nim
+ * dopiero, zaglądając do panelu — czyli zwykle wtedy, gdy już planował wolne.
+ * Bez przypomnienia o Comarchu: nie ma czego tam wypisywać.
+ */
+export const notifyAbsenceRejected = async (absence, user) => {
+  const { to, cc } = recipients(absence.userID, user?.section);
+
+  const zakres = formatDateRange(absence.dateFrom, absence.dateTo);
+
+  const body = compose([
+    `Wniosek urlopowy został odrzucony.`,
+    null,
+    ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${absence.userID}`],
+    ["Rodzaj", absenceKindLabel(absence.kind)],
+    ["Termin", zakres],
+    ["Dni roboczych", String(absence.workDays)],
+    ...(absence.decidedByName ? [["Odrzucił", absence.decidedByName]] : []),
+    ...(absence.decisionNote ? [["Uwagi", absence.decisionNote]] : []),
+    null,
+    `Dni nie zostały zdjęte z puli. Jeśli termin da się zmienić, złóż nowy wniosek albo uzgodnij go z kierownikiem.`,
+    linkLine("/urlopy", "Moje wnioski"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: urlop odrzucony — ${zakres}`,
+    kind: "urlop-odrzucony",
+    ...body,
+  });
+};
+
 // --- 4. zatwierdzone nadgodziny / wcześniejsze wyjście ----------------------
 
 /**
@@ -271,6 +306,39 @@ export const notifyOvertimeApproved = async (request, user) => {
     cc,
     subject: `Punktualnik: ${kindLabel(request.kind).toLowerCase()} — zatwierdzone`,
     kind: "nadgodziny-zatwierdzone",
+    ...body,
+  });
+};
+
+/**
+ * Odrzucony wniosek o nadgodziny albo wcześniejsze wyjście. Saldo pokazujemy
+ * jako "bez zmian" — przy wcześniejszym wyjściu to właśnie ta informacja jest
+ * sednem: godziny nie zostały odpisane, a nieobecność trzeba wyjaśnić inaczej.
+ */
+export const notifyOvertimeRejected = async (request, user) => {
+  const { to, cc } = recipients(request.userID, user?.section);
+
+  const body = compose([
+    `Wniosek został odrzucony.`,
+    null,
+    ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${request.userID}`],
+    ["Rodzaj", kindLabel(request.kind)],
+    ["Wymiar", formatMinutes(signedMinutes(request), { withSign: true })],
+    ["Data", formatDate(request.data)],
+    ...(request.decidedByName ? [["Odrzucił", request.decidedByName]] : []),
+    ...(request.decisionNote ? [["Uwagi", request.decisionNote]] : []),
+    null,
+    ["Saldo (bez zmian)", formatMinutes(getOvertimeBalance(request.userID), { withSign: true })],
+    null,
+    `Jeśli decyzja jest niejasna, wyjaśnij ją z kierownikiem.`,
+    linkLine("/nadgodziny", "Moje nadgodziny"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: ${kindLabel(request.kind).toLowerCase()} — odrzucone`,
+    kind: "nadgodziny-odrzucone",
     ...body,
   });
 };
