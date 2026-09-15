@@ -152,12 +152,14 @@ export default function Nieobecnosci({
         body: JSON.stringify(body),
       });
       const odp = await res.json().catch(() => ({}));
+      // Zwracamy body, a nie samo true: formularz wpisu potwierdza zapis danymi
+      // z odpowiedzi (liczba dni roboczych liczy się dopiero na serwerze).
       if (!res.ok) {
         setErr(odp.message || blad(odp.error));
-        return false;
+        return null;
       }
       await refresh();
-      return true;
+      return odp;
     } finally {
       setBusy(false);
     }
@@ -336,7 +338,7 @@ export default function Nieobecnosci({
         )}
 
         {/* 2. WPIS ZA PRACOWNIKA --------------------------------------------- */}
-        <ManualAbsence users={users} busy={busy} call={call} />
+        <ManualAbsence users={users} busy={busy} call={call} err={err} />
 
         {/* 3. PULA DNI -------------------------------------------------------- */}
         <Allowances
@@ -575,8 +577,8 @@ const TodayAbsences = ({ day, absences }) => (
  * L4 ze zwolnienia i urlop zgłoszony telefonem. Zapisuje się od razu
  * zatwierdzony — zakłada go osoba, która i tak by go akceptowała.
  */
-const ManualAbsence = ({ users, busy, call }) => {
-  const [form, setForm] = useState({
+const ManualAbsence = ({ users, busy, call, err }) => {
+  const [form, setFormState] = useState({
     userID: "",
     kind: "sick_leave",
     dateFrom: nextWorkingDay(),
@@ -584,16 +586,48 @@ const ManualAbsence = ({ users, busy, call }) => {
     reason: "",
   });
 
+  // Wynik zapisu pokazujemy POD formularzem. Wcześniej sukces nie zostawiał
+  // żadnego śladu (formularz czyścił samą notatkę), a błąd lądował na samej
+  // górze strony — zwykle poza ekranem kierownika, który przewinął do formularza.
+  const [saved, setSaved] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  // Każda zmiana pola gasi stary komunikat: "Zapisano: …" przy innych danych
+  // w formularzu sugerowałoby, że zapisały się właśnie te.
+  const setForm = (next) => {
+    setFormState(next);
+    setSaved("");
+    setFailed(false);
+  };
+
   const workDays = countWorkingDays(form.dateFrom, form.dateTo);
 
   const submit = async (e) => {
     e.preventDefault();
-    const ok = await call(
+    setSaved("");
+    setFailed(false);
+
+    const odp = await call(
       "/api/absences",
       { ...form, userID: Number(form.userID) },
       () => "Nie udało się zapisać nieobecności."
     );
-    if (ok) setForm({ ...form, reason: "" });
+    if (!odp) {
+      setFailed(true);
+      return;
+    }
+
+    // O mailu do pracownika NIE piszemy: wysyłka idzie w tle i bywa wyłączona,
+    // więc potwierdzenie mówi tylko to, co na pewno się stało — zapis w bazie.
+    const a = odp.absence;
+    const who = users.find((u) => String(u.id) === String(form.userID));
+    const name = who ? `${who.surname} ${who.name}` : "pracownik";
+    setFormState({ ...form, reason: "" });
+    setSaved(
+      a
+        ? `Zapisano: ${name} — ${absenceKindLabel(a.kind)}, ${formatDateRange(a.dateFrom, a.dateTo)} (dni roboczych: ${a.workDays}). Wpis jest już zatwierdzony.`
+        : "Zapisano nieobecność."
+    );
   };
 
   return (
@@ -688,6 +722,15 @@ const ManualAbsence = ({ users, busy, call }) => {
           onChange={(e) => setForm({ ...form, reason: e.target.value })}
           className="mt-3"
         />
+
+        <Alert tone="ok" className="mt-3">
+          {saved}
+        </Alert>
+        {failed && (
+          <Alert tone="danger" className="mt-3">
+            {err}
+          </Alert>
+        )}
       </form>
     </>
   );
