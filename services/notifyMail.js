@@ -5,7 +5,8 @@ import { sendMail, appUrl, mailEnabled } from "./mailer";
 import { absenceKindLabel, requiresCertificate } from "./absenceKinds";
 import { kindLabel, signedMinutes } from "./overtimeKinds";
 import getOvertimeBalance from "./getOvertimeBalance";
-import { formatMinutes, formatDuration, formatDate, formatDateRange } from "../utils";
+import { appTime } from "./workday";
+import { formatMinutes, formatDuration, formatDate, formatDateRange, hhmm } from "../utils";
 
 dayjs.locale("pl");
 
@@ -118,7 +119,12 @@ const linkLine = (path, label) => {
 };
 
 const dzien = formatDate;
-const godzina = (stamp) => dayjs(stamp).format("HH:mm");
+// Dwa różne kształty godzin i dwie różne funkcje — celowo bez wspólnej nazwy.
+// Karty czasu (Times) mają ISO z offsetem i trzeba je przeliczyć na strefę
+// aplikacji (proces na Mikrusie chodzi w UTC). Wpisy zadań (TaskEntries) są już
+// czasem lokalnym bez offsetu i wystarczy je wyciąć — patrz services/workday.js.
+const godzinaKarty = (stamp) => appTime(stamp, "HH:mm");
+const godzinaZadania = hhmm;
 
 /**
  * Zdanie dla rodzajów nieobecności, przy których zgoda w Punktualniku to dopiero
@@ -150,8 +156,8 @@ export const notifyMissingPunchOut = async (card) => {
     null,
     ["Pracownik", `${card.name} ${card.surname}`],
     ["Dzień", dzien(card.data)],
-    ["Wejście", godzina(card.startTime)],
-    ["Wpisane wyjście", `${godzina(card.endTime)} (domyślne, osiem godzin od wejścia)`],
+    ["Wejście", godzinaKarty(card.startTime)],
+    ["Wpisane wyjście", `${godzinaKarty(card.endTime)} (domyślne, osiem godzin od wejścia)`],
     ["Zapisany czas", card.totalWorkTime],
     null,
     `Ta godzina wyjścia jest ZAŁOŻONA, nie zmierzona. Jeśli dniówka wyglądała inaczej, zgłoś to kierownikowi — poprawka zajmuje chwilę i zostaje podpisana.`,
@@ -179,8 +185,8 @@ export const notifyUnfinishedTask = async (entry) => {
     ["Dzień", dzien(entry.data)],
     ["Projekt", entry.projectName || "(nie wskazano)"],
     ["Opis", entry.description || "(pusty)"],
-    ["Start", godzina(entry.startedAt)],
-    ["Domknięcie", `${godzina(entry.endedAt)} — granica doby roboczej`],
+    ["Start", godzinaZadania(entry.startedAt)],
+    ["Domknięcie", `${godzinaZadania(entry.endedAt)} — granica doby roboczej`],
     ["Zapisany wymiar", formatDuration(entry.seconds)],
     null,
     `Wpis jest oznaczony jako domknięty automatycznie i czeka na sprawdzenie. Popraw wymiar u siebie w zadaniach — edycja zdejmuje ten znacznik.`,
@@ -551,7 +557,7 @@ export const notifyCardChanged = async (card, action, actor, before) => {
   const dzienKarty = formatDate(card.data);
 
   const godziny = (row) =>
-    row?.startTime && row?.endTime ? `${godzina(row.startTime)} – ${godzina(row.endTime)}` : "—";
+    row?.startTime && row?.endTime ? `${godzinaKarty(row.startTime)} – ${godzinaKarty(row.endTime)}` : "—";
 
   const body = compose([
     opis.zdanie,
@@ -607,7 +613,7 @@ export const notifyTaskEntryChanged = async (entry, action, actor, owner, reason
     ["Dzień", formatDate(entry.data)],
     ["Projekt", entry.projectName || "(nie wskazano)"],
     ["Opis", entry.description || "(pusty)"],
-    ["Godziny", entry.startedAt && entry.endedAt ? `${godzina(entry.startedAt)} – ${godzina(entry.endedAt)}` : "—"],
+    ["Godziny", entry.startedAt && entry.endedAt ? `${godzinaZadania(entry.startedAt)} – ${godzinaZadania(entry.endedAt)}` : "—"],
     ["Wymiar", formatDuration(entry.seconds ?? 0)],
     ["Kto", kto(actor)],
     ...(reason ? [["Powód", reason]] : []),
