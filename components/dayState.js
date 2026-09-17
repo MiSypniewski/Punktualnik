@@ -51,6 +51,13 @@ const STATES = {
 export const stateBadge = (person) => {
   const base = STATES[person.state] || STATES.no_card;
 
+  // Karta otwarta w dniu, który już się skończył. Nie "pracuje" — nikt nie
+  // zamknął karty. Stan istnieje tylko między końcem doby a 3:00, kiedy domyka
+  // ją zadanie nocne, więc ton zostaje neutralny: nie ma tu czego naprawiać
+  // ręcznie, jest co zrozumieć, patrząc na puste "Czas".
+  if ((person.state === "working" || person.state === "absent_present") && !person.live) {
+    return { label: "Karta otwarta", tone: "neutral" };
+  }
   if (person.state === "done" && !person.autoClosed) {
     return { label: base.label, tone: person.full ? "ok" : "danger" };
   }
@@ -62,8 +69,19 @@ export const stateBadge = (person) => {
   return base;
 };
 
-/** Czy ten stan znaczy "pracuje TERAZ" — jedyne uprawnienie do bursztynu. */
-export const isLive = (person) => person.state === "working" || person.state === "absent_present";
+/**
+ * Czy ten wiersz opisuje stan "teraz" — jedyne uprawnienie do bursztynu,
+ * do kropki na żywo, do tykającego licznika i do belki biegnącej na osi czasu.
+ *
+ * Czytamy FLAGĘ z serwera, a nie nazwę stanu. Poprzednia wersja sprawdzała
+ * `state === "working" || state === "absent_present"` i miała dwie dziury:
+ * `absent_present` obejmowało też kartę już zamkniętą (pracownik z urlopem,
+ * który przyszedł i odbił wejście ORAZ wyjście, wisiał jako "W pracy"
+ * z tykającym licznikiem), a żadna z nazw nie wiedziała, czy oglądany dzień
+ * jest w ogóle dzisiejszy. Obie rzeczy rozstrzyga teraz serwer, który jako
+ * jedyny zna dobę roboczą i strefę aplikacji (services/dayBoard.js).
+ */
+export const isLive = (person) => Boolean(person.live);
 
 // --- dopiski przy godzinach -------------------------------------------------
 //
