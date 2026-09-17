@@ -122,6 +122,26 @@ export const DATETIME_FORMAT = "YYYY-MM-DD HH:mm";
 /** Dowolny znacznik → "2026-08-14". Pusta wartość zostaje pusta, nie "Invalid Date". */
 export const formatDate = (value) => (value ? dayjs(value).format(DATE_FORMAT) : "");
 
+/**
+ * Czy to jest data ISTNIEJĄCA, a nie tylko ciąg w kształcie daty.
+ *
+ * Aplikacja sprawdza daty z adresu wyrażeniem `/^\d{4}-\d{2}-\d{2}$/`, które
+ * przepuszcza "2026-13-99" i "2026-02-30" — kształt jest poprawny, dnia nie ma.
+ * Tam, gdzie data jest jednym z kilku filtrów, kończy się to pustą listą i nikt
+ * tego nie zauważa. Na /urlopy/stan data jest TREŚCIĄ ekranu: zły dzień
+ * przechodził do nagłówka jako "Invalid Date", a strzałki liczyły od niego
+ * następny dzień, dostając kolejne "Invalid Date".
+ *
+ * Porównanie po formatowaniu wyłapuje oba przypadki bez dodatkowej wtyczki:
+ * dayjs dla dnia nieistniejącego zwraca "Invalid Date", a dla przepełnionego
+ * (30 lutego) przesuwa na 2 marca — w obu wynik różni się od wejścia.
+ */
+export const isIsoDate = (value) => {
+  const raw = String(value ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+  return dayjs(raw).format(DATE_FORMAT) === raw;
+};
+
 /** Znacznik z godziną → "2026-08-14 07:12". Sekund nie pokazujemy nigdzie w tekście. */
 export const formatDateTime = (value) => (value ? dayjs(value).format(DATETIME_FORMAT) : "");
 

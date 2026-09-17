@@ -34,7 +34,7 @@ zmiany widać od razu po odświeżeniu strony.
 |---|---|
 | `npm run admin -- role <email\|id> user` | pracownik: własne karty, nadgodziny i zadania |
 | `npm run admin -- role <email\|id> editor` | wspólny kiosk: obsługa kart czasu sekcji (zadań nie raportuje) |
-| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, urlopy, projekty, raport zadań, korekta kart czasu, eksporty |
+| `npm run admin -- role <email\|id> manager` | kierownik: nadgodziny, urlopy, dzień zespołu, projekty, raport zadań, korekta kart czasu, eksporty |
 | `npm run admin -- sections <email\|id>` | pokazuje, które sekcje obsługuje kierownik |
 | `npm run admin -- sections <email\|id> <a,b,c>` | ustawia je (podmienia całą listę) |
 | `npm run admin -- sections <email\|id> -` | czyści przypisania |
@@ -754,9 +754,11 @@ nie pojedynczego dnia, więc jego wymiar trzeba policzyć.
 pozostało), formularz wniosku i historia z możliwością anulowania, dopóki wniosek
 czeka na decyzję.
 
-**Kierownik** — `/urlopy/zarzadzaj`: wnioski do rozpatrzenia, wpisywanie
-nieobecności za pracownika, przydzielanie dni i historia z filtrami. Widzi
-wyłącznie swoje sekcje (`ManagerSections`, jak przy nadgodzinach).
+**Kierownik** ma dwa ekrany, wiązane paskiem podzakładek. `/urlopy/zarzadzaj` to
+**obieg wniosków**: wnioski do rozpatrzenia, wpisywanie nieobecności za
+pracownika, przydzielanie dni i historia z filtrami. `/urlopy/stan` to
+**dzień zespołu** (niżej). Oba widzą wyłącznie swoje sekcje (`ManagerSections`,
+jak przy nadgodzinach).
 
 **Zatwierdzony urlop da się cofnąć** — i to jest najczęstszy przypadek użycia:
 pracownik rezygnuje, a sam już nic nie zrobi, bo anulowanie działa tylko na
@@ -765,6 +767,135 @@ wniosku oczekującym. Kierownik usuwa nieobecność z historii, podając
 Konsekwencje odkręcają się same: dni wracają do puli, kafelek nieobecności znika
 z kiosku i sprzed nazwiska w „Teraz w toku”, a ten sam termin da się zgłosić
 ponownie (kontrola nakładania patrzy tylko na *Oczekuje* i *Zatwierdzony*).
+
+### Aktualny stan — dzień zespołu
+
+`/urlopy/stan`, wyłącznie `manager`. Jedyny ekran, który zestawia **trzy osie
+ewidencji naraz**: karty czasu (`Times` — kto był i o której), nieobecności
+(`Absences` — kogo nie ma) i zgody na zmianę godzin (`Overtime` — kto wychodzi
+wcześniej albo zostaje dłużej). Czwarta, `TaskEntries`, wchodzi informacyjnie
+i tylko dla dnia dzisiejszego.
+
+Powstał z tego, że poranne pytanie „jak dziś stoi zespół” wymagało czterech
+ekranów: tablicy kafelków, panelu nieobecności, panelu nadgodzin i raportu
+zadań — a odpowiedzi trzeba było zestawić w głowie.
+
+Zawartość, w kolejności czytania: **kafle liczbowe**, **oś czasu**, **tabela
+zespołu** (na telefonie karty) i **wnioski do rozpatrzenia**. Dzień wybiera się
+strzałkami, skrótami *Wczoraj / Dziś / Jutro* albo polem daty; siedzi w adresie
+(`?dzien=RRRR-MM-DD`), więc widok da się zalinkować. „Dziś” **zdejmuje**
+parametr, bo link wysłany komuś jutro miałby inaczej pokazywać wczoraj.
+
+#### Planowane wyjście jest PROGNOZĄ, nie planem
+
+**Aplikacja nie ma grafiku pracy.** Nie istnieje tabela zmian, nie ma pola
+„o której ma zaczynać”, nie ma wymiaru etatu. Godzina wejścia bierze się
+z odbicia karty, a godzina wyjścia jest z niej wyliczana:
+
+```
+planowane wyjście = wejście + 8 h + „zostaję dłużej” − „wcześniejsze wyjście”
+```
+
+Liczą się wyłącznie wnioski **zatwierdzone** i wyłącznie z tego dnia. Ósemka to
+`WORKDAY_HOURS` z `utils/index.js` — ta sama liczba, którą kafelek kiosku
+podstawia przy odbiciu wejścia i którą zadanie nocne wpisuje przy domykaniu.
+
+Trzy rzeczy, które łatwo pomylić:
+
+- **`extra_work` nie przesuwa wyjścia.** „Praca poza godzinami (np. wieczorem
+  w domu)” dodaje do salda, ale nie wydłuża obecności w firmie. Przesuwają
+  tylko `stay_longer` i `early_leave`.
+- **Niedogodziny to nie wcześniejsze wyjście.** Wcześniejsze wyjście jest
+  wnioskiem na konkretny dzień i przesuwa godzinę; niedogodziny to ujemne
+  SALDO wszystkich zatwierdzonych wniosków, bez własnej daty. Saldo pojawia
+  się na tym ekranie tylko jako drobny chip przy nazwisku, i tylko na minusie.
+- **Prognoza jest oznaczona gwiazdką**, jak karta domknięta nocą znacznikiem
+  `auto`. Karta zamknięta ma godzinę faktyczną i gwiazdki nie ma.
+
+Widok świadomie **nie** bierze zapisanego `Times.endTime` karty otwartej, choć
+tam już stoi „wejście + 8 h”: `components/card.js` wpisuje je przy odbiciu
+i nie zna wniosków o wcześniejsze wyjście, więc dla kogoś z podpisaną zgodą
+kłamałoby o godzinę.
+
+#### Stany
+
+| Stan | Kiedy | Kolor |
+|---|---|---|
+| **W pracy** | karta otwarta | bursztyn — jedyne uprawnione użycie na tym ekranie |
+| **Po pracy** | karta zamknięta | zieleń przy pełnej dniówce ZMIERZONEJ, inaczej neutralny |
+| **Nieobecność** | zatwierdzona nieobecność, bez karty | neutralny, ze skrótem rodzaju |
+| **Wniosek** | nieobecność czeka na decyzję | akcent |
+| **Bez karty** | nic z powyższych | neutralny do 9:00, potem czerwony |
+| **W planie** | tylko dzień przyszły, bez zgłoszonej nieobecności | neutralny |
+
+Karta z flagą `autoClosed` **nigdy nie dostaje zieleni**, choć ma równe osiem
+godzin: ta ósemka jest założona, nie zmierzona, a zieleń w tym systemie znaczy
+„przepracowane i pełne”.
+
+Etykiety są bezosobowe („Po pracy”, nie „Zakończył”) — rodzaj gramatyczny
+pracownika nie jest aplikacji znany i nie ma się w nim zgadywać.
+
+Chip **„po planowanym wyjściu”** przy karcie wciąż otwartej to prawie zawsze
+zapomniane drugie dotknięcie kafelka. Zadanie nocne złapie je dopiero o 3:00,
+więc ten ekran jest jedynym miejscem, gdzie da się zareagować tego samego dnia.
+
+#### Dzień przyszły i dzień miniony
+
+Dzień przyszły liczy się inaczej i wygląda inaczej, bo o jutrze wiadomo tylko
+tyle, kto nie ma zgłoszonej nieobecności. Kolumny godzin i oś czasu znikają
+razem z nagłówkami (kolumna bez treści nie ma stać pusta), a kafle liczą
+*W planie / Nieobecności / Wnioski* zamiast obecności. Chip „bez karty” tam nie
+występuje — byłby zarzutem postawionym całemu zespołowi o dniu, w którym karty
+nie dało się jeszcze odbić.
+
+Dla wczoraj i jutra **polling jest wyłączony**: przeszłość się nie zmienia,
+a przyszłość nie ma „teraz”. Dziś odświeża się co `LIVE_POLL_MS` (45 s,
+`utils/live.js`) — tym samym cyklem co tablica kiosku i „Teraz w toku”.
+
+#### Wnioski do rozpatrzenia
+
+Na dole ekranu urlopy i nadgodziny w **jednej** liście, najdłużej czekające na
+górze (po `createdAt` — data nieobecności stawiałaby na górze wnioski złożone
+dziś na daleki termin). Kierownik nie myśli kategoriami tabel: rano ma do
+rozstrzygnięcia „cztery rzeczy”, a nie „dwa urlopy w jednym panelu i dwie
+nadgodziny w drugim”.
+
+Przyciski wołają **istniejące** endpointy (`PUT /api/absences/[id]`,
+`PUT /api/overtime/[id]`), więc zasięg sekcyjny, blokada przy równoległej
+decyzji i maile są te same co w panelach modułów. Ostrzeżenie „po zatwierdzeniu
+zostanie −3 dni” też — i przycisk nadal działa, bo zgoda na poczet przyszłego
+przydziału jest decyzją kierownika.
+
+Pola notatki, cofania wniosku i przydziału dni tu **nie ma**: to praca przy
+biurku, nie spojrzenie z rana. Prowadzi do nich link „Rozpatrz szczegółowo”,
+zawężony do pracownika.
+
+Lista **nie zależy od wybranego dnia** — wniosek czeka na decyzję niezależnie
+od tego, na który dzień go złożono.
+
+#### Wydajność
+
+Ekran składa **pięć zapytań** na jedno żądanie (skład zespołu, karty,
+nieobecności, zgody, biegnące timery) i odpytuje sam siebie z każdej otwartej
+karty kierownika, więc jest po raporcie zadań drugim kandydatem na zamrożenie
+pętli zdarzeń. Stąd trzy reguły w `services/dayBoard.js`:
+
+- **zero zapisów w ścieżce odczytu** — żadnego domykania „przy okazji”;
+  to jest dokładnie przyczyna awarii z 21.08.2026;
+- wszystkie odczyty w jednej transakcji, żeby ktoś nie zniknął z dwóch list
+  naraz, odbijając kartę między zapytaniami;
+- statementy w cache’u po LICZBIE sekcji, a pusty zasięg zwraca pustkę bez
+  odpytania bazy.
+
+Karty dopasowujemy przez `substr(data, 1, 10) = @day`, a **nie** dosłownym
+porównaniem pełnego ISO, którym posługuje się `services/getSectionTime.js`.
+Tamto działa tylko dla „dziś” i tylko przy stałym offsecie; ten ekran pyta
+o dowolną datę, także o dzień po zmianie czasu. Jest pod to indeks
+`idx_times_datepart`, założony dokładnie w tym celu.
+
+Data z adresu przechodzi przez `isIsoDate` z `utils/index.js`, nie przez samo
+`/^\d{4}-\d{2}-\d{2}$/`: tamto wyrażenie przepuszcza `2026-13-99`
+i `2026-02-30`, a tutaj data jest treścią ekranu, nie jednym z filtrów.
 
 ### Rodzaje
 
@@ -922,8 +1053,12 @@ zawsze zwraca komplet, także gdy widok przyciął listę do 500 pozycji.
 
 ### Czego moduł NIE robi
 
-- Nie dotyka tabeli `Times` ani eksportu kart czasu — urlop nie tworzy wpisu
-  obecności.
+- Nie ZAPISUJE nic do tabeli `Times` ani do eksportu kart czasu — urlop nie
+  tworzy wpisu obecności. Czyta ją natomiast
+  [Aktualny stan](#aktualny-stan--dzień-zespołu), żeby postawić nieobecność
+  obok godzin.
+- Nie zna grafiku pracy: planowane wyjście na tamtym ekranie jest wyliczane
+  z odbicia karty, a nie odczytane z harmonogramu.
 - Nie zna kalendarza zespołu ani limitu „ilu naraz może być na urlopie”.
 - Nie przenosi zaległego urlopu na nowy rok sam z siebie — kierownik dopisuje
   go jako zwykły przydział.
@@ -1498,9 +1633,9 @@ To samo dotyczy treści powiadomień — mailowych
 i czatowych: mail o zatwierdzonym urlopie ma dać się zestawić z wierszem arkusza
 bez przeliczania w głowie.
 
-#### Cztery miejsca z datą słowną
+#### Pięć miejsc z datą słowną
 
-Reguła dotyczy daty w roli DANEJ. Są cztery napisy, które daną nie są — nikt ich
+Reguła dotyczy daty w roli DANEJ. Jest pięć napisów, które daną nie są — nikt ich
 nie przepisuje, nie sortuje ani nie porównuje z arkuszem. Odpowiadają na pytanie
 „który to dzień", rzucone kątem oka, i dlatego zostają po polsku:
 
@@ -1510,8 +1645,9 @@ nie przepisuje, nie sortuje ani nie porównuje z arkuszem. Odpowiadają na pytan
 | nagłówek tablicy kiosku (`services/sectionBoard.js`) | `środa, 26 sierpnia 2026` | napis oglądany z drugiego końca hali; ma potwierdzić, że tablica pokazuje dziś |
 | kafelek nieobecności (`components/card.js`) | `do 28.08` | dopisek w jednej linii podpisu na kafelku, obok reszty tekstu |
 | nagłówki grup dni w zadaniach (`pages/zadania/index.js`) | `Dziś`, `Wczoraj`, `wtorek, 18 sierpnia` | nagłówek grupy, do odnalezienia się na własnej liście; w wierszach stoją godziny, nie daty — od zestawiania dat jest raport kierownika |
+| wybór dnia na `/urlopy/stan` (`components/dayNav.js`) | `czwartek, 17 września 2026` | potwierdzenie, który dzień pokazuje ekran; obok, w polu daty, stoi to samo jako `RRRR-MM-DD` do czytania jako dana |
 
-Wspólny mianownik: **wszystkie cztery to ekrany „na rzut oka", a nie tabele.**
+Wspólny mianownik: **wszystkie pięć to ekrany „na rzut oka", a nie tabele.**
 `środa` odpowiada na pytanie od razu, `2026-08-26` wymaga policzenia. Wszędzie
 indziej — w każdej tabeli, w każdym eksporcie, w każdym powiadomieniu i w każdym
 komunikacie walidacji — obowiązuje `RRRR-MM-DD`.
@@ -1535,6 +1671,7 @@ Nowy ekran składa się z `components/ui/`, nie z klas pisanych na miejscu:
 | kafla z liczbą | `Stat` |
 | `<h1>` z opisem strony | `PageHeader` |
 | „brak danych” | `EmptyState` |
+| podzakładek w module (dwie strony jednego obiegu) | `TabNav`; listę pozycji trzyma jeden plik per moduł, np. `components/absenceTabs.js` |
 | emoji jako ikony | `components/ui/icons.js` |
 
 Powłokę daje `BaseLayout` (strażnik sesji) → `AppShell` (pasek, kontener, stopka).
@@ -1546,7 +1683,11 @@ Pozycje menu buduje `navItems` w `components/stationRail.js` — widoczność id
 przez predykaty z `services/roles.js`, a nie przez ręczne porównania ról. Pełny
 pasek pokazuje się od **1280 px**; niżej pozycje chowają się pod przycisk menu,
 bo przy ośmiu pozycjach kierownika nie mieszczą się obok zegara i konta. Dodając
-kolejną pozycję sprawdź pasek na 1280 px — to tam kończy się miejsce.
+kolejną pozycję sprawdź pasek na 1280 px — to tam kończy się miejsce. Po dojściu
+„Aktualnego stanu” (wrzesień 2026) kierownik ma tam **siedem pozycji
+pierwszoplanowych** i mieszczą się bez przewijania, ale zapasu już nie ma:
+następny ekran modułu powinien wejść jako PODZAKŁADKA (`TabNav`), nie jako
+kolejna pozycja paska.
 
 Uwaga na `@tailwindcss/forms`: plugin twardo maluje pola na biało selektorami
 atrybutowymi (`[type='text']`), które wygrywają specyficznością z gołym `input`.

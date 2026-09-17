@@ -3,6 +3,7 @@ import { getDayBoard } from "../../../services/dayBoard";
 import { canApproveLeave } from "../../../services/roles";
 import { visibleSections } from "../../../services/scope";
 import { workDay } from "../../../services/workday";
+import { isIsoDate } from "../../../utils";
 
 // Dzień zespołu dla ekranu /urlopy/stan, odpytywany cyklicznie — tak samo jak
 // /api/time/board zasila tablicę kiosku, a /api/entries/running sekcję
@@ -16,8 +17,6 @@ import { workDay } from "../../../services/workday";
 // Endpoint wyłącznie CZYTA i tak ma zostać. Zapis wykonywany przy odczycie —
 // choćby domykanie czegoś "przy okazji" — położył serwer 21.08.2026 (README,
 // "Kiedy aplikacja muli").
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
@@ -42,7 +41,7 @@ export default async (req, res) => {
   // w pętli, a jedno przeklejone query nie ma prawa zostawić kierownika
   // z pustym ekranem do końca zmiany.
   const raw = String(req.query.dzien ?? "");
-  const day = DATE_RE.test(raw) ? raw : workDay();
+  const day = isIsoDate(raw) ? raw : workDay();
 
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).json(getDayBoard({ day, sections: visibleSections(token) }));

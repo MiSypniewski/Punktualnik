@@ -29,7 +29,7 @@ import { getDayBoard } from "../../services/dayBoard";
 import { canApproveLeave } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
 import { workDay } from "../../services/workday";
-import { formatDuration, hhmm } from "../../utils";
+import { formatDuration, hhmm, isIsoDate } from "../../utils";
 import { LIVE_POLL_MS, fetchLive } from "../../utils/live";
 
 // Dzień zespołu na jednym ekranie: kto jest w pracy i od której, o której
@@ -45,8 +45,6 @@ import { LIVE_POLL_MS, fetchLive } from "../../utils/live";
 // karty, a godzina wyjścia jest z niej WYLICZANA (start + 8 h ± zatwierdzone
 // wnioski). Stąd gwiazdka przy prognozie i stąd puste kolumny godzin dla dnia
 // przyszłego: dopóki nikt nie odbije wejścia, nie ma od czego liczyć.
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const boardKey = (day) => `/api/absences/board?dzien=${encodeURIComponent(day)}`;
 
@@ -66,8 +64,10 @@ export async function getServerSideProps(ctx) {
   // wzorzec, co filtry w panelu wniosków i w raporcie zadań. Zła wartość
   // wraca cicho na dziś, bo przeklejony adres nie ma prawa zostawić
   // kierownika z pustym ekranem.
+  // isIsoDate, a nie samo wyrażenie regularne: "2026-13-99" ma kształt daty,
+  // ale takiego dnia nie ma, i trafiał do nagłówka jako "Invalid Date".
   const raw = String(ctx.query.dzien ?? "");
-  const day = DATE_RE.test(raw) ? raw : workDay();
+  const day = isIsoDate(raw) ? raw : workDay();
 
   const sections = visibleSections(token);
 
