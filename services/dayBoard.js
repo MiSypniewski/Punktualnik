@@ -341,6 +341,10 @@ export const getDayBoard = ({ day, sections }) => {
       // Brak karty przestaje być "jeszcze nie przyszedł" po LATE_PUNCH_HOUR,
       // a dla dnia minionego jest tym od razu. Dla przyszłego nie jest niczym.
       latePunch: state === "no_card" && !isFuture && (!isToday || nowMoment.hour() >= LATE_PUNCH_HOUR),
+      // Karta wciąż otwarta po wyliczonej godzinie wyjścia. Rozstrzygamy to na
+      // serwerze, bo porównujemy dwie godziny w strefie aplikacji — zegar
+      // przeglądarki bywa przestawiony, a od tego zależy chip ostrzeżenia.
+      overdue: open && plannedStamp !== null && nowMoment.isAfter(dayjs(plannedStamp)),
       running: runningByUser.get(person.userID) || null,
     };
   });
