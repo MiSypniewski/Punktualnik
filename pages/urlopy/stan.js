@@ -9,7 +9,15 @@ import DayTimeline from "../../components/dayTimeline";
 import LiveDot from "../../components/liveDot";
 import PendingDecisions from "../../components/pendingDecisions";
 import { ProjectMark } from "../../components/projectColors";
-import { absenceLabel, isLive, remarks, stateBadge } from "../../components/dayState";
+import {
+  absenceLabel,
+  exitAlarming,
+  exitMarks,
+  exitNote,
+  isLive,
+  nameNote,
+  stateBadge,
+} from "../../components/dayState";
 import {
   Alert,
   Badge,
@@ -86,18 +94,35 @@ const fullName = (person) => `${person.surname} ${person.name}`;
 /** Godzina albo kreska — pusta komórka w kolumnie liczb czyta się jak błąd. */
 const hourCell = (value) => value || "—";
 
-const Remarks = ({ person, className }) => {
-  const list = remarks(person);
-  if (list.length === 0) return null;
+/**
+ * Godzina wyjścia razem ze wszystkim, co o niej trzeba wiedzieć.
+ *
+ * Kolumna "Uwagi" stała tu do września 2026 i zniknęła: rządek chipów
+ * wersalikami obok każdego nazwiska kazał czytać siedem wielkich napisów na
+ * ekranie, który ma dawać odpowiedź jednym spojrzeniem. Znaczniki karty
+ * wróciły do godziny, o której mówią, a całe wyprowadzenie tej godziny
+ * (wejście + 8 h ± wnioski) siedzi w dymku — łącznie z ostrzeżeniem
+ * o karcie wiszącej po planowanym wyjściu.
+ */
+const ExitCell = ({ person }) => {
+  const marks = exitMarks(person);
+  const alarming = exitAlarming(person);
 
   return (
-    <div className={classNames("flex flex-wrap gap-1", className)}>
-      {list.map((r) => (
-        <Badge key={r.label} tone={r.tone} title={r.title}>
-          {r.label}
-        </Badge>
-      ))}
-    </div>
+    <span title={exitNote(person) || undefined}>
+      <span className={classNames(alarming && "font-semibold text-signal-strong")}>
+        {hourCell(person.endHm)}
+        {/* Gwiazdka znaczy "wyliczone, nie zmierzone" — legenda stoi pod tabelą. */}
+        {person.endIsPlanned && <span className="text-signal-strong">*</span>}
+      </span>
+      {marks.length > 0 && (
+        // Znaczniki karty małymi literami i drobnym tekstem: to przypis do
+        // liczby obok, nie osobna informacja.
+        <span className="ml-1 font-sans text-xs font-normal normal-case text-muted">
+          {marks.join(" ")}
+        </span>
+      )}
+    </span>
   );
 };
 
@@ -133,7 +158,13 @@ const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
   return (
     <Tr className={classNames(live && "bg-signal-soft")}>
       <Td>
-        <span className="font-medium">{fullName(person)}</span>
+        {/* Dymek przy nazwisku niesie ujemne saldo nadgodzin. Saldo jest stanem
+            narastającym, bez własnej daty, więc nie ma czego robić w wierszu
+            opisującym JEDEN dzień — ale przy rozmowie z pracownikiem przydaje
+            się pod ręką. */}
+        <span className="font-medium" title={nameNote(person) || undefined}>
+          {fullName(person)}
+        </span>
         {/* Kierownik odbija własną kartę jak każdy, więc stoi na tej liście —
             bez podpisu szukałby siebie po nazwisku. */}
         {isMe && <span className="ml-2 text-xs text-muted">(Ty)</span>}
@@ -150,9 +181,7 @@ const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
         <>
           <Num>{hourCell(person.startHm)}</Num>
           <Num>
-            {hourCell(person.endHm)}
-            {/* Gwiazdka znaczy "wyliczone, nie zmierzone" — legenda stoi pod tabelą. */}
-            {person.endIsPlanned && <span className="text-signal-strong">*</span>}
+            <ExitCell person={person} />
           </Num>
           <Num>{person.startHm ? formatDuration(worked) : "—"}</Num>
         </>
@@ -162,9 +191,6 @@ const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
           <RunningCell running={person.running} drift={drift} />
         </Td>
       )}
-      <Td>
-        <Remarks person={person} />
-      </Td>
     </Tr>
   );
 };
@@ -187,7 +213,7 @@ const PersonCard = ({ person, showHours, showRunning, drift, isMe }) => {
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-medium truncate">
+        <p className="font-medium truncate" title={nameNote(person) || undefined}>
           {fullName(person)}
           {isMe && <span className="ml-2 text-xs font-normal text-muted">(Ty)</span>}
         </p>
@@ -201,9 +227,7 @@ const PersonCard = ({ person, showHours, showRunning, drift, isMe }) => {
         <p className="mt-1 font-mono text-sm tabular-nums text-muted">
           {person.startHm ? (
             <>
-              {person.startHm} → {hourCell(person.endHm)}
-              {person.endIsPlanned && <span className="text-signal-strong">*</span>} ·{" "}
-              {formatDuration(worked)}
+              {person.startHm} → <ExitCell person={person} /> · {formatDuration(worked)}
             </>
           ) : (
             "bez karty czasu"
@@ -219,7 +243,6 @@ const PersonCard = ({ person, showHours, showRunning, drift, isMe }) => {
         </div>
       )}
 
-      <Remarks person={person} className="mt-2" />
     </li>
   );
 };
@@ -297,18 +320,28 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           o jutrze aplikacja wie tylko tyle, kto nie ma nieobecności — godzin
           jeszcze nie ma skąd wziąć. "W pracy 0" byłoby prawdą, która nic nie
           mówi. */}
+      {/* "Nieobecności planowane", a nie samo "Nieobecności": obok stoi kafel
+          "Bez karty", który też liczy ludzi, których nie ma, i dwie nazwy
+          znaczące „nie ma go" niczego nie rozdzielały. Rozdziela je
+          USPRAWIEDLIWIENIE — tu nieobecność zgłoszona i zatwierdzona, tam brak
+          karty bez wyjaśnienia. */}
       {isFuture ? (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
           <Stat label="W planie" value={counts.expected} hint="bez zgłoszonej nieobecności" />
-          <Stat label="Nieobecności" value={counts.absent} hint="zatwierdzone" />
+          <Stat label="Nieobecności planowane" value={counts.absent} hint="zatwierdzone" />
           <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           <Stat label="W pracy" value={counts.working} tone={counts.working > 0 ? "signal" : "default"} />
           <Stat label="Po pracy" value={counts.done} />
-          <Stat label="Nieobecności" value={counts.absent} />
-          <Stat label="Bez karty" value={counts.noCard} tone={counts.noCard > 0 ? "danger" : "default"} />
+          <Stat label="Nieobecności planowane" value={counts.absent} hint="zgłoszone i zatwierdzone" />
+          <Stat
+            label="Bez karty"
+            value={counts.noCard}
+            hint="bez zgłoszonej nieobecności"
+            tone={counts.noCard > 0 ? "danger" : "default"}
+          />
           <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
         </div>
       )}
@@ -354,7 +387,6 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
                       </>
                     )}
                     {showRunning && <Th>Teraz robi</Th>}
-                    <Th>Uwagi</Th>
                   </Tr>
                 </thead>
                 <tbody>

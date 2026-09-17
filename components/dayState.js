@@ -36,10 +36,14 @@ const STATES = {
 /**
  * Etykieta i ton chipa stanu.
  *
- * Dwa doprecyzowania wobec surowej mapy wyżej:
+ * Trzy doprecyzowania wobec surowej mapy wyżej:
  *  - pełna dniówka dostaje zieleń, ale karta domknięta nocą NIGDY — ósemka
  *    wpisana przez zadanie nocne jest założona, nie zmierzona, a zieleń w tym
  *    systemie znaczy "przepracowane i pełne";
+ *  - dniówka NIEPEŁNA dostaje czerwień, tym samym podziałem, co belka na osi
+ *    czasu (components/dayTimeline.js). Wcześniej była neutralna razem
+ *    z domkniętą nocą i przez to niewidoczna, choć jest jedyną z trzech, która
+ *    wymaga rozmowy z pracownikiem;
  *  - brak karty robi się czerwony dopiero wtedy, gdy przestaje znaczyć
  *    "jeszcze nie przyszedł" (flagę `latePunch` ustawia serwer, bo zegar
  *    przeglądarki bywa przestawiony).
@@ -47,8 +51,8 @@ const STATES = {
 export const stateBadge = (person) => {
   const base = STATES[person.state] || STATES.no_card;
 
-  if (person.state === "done" && person.full && !person.autoClosed) {
-    return { label: base.label, tone: "ok" };
+  if (person.state === "done" && !person.autoClosed) {
+    return { label: base.label, tone: person.full ? "ok" : "danger" };
   }
   // Tylko `no_card`. `pending_absence` zostaje w tonie wniosku, bo tam brak
   // karty ma już wyjaśnienie — ktoś zgłosił nieobecność i czeka na decyzję.
@@ -61,77 +65,89 @@ export const stateBadge = (person) => {
 /** Czy ten stan znaczy "pracuje TERAZ" — jedyne uprawnienie do bursztynu. */
 export const isLive = (person) => person.state === "working" || person.state === "absent_present";
 
+// --- dopiski przy godzinach -------------------------------------------------
+//
+// Do września 2026 wszystko poniżej stało w osobnej kolumnie "Uwagi" jako rządek
+// chipów wersalikami. Przy trzech chipach w wierszu kolumna przestawała się
+// czytać, a ekran, który ma dawać odpowiedź JEDNYM SPOJRZENIEM, kazał czytać
+// siedem wielkich napisów obok każdego nazwiska.
+//
+// Dopiski wróciły więc tam, o czym mówią: znaczniki karty stoją przy godzinie
+// wyjścia, wyprowadzenie tej godziny siedzi w jej dymku, a stany, o których
+// mówi już chip stanu i podpis nieobecności ("karta mimo nieobecności",
+// "wniosek oczekuje"), nie są powtarzane wcale.
+
 /**
- * Drobne dopiski w kolumnie "Uwagi": wyłącznie rzeczy, które zmieniają odczyt
- * godzin albo wymagają reakcji. Każdy to para {label, tone, title}.
+ * Skąd wzięła się godzina w kolumnie "Wyjście" — treść dymka.
+ *
+ * Wyprowadzenie wpisane słowami, a nie chip "wcześniej o 1h 30min": kierownik
+ * patrzący na 14:00 pyta „czemu 14:00", a nie „czy jest tu jakiś wniosek".
  */
-export const remarks = (person) => {
-  const out = [];
+export const exitNote = (person) => {
+  if (!person.startHm) return "";
+
+  const parts = [];
+
+  if (person.endIsPlanned) {
+    const shift = [];
+    if (person.stayLongerMin > 0)
+      shift.push(`+ ${formatMinutes(person.stayLongerMin)} (zatwierdzone zostanie dłużej)`);
+    if (person.earlyLeaveMin > 0)
+      shift.push(`− ${formatMinutes(person.earlyLeaveMin)} (zatwierdzone wcześniejsze wyjście)`);
+
+    parts.push(
+      `Godzina WYLICZONA: ${person.startHm} + 8 h${shift.length ? ` ${shift.join(" ")}` : ""}.` +
+        " Aplikacja nie zna grafiku pracy, więc to prognoza, nie ustalenie."
+    );
+    if (person.overdue) {
+      parts.push(
+        "Karta wisi otwarta po tej godzinie — sprawdź, czy ktoś nie zapomniał drugiego dotknięcia kafelka."
+      );
+    }
+  }
 
   if (person.autoClosed) {
-    out.push({
-      label: "auto",
-      tone: "neutral",
-      title: "Kartę domknęło zadanie nocne na osiem godzin od wejścia — godzina jest założona, nie zmierzona",
-    });
+    parts.push(
+      "Kartę domknęło zadanie nocne na osiem godzin od wejścia — ta godzina jest założona, nie zmierzona."
+    );
   }
   if (person.editedByName) {
-    out.push({ label: `popr. ${person.editedByName}`, tone: "neutral", title: "Karta poprawiona przez kierownika" });
-  }
-  if (person.earlyLeaveMin > 0) {
-    out.push({
-      label: `wcześniej o ${formatMinutes(person.earlyLeaveMin)}`,
-      tone: "accent",
-      title: "Zatwierdzony wniosek o wcześniejsze wyjście — planowane wyjście jest o tyle wcześniej",
-    });
-  }
-  if (person.stayLongerMin > 0) {
-    out.push({
-      label: `dłużej o ${formatMinutes(person.stayLongerMin)}`,
-      tone: "accent",
-      title: "Zatwierdzony wniosek o zostanie dłużej — planowane wyjście jest o tyle później",
-    });
-  }
-  // Karta otwarta po godzinie, o której miała się zamknąć. To prawie zawsze
-  // zapomniane drugie dotknięcie kafelka, a zadanie nocne złapie je dopiero
-  // o 3:00 — ten chip jest jedynym miejscem, gdzie da się zareagować tego
-  // samego dnia. Bursztyn, bo mówi o stanie "teraz".
-  if (person.overdue) {
-    out.push({
-      label: "po planowanym wyjściu",
-      tone: "signal",
-      title:
-        "Karta wisi otwarta po wyliczonej godzinie wyjścia — sprawdź, czy ktoś nie zapomniał drugiego dotknięcia kafelka",
-    });
-  }
-  if (person.state === "absent_present") {
-    out.push({
-      label: "karta mimo nieobecności",
-      tone: "signal",
-      title: "Ma zatwierdzoną nieobecność na ten dzień, a jednak odbił kartę",
-    });
-  }
-  // Wniosek oczekujący dopisujemy TYLKO wtedy, gdy nie mówi o nim już chip
-  // stanu — czyli gdy ktoś zgłosił urlop na ten dzień i MIMO TO odbił kartę.
-  // To sytuacja, o której kierownik ma wiedzieć przed decyzją; przy pustej
-  // karcie stan "Wniosek" wystarcza i drugi chip byłby powtórzeniem.
-  if (person.absence && person.absence.status === "pending" && person.state !== "pending_absence") {
-    out.push({ label: "wniosek oczekuje", tone: "accent", title: "Nieobecność na ten dzień czeka na decyzję" });
-  }
-  // Saldo nadgodzin to stan NARASTAJĄCY, bez własnej daty — nie ma nic wspólnego
-  // z wnioskiem o wcześniejsze wyjście z tego dnia. Pokazujemy je tylko na
-  // minusie, bo tylko wtedy jest czego dopilnować (przypomnienie o niedogodzinach
-  // wraca w każdy wtorek, dopóki saldo nie wróci nad progiem).
-  if (person.balanceMin < 0) {
-    out.push({
-      label: `saldo ${formatMinutes(person.balanceMin)}`,
-      tone: "danger",
-      title: "Ujemne saldo nadgodzin — do pokrycia urlopem i osobnym wnioskiem",
-    });
+    parts.push(`Kartę poprawił kierownik: ${person.editedByName}.`);
   }
 
+  return parts.join(" ");
+};
+
+/**
+ * Znaczniki karty przy godzinie wyjścia — drobnym tekstem, nie chipem
+ * wersalikami. To przypis do liczby obok, nie osobna informacja.
+ */
+export const exitMarks = (person) => {
+  const out = [];
+  if (person.autoClosed) out.push("auto");
+  if (person.editedByName) out.push("popr.");
   return out;
 };
+
+/**
+ * Czy godzina wyjścia sama ma krzyczeć. Bursztyn, bo mówi o stanie "teraz":
+ * karta otwarta po wyliczonej godzinie wyjścia to prawie zawsze zapomniane
+ * drugie dotknięcie kafelka, a zadanie nocne złapie je dopiero o 3:00.
+ */
+export const exitAlarming = (person) => Boolean(person.overdue);
+
+/**
+ * Dymek przy nazwisku: ujemne saldo nadgodzin.
+ *
+ * Saldo jest stanem NARASTAJĄCYM, bez własnej daty — nie ma nic wspólnego z tym
+ * konkretnym dniem i dlatego zeszło z wiersza do dymka. Na plusie milczy: nie
+ * ma czego pilnować, a przypomnienie o niedogodzinach wraca w każdy wtorek,
+ * dopóki saldo jest pod progiem.
+ */
+export const nameNote = (person) =>
+  person.balanceMin < 0
+    ? `Saldo nadgodzin ${formatMinutes(person.balanceMin)} — do pokrycia urlopem i osobnym wnioskiem.`
+    : "";
 
 /**
  * Rodzaj nieobecności w skrócie z terminem powrotu, albo puste.

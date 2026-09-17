@@ -781,7 +781,10 @@ ekranów: tablicy kafelków, panelu nieobecności, panelu nadgodzin i raportu
 zadań — a odpowiedzi trzeba było zestawić w głowie.
 
 Zawartość, w kolejności czytania: **kafle liczbowe**, **oś czasu**, **tabela
-zespołu** (na telefonie karty) i **wnioski do rozpatrzenia**. Dzień wybiera się
+zespołu** (na telefonie karty) i **wnioski do rozpatrzenia**. Kafle rozdzielają
+*Nieobecności planowane* (zgłoszone i zatwierdzone) od *Bez karty* (brak karty
+bez wyjaśnienia) — dwa kafle znaczące „nie ma go” rozdziela
+USPRAWIEDLIWIENIE, nie sama liczba. Dzień wybiera się
 strzałkami, skrótami *Wczoraj / Dziś / Jutro* albo polem daty; siedzi w adresie
 (`?dzien=RRRR-MM-DD`), więc widok da się zalinkować. „Dziś” **zdejmuje**
 parametr, bo link wysłany komuś jutro miałby inaczej pokazywać wczoraj.
@@ -822,7 +825,7 @@ kłamałoby o godzinę.
 | Stan | Kiedy | Kolor |
 |---|---|---|
 | **W pracy** | karta otwarta | bursztyn — jedyne uprawnione użycie na tym ekranie |
-| **Po pracy** | karta zamknięta | zieleń przy pełnej dniówce ZMIERZONEJ, inaczej neutralny |
+| **Po pracy** | karta zamknięta | zieleń przy pełnej dniówce ZMIERZONEJ, czerwień przy niepełnej, neutralny przy domkniętej nocą |
 | **Nieobecność** | zatwierdzona nieobecność, bez karty | neutralny, ze skrótem rodzaju |
 | **Wniosek** | nieobecność czeka na decyzję | akcent |
 | **Bez karty** | nic z powyższych | neutralny do 9:00, potem czerwony |
@@ -830,7 +833,11 @@ kłamałoby o godzinę.
 
 Karta z flagą `autoClosed` **nigdy nie dostaje zieleni**, choć ma równe osiem
 godzin: ta ósemka jest założona, nie zmierzona, a zieleń w tym systemie znaczy
-„przepracowane i pełne”.
+„przepracowane i pełne”. Nie dostaje też czerwieni — o tej karcie nie wiadomo
+nic poza tym, że nikt jej nie zamknął, więc „za krótko” byłoby równie
+nieuprawnione jak „pełna”. Neutralny szary należy wyłącznie do niej; dniówka
+NIEPEŁNA jest czerwona, bo jest jedyną z trzech, która wymaga rozmowy
+z pracownikiem.
 
 Etykiety są bezosobowe („Po pracy”, nie „Zakończył”) — rodzaj gramatyczny
 pracownika nie jest aplikacji znany i nie ma się w nim zgadywać.
@@ -838,6 +845,26 @@ pracownika nie jest aplikacji znany i nie ma się w nim zgadywać.
 Chip **„po planowanym wyjściu”** przy karcie wciąż otwartej to prawie zawsze
 zapomniane drugie dotknięcie kafelka. Zadanie nocne złapie je dopiero o 3:00,
 więc ten ekran jest jedynym miejscem, gdzie da się zareagować tego samego dnia.
+
+#### Co pokazuje oś czasu
+
+Belka na osobę, od wejścia do wyjścia, z **godzinami wypisanymi na niej**
+(w belce, gdy się mieszczą, obok — gdy dzień był krótki). Kolor belki to ten
+sam podział, co chip stanu w tabeli: bursztyn „w pracy”, zieleń „pełna
+dniówka”, czerwień „dniówka niepełna”, szarość „domknięta nocą”.
+
+Do tego pasmo nieobecności na całą szerokość okna, włosowa kreska planowanego
+wyjścia i pionowa linia „teraz”.
+
+**Wcześniejsze wyjście przesuwa kreskę, a nie belkę.** Zatwierdzona godzina
+w dół (np. wyjście o 14:00 zamiast 15:30) zmienia planowane wyjście — czyli
+kreskę na osi i kolumnę „Wyjście”. Belka pokazuje obecność FAKTYCZNĄ: jeśli
+pracownik wyjdzie o 14:00 i odbije kartę, skończy się o 14:00 sama; jeśli
+zostanie do 15:30, pojedzie do 15:30 i **wystanie za kreskę**, bo tak było.
+Kolumna „Czas” też nie jest skracana — karta mierzy obecność, a godzinę
+„oddaną” rozlicza saldo nadgodzin, osobną osią. Belka wystająca za kreskę na
+karcie WCIĄŻ OTWARTEJ to inna sytuacja i ma własny sygnał: godzina wyjścia
+robi się bursztynowa i pogrubiona (zapomniane drugie dotknięcie kafelka).
 
 #### Dzień przyszły i dzień miniony
 
@@ -851,6 +878,26 @@ nie dało się jeszcze odbić.
 Dla wczoraj i jutra **polling jest wyłączony**: przeszłość się nie zmienia,
 a przyszłość nie ma „teraz”. Dziś odświeża się co `LIVE_POLL_MS` (45 s,
 `utils/live.js`) — tym samym cyklem co tablica kiosku i „Teraz w toku”.
+
+#### Bez kolumny „Uwagi”
+
+Pierwsza wersja miała siódmą kolumnę z rządkiem chipów wersalikami (`auto`,
+`popr.`, `wcześniej o 1h 30min`, `saldo −5h`, `karta mimo nieobecności`).
+Przy trzech chipach w wierszu przestawała się czytać, a ekran, który ma dawać
+odpowiedź jednym spojrzeniem, kazał czytać siedem wielkich napisów obok każdego
+nazwiska. Kolumna zniknęła, a jej treść wróciła tam, o czym mówi:
+
+| Co | Gdzie teraz |
+|---|---|
+| znaczniki karty (`auto`, `popr.`) | drobnym tekstem przy godzinie wyjścia |
+| wyprowadzenie godziny (`wejście + 8 h ± wnioski`) | dymek godziny wyjścia |
+| karta otwarta po planowanym wyjściu | sama godzina robi się bursztynowa i pogrubiona |
+| ujemne saldo nadgodzin | dymek przy nazwisku |
+| „karta mimo nieobecności”, „wniosek oczekuje” | nigdzie — mówi o nich już chip stanu i podpis nieobecności pod nim |
+
+Dwa ostatnie nie są stratą: wiersz z chipem **W pracy** i podpisem
+*Urlop do 2026-09-17* pod nim mówi „ma urlop, a jednak odbił kartę” bez
+trzeciego napisu o tym samym.
 
 #### Wnioski do rozpatrzenia
 

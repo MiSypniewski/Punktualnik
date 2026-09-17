@@ -23,6 +23,34 @@ import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR } from "../utils";
 
 const MINUTES_PER_DAY = 24 * 60;
 
+// Od jakiej szerokości belki napis „06:45 – 15:45*” mieści się w niej samej.
+// Trzynaście znaków monospace przy text-xs to około 90 px, a najwęższy tor
+// (kolumna nazwisk odjęta od szerokości okna na progu lg) ma około 790 px —
+// stąd czternaście procent z zapasem. Poniżej progu godziny idą OBOK belki,
+// bo tor ma overflow-hidden i napis w za wąskiej belce zostałby przycięty
+// w połowie cyfry.
+const LABEL_FITS_PCT = 14;
+
+/**
+ * Kolor belki i tekstu na niej.
+ *
+ * Cztery przypadki, nie trzy, i to jest zmiana wobec pierwszej wersji: „karta
+ * niepełna” i „karta domknięta nocą” dzieliły wcześniej jeden neutralny szary
+ * i przez to niepełna dniówka była na osi niewidoczna, choć jest jedyną
+ * z czterech, która wymaga rozmowy z pracownikiem.
+ *
+ * Domknięta nocą ZOSTAJE neutralna: ta ósemka jest założona, nie zmierzona,
+ * więc nie wolno jej pomalować ani na zielono („przepracowane i pełne”), ani
+ * na czerwono („za krótko”) — o niej nie wiadomo nic poza tym, że nikt karty
+ * nie zamknął.
+ */
+const barStyle = (person, running) => {
+  if (running) return { bar: "bg-signal", ink: "text-signal-ink" };
+  if (person.autoClosed) return { bar: "bg-raised border border-line", ink: "text-muted" };
+  if (person.full) return { bar: "bg-ok", ink: "text-ok-ink" };
+  return { bar: "bg-danger", ink: "text-danger-ink" };
+};
+
 /**
  * Okno godzin osi.
  *
@@ -79,10 +107,16 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
             godzin musi stać dokładnie nad torem, nie obok niego. */}
         <div className="w-48 shrink-0" />
         <div className="relative flex-grow h-4">
-          {hours.map((h) => (
+          {hours.map((h, i) => (
             <span
               key={h}
-              className="absolute -translate-x-1/2 font-mono text-[0.6875rem] tabular-nums text-muted"
+              className={classNames(
+                "absolute font-mono text-[0.6875rem] tabular-nums text-muted",
+                // Podpis stoi NAD kreską, czyli wyśrodkowany na niej. Skrajne
+                // dwa są wyjątkiem: wyśrodkowany wisiałby połową w marginesie
+                // strony, więc pierwszy dosuwa się w prawo, ostatni w lewo.
+                i === 0 ? "translate-x-0" : i === hours.length - 1 ? "-translate-x-full" : "-translate-x-1/2"
+              )}
               style={{ left: `${pct(h * 60)}%` }}
             >
               {String(h % 24).padStart(2, "0")}
@@ -103,6 +137,11 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
           const barTo = hasCard
             ? pct(running ? Math.max(nowLive, person.startMin) : person.endMin)
             : 0;
+
+          // Godziny karty — te same, które stoją w tabeli. Dla karty otwartej
+          // druga liczba jest PROGNOZĄ, więc dostaje gwiazdkę jak w tabeli.
+          const span = `${person.startHm} – ${person.endHm}${person.endIsPlanned ? "*" : ""}`;
+          const inside = barTo - barFrom >= LABEL_FITS_PCT;
 
           return (
             <div key={person.userID} className="flex items-center gap-3">
@@ -145,18 +184,46 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
                 )}
 
                 {hasCard && (
-                  <span
-                    className={classNames(
-                      "absolute top-0.5 bottom-0.5 rounded-sm",
-                      running
-                        ? "bg-signal"
-                        : person.full && !person.autoClosed
-                        ? "bg-ok"
-                        : "bg-raised border border-line"
+                  <>
+                    <span
+                      className={classNames(
+                        "absolute top-0.5 bottom-0.5 rounded-sm flex items-center overflow-hidden",
+                        barStyle(person, running).bar
+                      )}
+                      style={{ left: `${barFrom}%`, width: `${Math.max(barTo - barFrom, 0.4)}%` }}
+                    >
+                      {/* Godziny W BELCE, gdy się w niej mieszczą. Szeroka belka
+                          ma na nie miejsce i wtedy liczba stoi dokładnie tam,
+                          gdzie oko już patrzy. */}
+                      {inside && (
+                        <span
+                          className={classNames(
+                            "px-1.5 font-mono text-xs tabular-nums whitespace-nowrap",
+                            barStyle(person, running).ink
+                          )}
+                        >
+                          {span}
+                        </span>
+                      )}
+                    </span>
+
+                    {/* Belka krótka — godziny obok niej. Po prawej, a przy
+                        belce kończącej się u krawędzi okna po lewej, bo tor ma
+                        overflow-hidden i napis wystający za prawy brzeg
+                        zostałby ucięty w połowie. */}
+                    {!inside && (
+                      <span
+                        className="absolute top-0 bottom-0 flex items-center font-mono text-xs tabular-nums whitespace-nowrap text-muted"
+                        style={
+                          barTo <= 78
+                            ? { left: `${barTo}%`, paddingLeft: "0.375rem" }
+                            : { right: `${100 - barFrom}%`, paddingRight: "0.375rem" }
+                        }
+                      >
+                        {span}
+                      </span>
                     )}
-                    style={{ left: `${barFrom}%`, width: `${Math.max(barTo - barFrom, 0.4)}%` }}
-                    title={`${person.startHm} – ${person.endHm}`}
-                  />
+                  </>
                 )}
 
                 {/* Kreska planowanego wyjścia — tylko dla karty otwartej, bo
@@ -199,8 +266,14 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
           <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-ok" /> pełna dniówka
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-raised border border-line" /> karta
-          niepełna lub domknięta nocą
+          <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-danger" /> dniówka niepełna
+        </span>
+        <span
+          className="flex items-center gap-1.5"
+          title="Kartę domknęło zadanie nocne na osiem godzin od wejścia — ta godzina jest założona, nie zmierzona"
+        >
+          <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-raised border border-line" /> domknięta
+          nocą
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-raised" /> nieobecność
