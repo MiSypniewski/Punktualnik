@@ -98,8 +98,11 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
   // klienta jest identyczny z HTML-em z serwera (drift = 0).
   const nowLive = Math.min(nowMin + Math.floor(drift / 60), MINUTES_PER_DAY * 2);
 
+  // Bez własnego marginesu dolnego: rytm strony ustawia strona
+  // (pages/urlopy/stan.js), inaczej dwa marginesy konkurowałyby i podniesienie
+  // odstępu na stronie po cichu ograniczałby margines z tego komponentu.
   return (
-    <div className="mb-6">
+    <div>
       {/* Skala godzin. Podpis jest przesunięty w lewo o pół swojej szerokości,
           żeby stał NAD kreską, a nie za nią. */}
       <div className="flex items-end gap-3 mb-1">

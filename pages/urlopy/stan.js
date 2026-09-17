@@ -3,7 +3,6 @@ import useSWR from "swr";
 import classNames from "classnames";
 import { getToken } from "next-auth/jwt";
 import BaseLayout from "../../components/baseLayout";
-import AbsenceTabs from "../../components/absenceTabs";
 import DayNav from "../../components/dayNav";
 import DayTimeline from "../../components/dayTimeline";
 import LiveDot from "../../components/liveDot";
@@ -297,7 +296,9 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
         description="Dzień zespołu: obecność z kart czasu, nieobecności i zgody na zmianę godzin — w jednym miejscu."
       />
 
-      <AbsenceTabs className="mb-5" />
+      {/* Bez paska podzakładek. Do obiegu wniosków prowadzi pozycja
+          „Nieobecności” w pasku stacyjnym, a ten ekran jest oglądany codziennie
+          rano i ma zaczynać się od dnia zespołu, nie od wyboru, gdzie pójść. */}
 
       {sections.length === 0 && (
         <Alert tone="warn" className="mb-6">
@@ -326,13 +327,13 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           USPRAWIEDLIWIENIE — tu nieobecność zgłoszona i zatwierdzona, tam brak
           karty bez wyjaśnienia. */}
       {isFuture ? (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
           <Stat label="W planie" value={counts.expected} hint="bez zgłoszonej nieobecności" />
           <Stat label="Nieobecności planowane" value={counts.absent} hint="zatwierdzone" />
           <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
           <Stat label="W pracy" value={counts.working} tone={counts.working > 0 ? "signal" : "default"} />
           <Stat label="Po pracy" value={counts.done} />
           <Stat label="Nieobecności planowane" value={counts.absent} hint="zgłoszone i zatwierdzone" />
@@ -351,12 +352,12 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           też jej nie ma — nie byłoby na niej ani jednej belki, bo godzin
           jeszcze nie ma skąd wziąć. */}
       {people.length > 0 && !isFuture && (
-        <div className="hidden lg:block">
+        <div className="hidden lg:block mb-10">
           <DayTimeline people={people} isToday={isToday} nowMin={board.nowMin} drift={drift} />
         </div>
       )}
 
-      <Plate className="mb-6 overflow-hidden">
+      <Plate className="mb-3 overflow-hidden">
         <PlateHeader className="bg-raised">
           <h2 className="text-xs font-bold uppercase tracking-signage">Zespół ({people.length})</h2>
           <p className="text-xs text-muted">
@@ -441,7 +442,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           overtime={board.pending.overtime}
           leaveLeft={board.leaveLeft}
           onDecided={mutate}
-          className="mt-6"
+          className="mt-10"
         />
       )}
     </BaseLayout>

@@ -754,11 +754,11 @@ nie pojedynczego dnia, więc jego wymiar trzeba policzyć.
 pozostało), formularz wniosku i historia z możliwością anulowania, dopóki wniosek
 czeka na decyzję.
 
-**Kierownik** ma dwa ekrany, wiązane paskiem podzakładek. `/urlopy/zarzadzaj` to
-**obieg wniosków**: wnioski do rozpatrzenia, wpisywanie nieobecności za
-pracownika, przydzielanie dni i historia z filtrami. `/urlopy/stan` to
-**dzień zespołu** (niżej). Oba widzą wyłącznie swoje sekcje (`ManagerSections`,
-jak przy nadgodzinach).
+**Kierownik** ma dwa ekrany, oba z własną pozycją w pasku stacyjnym.
+`/urlopy/zarzadzaj` to **obieg wniosków**: wnioski do rozpatrzenia, wpisywanie
+nieobecności za pracownika, przydzielanie dni i historia z filtrami.
+`/urlopy/stan` to **dzień zespołu** (niżej). Oba widzą wyłącznie swoje sekcje
+(`ManagerSections`, jak przy nadgodzinach).
 
 **Zatwierdzony urlop da się cofnąć** — i to jest najczęstszy przypadek użycia:
 pracownik rezygnuje, a sam już nic nie zrobi, bo anulowanie działa tylko na
@@ -1718,7 +1718,7 @@ Nowy ekran składa się z `components/ui/`, nie z klas pisanych na miejscu:
 | kafla z liczbą | `Stat` |
 | `<h1>` z opisem strony | `PageHeader` |
 | „brak danych” | `EmptyState` |
-| podzakładek w module (dwie strony jednego obiegu) | `TabNav`; listę pozycji trzyma jeden plik per moduł, np. `components/absenceTabs.js` |
+| podzakładek w module (dwie strony jednego obiegu) | `TabNav`; listę pozycji trzyma jeden plik per moduł, np. `components/absenceTabs.js`. Dziś używa go tylko `/urlopy/zarzadzaj` — na `/urlopy/stan` pasek zdjęto, bo ten ekran jest oglądany codziennie rano i ma zaczynać się od dnia zespołu, nie od wyboru, gdzie pójść |
 | emoji jako ikony | `components/ui/icons.js` |
 
 Powłokę daje `BaseLayout` (strażnik sesji) → `AppShell` (pasek, kontener, stopka).
