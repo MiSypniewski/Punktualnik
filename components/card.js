@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
 import { absenceKindShort } from "../services/absenceKinds";
-import { DifferenceTime, Timer } from "../utils";
+import { DifferenceTime, Timer, WORKDAY_HOURS } from "../utils";
 import LiveDot from "./liveDot";
 
 import dayjs from "dayjs";
@@ -168,7 +168,7 @@ const Card = ({ data, onSaved }) => {
       return;
     }
     if (status === "wait") {
-      const endTime = dayjs().add(8, "hour").format();
+      const endTime = dayjs().add(WORKDAY_HOURS, "hour").format();
       setStartTime(dayjs().format());
       setEndTime(endTime);
       setStatus("workInProgress");

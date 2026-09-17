@@ -32,9 +32,21 @@ const ROUNDS = Number(arg("rounds", 5));
 const COOKIE = arg("cookie", "");
 
 // Ścieżki dobrane tak, żeby odwzorować realny ruch: najcięższy SSR panelu
-// kierownika, strona pracownika i dwa endpointy odpytywane cyklicznie przez
-// każdą otwartą kartę.
-const PATHS = ["/zadania/zarzadzaj", "/zadania", "/api/entries/timer", "/api/entries/running"];
+// kierownika, strona pracownika i endpointy odpytywane cyklicznie przez każdą
+// otwartą kartę.
+//
+// /urlopy/stan i /api/absences/board doszły z ekranem „Aktualny stan”: ten
+// widok składa pięć zapytań na jedno żądanie i odpytuje sam siebie co 45 s
+// z każdej otwartej karty kierownika, więc jest drugim po raporcie zadań
+// kandydatem na zamrożenie pętli zdarzeń.
+const PATHS = [
+  "/zadania/zarzadzaj",
+  "/zadania",
+  "/urlopy/stan",
+  "/api/entries/timer",
+  "/api/entries/running",
+  "/api/absences/board",
+];
 
 const percentile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor((sorted.length * p) / 100))];
 

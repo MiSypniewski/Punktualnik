@@ -111,6 +111,32 @@ const elapsedSeconds = (startedAt, nowStamp) =>
   Math.max(0, dayjs(nowStamp).diff(dayjs(startedAt), "second"));
 
 /**
+ * Same biegnące timery zespołu, bez listy "bez timera".
+ *
+ * Wydzielone, bo services/dayBoard.js potrzebuje dokładnie tej jednej listy —
+ * wołanie całego getLiveBoard() dokładałoby mu przy każdym cyklu odpytywania
+ * drugie, niepotrzebne zapytanie (stmtIdle). Kopia samego SELECT-a w tamtym
+ * pliku byłaby drugim miejscem, w którym trzeba pamiętać o zawężeniu po
+ * u.section i o liczeniu elapsedSec na serwerze.
+ *
+ * @param {string[]} sections zasięg z services/scope.js
+ */
+export const getRunningEntries = (sections) => {
+  const list = Array.isArray(sections) ? sections : [];
+  if (list.length === 0) return [];
+
+  const nowStamp = toStamp(appNow());
+  const params = {};
+  list.forEach((s, i) => {
+    params[`sec${i}`] = String(s);
+  });
+
+  return stmtRunning(list.length)
+    .all(params)
+    .map((r) => ({ ...r, elapsedSec: elapsedSeconds(r.startedAt, nowStamp) }));
+};
+
+/**
  * @param {string[]} sections zasięg z services/scope.js
  * @returns {{running: object[], idle: object[], generatedAt: string}}
  */

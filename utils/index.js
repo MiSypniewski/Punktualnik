@@ -24,10 +24,26 @@ export const Timer = (stop) => {
   }
 };
 
+/**
+ * Ile trwa domyślna dniówka.
+ *
+ * Ta liczba istniała w trzech kopiach: jako granica nadgodzin w DifferenceTime
+ * niżej, jako `endTime` podstawiane przy odbiciu wejścia (components/card.js)
+ * i jako reguła domknięcia karty zapomnianej na kiosku
+ * (services/closeOpenCards.js). Wszystkie trzy mówią o tej samej ósemce, więc
+ * rozjechanie ich znaczyłoby, że kafelek liczy do innej godziny, niż zadanie
+ * nocne wpisuje do ewidencji.
+ *
+ * Siedzi w utils/, nie w services/, bo potrzebuje jej i przeglądarka
+ * (kafelek, oś czasu), i serwer (domykanie, planowane wyjście) — ta sama zasada
+ * co przy TASK_QUERY_MAX niżej.
+ */
+export const WORKDAY_HOURS = 8;
+
 export const DifferenceTime = (start, stop) => {
   const workTime = dayjs(stop).diff(dayjs(start), "hours");
   const tmp = dayjs.duration(dayjs(stop).diff(dayjs(start)));
-  if (workTime < 8) {
+  if (workTime < WORKDAY_HOURS) {
     return {
       overtime: false,
       time: tmp.format(`HH:mm:ss`),
@@ -66,6 +82,21 @@ export const TASK_QUERY_MAX = 100;
  */
 export const TIME_LIST_LIMIT = 500;
 
+/**
+ * Okno godzin osi czasu na /urlopy/stan.
+ *
+ * Stałe, a nie wyliczone z danych: oś, która co odświeżenie zmienia skalę,
+ * przestaje dawać porównanie między dniami — belka „od 7:00” byłaby w innym
+ * miejscu we wtorek i w środę. components/dayTimeline.js rozszerza okno tylko
+ * wtedy, gdy ktoś realnie wyszedł poza nie, i zawsze do pełnej godziny.
+ *
+ * Tu, a nie w services/, z tego samego powodu co TIME_LIST_LIMIT wyżej —
+ * liczb potrzebuje wyłącznie przeglądarka, ale import z services/ wciągnąłby
+ * do jej bundla better-sqlite3.
+ */
+export const TIMELINE_FROM_HOUR = 5;
+export const TIMELINE_TO_HOUR = 19;
+
 // --- daty ------------------------------------------------------------------
 //
 // JEDEN format daty w całej aplikacji: RRRR-MM-DD.
@@ -90,6 +121,26 @@ export const DATETIME_FORMAT = "YYYY-MM-DD HH:mm";
 
 /** Dowolny znacznik → "2026-08-14". Pusta wartość zostaje pusta, nie "Invalid Date". */
 export const formatDate = (value) => (value ? dayjs(value).format(DATE_FORMAT) : "");
+
+/**
+ * Czy to jest data ISTNIEJĄCA, a nie tylko ciąg w kształcie daty.
+ *
+ * Aplikacja sprawdza daty z adresu wyrażeniem `/^\d{4}-\d{2}-\d{2}$/`, które
+ * przepuszcza "2026-13-99" i "2026-02-30" — kształt jest poprawny, dnia nie ma.
+ * Tam, gdzie data jest jednym z kilku filtrów, kończy się to pustą listą i nikt
+ * tego nie zauważa. Na /urlopy/stan data jest TREŚCIĄ ekranu: zły dzień
+ * przechodził do nagłówka jako "Invalid Date", a strzałki liczyły od niego
+ * następny dzień, dostając kolejne "Invalid Date".
+ *
+ * Porównanie po formatowaniu wyłapuje oba przypadki bez dodatkowej wtyczki:
+ * dayjs dla dnia nieistniejącego zwraca "Invalid Date", a dla przepełnionego
+ * (30 lutego) przesuwa na 2 marca — w obu wynik różni się od wejścia.
+ */
+export const isIsoDate = (value) => {
+  const raw = String(value ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+  return dayjs(raw).format(DATE_FORMAT) === raw;
+};
 
 /** Znacznik z godziną → "2026-08-14 07:12". Sekund nie pokazujemy nigdzie w tekście. */
 export const formatDateTime = (value) => (value ? dayjs(value).format(DATETIME_FORMAT) : "");

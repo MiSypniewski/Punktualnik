@@ -8,5 +8,6 @@ export { default as Stat } from "./stat";
 export { default as PageHeader } from "./pageHeader";
 export { default as EmptyState } from "./emptyState";
 export { default as FormatChoice } from "./formatChoice";
+export { default as TabNav } from "./tabNav";
 export { default as UserOptions } from "./userOptions";
 export * from "./icons";
