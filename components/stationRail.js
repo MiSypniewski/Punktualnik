@@ -53,8 +53,15 @@ const navItems = (user) => {
     items.push({ href: "/zadania/projekty", match: "/zadania/projekty", label: "Projekty", secondary: true });
   if (canApproveOvertime(role))
     items.push({ href: "/nadgodziny/zarzadzaj", match: "/nadgodziny/zarzadzaj", label: "Wnioski" });
-  if (canApproveLeave(role))
+  // Dzień zespołu na jednym ekranie. Pozycja jest PIERWSZOPLANOWA, choć moduł
+  // ma już swoją ("Nieobecności" niżej): tamta prowadzi do obiegu wniosków,
+  // czyli do pracy zaplanowanej, a ta do spojrzenia rzucanego codziennie rano.
+  // Oba ekrany wiąże pasek podzakładek (components/absenceTabs.js), więc
+  // kierownik nie musi wracać do paska stacyjnego, żeby przejść między nimi.
+  if (canApproveLeave(role)) {
+    items.push({ href: "/urlopy/stan", match: "/urlopy/stan", label: "Aktualny stan" });
     items.push({ href: "/urlopy/zarzadzaj", match: "/urlopy/zarzadzaj", label: "Nieobecności" });
+  }
   // Korekta kart czasu — narzędzie doraźne, więc `secondary`. Kierownik zagląda
   // tu po zapomnianym odbiciu, nie codziennie. Trasa jest STATYCZNA, więc Next
   // dopasuje ją przed dynamiczną /time/[id] ("Moja sekcja") i obie pozycje

@@ -3,6 +3,7 @@ import useSWR from "swr";
 import classNames from "classnames";
 import { getToken } from "next-auth/jwt";
 import BaseLayout from "../../components/baseLayout";
+import AbsenceTabs from "../../components/absenceTabs";
 import DayNav from "../../components/dayNav";
 import DayTimeline from "../../components/dayTimeline";
 import LiveDot from "../../components/liveDot";
@@ -271,6 +272,8 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
         title="Aktualny stan"
         description="Dzień zespołu: obecność z kart czasu, nieobecności i zgody na zmianę godzin — w jednym miejscu."
       />
+
+      <AbsenceTabs className="mb-5" />
 
       {sections.length === 0 && (
         <Alert tone="warn" className="mb-6">

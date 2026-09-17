@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
 import dayjs from "dayjs";
+import AbsenceTabs from "../../components/absenceTabs";
 import BaseLayout from "../../components/baseLayout";
 import AbsenceBadge from "../../components/absenceBadge";
 import { Input, Select, Textarea } from "../../components/ui/field";
@@ -226,6 +227,8 @@ export default function Nieobecnosci({
               : "Brak przypisanych sekcji"
           }
         />
+
+        <AbsenceTabs className="mb-5" />
 
         {sections.length === 0 && (
           <Alert tone="warn" className="mb-6">
