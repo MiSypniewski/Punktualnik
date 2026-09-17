@@ -403,6 +403,35 @@ Odbicia z kiosku (tabela `Times`). Kafelek na tablicy sekcji ma dwa dotknięcia:
 pierwsze zapisuje wejście, drugie wyjście. Między nimi wpis ma status
 `workInProgress` i leci licznik.
 
+### Co rozstrzyga serwer przy odbiciu
+
+Z dotknięcia kafelka serwer bierze **wyłącznie intencję** — „wejście” albo
+„wyjście”. Wszystko inne liczy sam (`services/punchCard.js`):
+
+| Dana | Skąd się bierze |
+|---|---|
+| kogo dotyczy karta | z adresu (`/api/time/empty_<id>` albo id wiersza), zestawionego z zasięgiem konta |
+| doba (`data`) | kotwica 3:00 liczona na serwerze, ta sama co na tablicy i w raportach |
+| godzina wejścia i wyjścia | zegar serwera w strefie aplikacji (`APP_TZ`), nie zegar tabletu |
+| `totalWorkTime`, `overTime` | `DifferenceTime` z tych godzin — ta sama funkcja, której używa korekta kierownika |
+| imię, nazwisko, sekcja, lokalizacja | kopiowane z konta pracownika |
+
+Cztery reguły, których pilnuje serwer:
+
+- **kiosk odbija tylko swoją sekcję.** Zasięg liczy `services/scope.js`, więc
+  żądanie o kartę pracownika spoza sekcji kończy się `403` i wpisem `[warn]
+  [punchCard]` w logu;
+- **jedna karta na osobę i dobę.** Drugie odbicie wejścia to `409` — wcześniej
+  pilnował tego wyłącznie stan kafelka w przeglądarce, więc dwa szybkie
+  dotknięcia potrafiły założyć dwa wiersze;
+- **domknięcie jest idempotentne.** Powtórzone „wyjście” zwraca kartę bez zapisu,
+  zamiast przesuwać godzinę wyjścia na „teraz”;
+- **karty nie da się przenieść.** `PUT` dotyka wyłącznie godziny wyjścia, wymiaru
+  i statusu; userID, sekcja i doba nie są zapisywalne z kiosku.
+
+Zmiana godzin po fakcie należy do kierownika i ma osobną trasę oraz osobne
+uprawnienie — [Korekta](#korekta--timezarzadzaj).
+
 ### Domykanie o 3:00
 
 Drugiego dotknięcia często nie ma — ktoś wychodzi bocznym wyjściem, ktoś zapomina.
