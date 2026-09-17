@@ -4,6 +4,7 @@ import classNames from "classnames";
 import { getToken } from "next-auth/jwt";
 import BaseLayout from "../../components/baseLayout";
 import DayNav from "../../components/dayNav";
+import DayTimeline from "../../components/dayTimeline";
 import LiveDot from "../../components/liveDot";
 import { ProjectMark } from "../../components/projectColors";
 import { absenceLabel, isLive, remarks, stateBadge } from "../../components/dayState";
@@ -305,6 +306,16 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           <Stat label="Nieobecności" value={counts.absent} />
           <Stat label="Bez karty" value={counts.noCard} tone={counts.noCard > 0 ? "danger" : "default"} />
           <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
+        </div>
+      )}
+
+      {/* Oś czasu chowa się poniżej lg: czternastu godzin nie da się czytać na
+          telefonie, a lista kart niżej niesie te same dane. Dla dnia przyszłego
+          też jej nie ma — nie byłoby na niej ani jednej belki, bo godzin
+          jeszcze nie ma skąd wziąć. */}
+      {people.length > 0 && !isFuture && (
+        <div className="hidden lg:block">
+          <DayTimeline people={people} isToday={isToday} nowMin={board.nowMin} drift={drift} />
         </div>
       )}
 
