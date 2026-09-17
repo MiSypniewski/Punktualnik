@@ -824,12 +824,28 @@ kłamałoby o godzinę.
 
 | Stan | Kiedy | Kolor |
 |---|---|---|
-| **W pracy** | karta otwarta | bursztyn — jedyne uprawnione użycie na tym ekranie |
+| **W pracy** | karta otwarta, dzień dzisiejszy | bursztyn — jedyne uprawnione użycie na tym ekranie |
 | **Po pracy** | karta zamknięta | zieleń przy pełnej dniówce ZMIERZONEJ, czerwień przy niepełnej, neutralny przy domkniętej nocą |
+| **Karta otwarta** | karta otwarta, ale dzień już się skończył | neutralny |
 | **Nieobecność** | zatwierdzona nieobecność, bez karty | neutralny, ze skrótem rodzaju |
 | **Wniosek** | nieobecność czeka na decyzję | akcent |
 | **Bez karty** | nic z powyższych | neutralny do 9:00, potem czerwony |
 | **W planie** | tylko dzień przyszły, bez zgłoszonej nieobecności | neutralny |
+
+**O stanie karty rozstrzyga najpierw to, czy jest OTWARTA, a dopiero potem
+nieobecność.** Zatwierdzony urlop nie zmienia stanu karty — zmienia tylko to,
+co stoi pod chipem. Pracownik, który miał urlop, a przyszedł i odbił wejście
+oraz wyjście, ma stan **Po pracy** i podpis „Urlop do …”; że pracował wbrew
+urlopowi, mówi właśnie ten podpis. Stan bursztynowy dostaje wyłącznie ten,
+kto ma urlop i **w tej chwili** pracuje, czyli ma kartę wciąż otwartą.
+
+**„Teraz” wymaga też, żeby oglądany dzień był dzisiejszy.** Kartę zapomnianą
+wczoraj zadanie nocne domyka o 3:00, więc między końcem doby a tą godziną
+istnieje wiersz z kartą otwartą w dniu, który się skończył. Nie jest to „pracuje”
+— to „nikt nie zamknął karty”, kolumna „Czas” pokazuje wtedy zero (nikt tego
+czasu nie zmierzył), a licznik nie tyka. Rozstrzyga o tym jedna flaga `live`
+z `services/dayBoard.js`, czytana przez chip stanu, kropkę na żywo, licznik
+i belkę na osi; widok nie zgaduje tego z nazwy stanu.
 
 Karta z flagą `autoClosed` **nigdy nie dostaje zieleni**, choć ma równe osiem
 godzin: ta ósemka jest założona, nie zmierzona, a zieleń w tym systemie znaczy

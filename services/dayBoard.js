@@ -280,9 +280,24 @@ export const getDayBoard = ({ day, sections }) => {
     // odbić, byłoby zarzutem postawionym całemu zespołowi naraz. Aplikacja nie
     // zna grafiku, więc jedyne, co o jutrze wie, to KTO NIE MA nieobecności —
     // i dokładnie to ten stan mówi.
+    //
+    // O STANIE KARTY ROZSTRZYGA NAJPIERW TO, CZY JEST OTWARTA, a dopiero potem
+    // nieobecność. Pierwsza wersja pytała odwrotnie
+    // (`approvedAbsence ? "absent_present" : isOpen(card) ? ...`) i przez to
+    // `absent_present` zwierało obwód przed `isOpen`: pracownik z zatwierdzonym
+    // urlopem, który przyszedł i odbił kartę POPRAWNIE — wejście i wyjście —
+    // zostawał na ekranie jako "W pracy" z tykającym licznikiem i belką biegnącą
+    // do bieżącej godziny, mimo że wyszedł o 14:39.
+    //
+    // `absent_present` znaczy więc dokładnie "ma nieobecność i pracuje TERAZ",
+    // a nie "ma nieobecność i kiedykolwiek dziś odbił kartę". Dniówka
+    // przepracowana wbrew urlopowi to zwykłe `done`; że była wbrew urlopowi,
+    // mówi podpis nieobecności pod chipem stanu.
     let state;
-    if (card) state = approvedAbsence ? "absent_present" : isOpen(card) ? "working" : "done";
-    else if (approvedAbsence) state = "absent";
+    if (card) {
+      if (!isOpen(card)) state = "done";
+      else state = approvedAbsence ? "absent_present" : "working";
+    } else if (approvedAbsence) state = "absent";
     else if (absence) state = "pending_absence";
     else state = isFuture ? "expected" : "no_card";
 
@@ -295,6 +310,16 @@ export const getDayBoard = ({ day, sections }) => {
     // i nie zna wniosków o wcześniejsze wyjście, więc dla kogoś z podpisaną
     // zgodą kłamałoby o godzinę.
     const open = Boolean(card) && isOpen(card);
+
+    // "Pracuje TERAZ" wymaga OBU warunków: karty otwartej i oglądanego dnia
+    // będącego dzisiejszym. Rozstrzygamy to na serwerze, bo tylko on zna dobę
+    // roboczą (liczoną od 3:00) i strefę aplikacji.
+    //
+    // Sam `open` nie wystarcza: karta zapomniana wczoraj jest otwarta do 3:00,
+    // kiedy domknie ją zadanie nocne. Kto przed tą godziną zajrzy na wczoraj,
+    // widziałby licznik tykający dla dnia, który się skończył, i belkę biegnącą
+    // do bieżącej godziny przez cały wykres.
+    const live = open && isToday;
     const plannedStamp =
       open && card.startTime
         ? dayjs(card.startTime).add(WORKDAY_HOURS, "hour").add(shiftMin, "minute").format()
@@ -309,7 +334,13 @@ export const getDayBoard = ({ day, sections }) => {
     // Wymiar: karta zamknięta ma go w bazie jako tekst, karta otwarta jeszcze
     // nie — dla niej liczymy sekundy na serwerze, żeby przeglądarka miała od
     // czego tykać, nie znając offsetu znaczników.
-    const workedSec = open
+    //
+    // Warunek to `live`, nie `open`: odejmowanie od chwili obecnej ma sens
+    // wyłącznie dziś. Dla karty zapomnianej wczoraj dałoby trzydzieści godzin
+    // dniówki, więc tam bierzemy to, co stoi w bazie — czyli zero, bo kiosk
+    // zapisuje totalWorkTime dopiero przy drugim dotknięciu kafelka. Zero jest
+    // tu prawdą: nikt tego czasu nie zmierzył.
+    const workedSec = live
       ? Math.max(0, nowMoment.diff(dayjs(card.startTime), "second"))
       : card
       ? parseHmsToSeconds(card.totalWorkTime)
@@ -334,6 +365,10 @@ export const getDayBoard = ({ day, sections }) => {
       startMin,
       endMin,
       endIsPlanned: open,
+      // Czy ten wiersz opisuje stan "teraz". Czytają to chip stanu, kropka na
+      // żywo, tykający licznik i belka na osi czasu — jedna flaga zamiast
+      // trzech miejsc zgadujących to z nazwy stanu.
+      live,
       workedSec,
       full: workedSec >= WORKDAY_HOURS * 3600,
       autoClosed: Boolean(card && card.autoClosed),
@@ -350,7 +385,10 @@ export const getDayBoard = ({ day, sections }) => {
       // Karta wciąż otwarta po wyliczonej godzinie wyjścia. Rozstrzygamy to na
       // serwerze, bo porównujemy dwie godziny w strefie aplikacji — zegar
       // przeglądarki bywa przestawiony, a od tego zależy chip ostrzeżenia.
-      overdue: open && plannedStamp !== null && nowMoment.isAfter(dayjs(plannedStamp)),
+      // Też tylko dziś: karta zapomniana wczoraj jest po planowanym wyjściu
+      // z definicji, a ostrzeżenie "sprawdź, czy ktoś nie zapomniał dotknięcia"
+      // nie ma tam czego naprawić — o 3:00 domknie ją zadanie nocne.
+      overdue: live && plannedStamp !== null && nowMoment.isAfter(dayjs(plannedStamp)),
       running: runningByUser.get(person.userID) || null,
     };
   });
