@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import db from "./db";
 import { logInfo } from "./log";
+import { WORKDAY_HOURS } from "../utils";
 
 // Domykanie kart czasu zapomnianych na kiosku.
 //
@@ -19,10 +20,10 @@ import { logInfo } from "./log";
 // wejściu: start + 8 h. To nadal ZGADYWANIE, stąd flaga autoClosed i znacznik
 // "auto" na kafelku — wpis czeka na potwierdzenie kierownika.
 
-// Ile trwa domyślna dniówka. Ta sama liczba, którą components/card.js podstawia
-// jako endTime przy odbiciu wejścia i którą utils/DifferenceTime traktuje jako
-// granicę nadgodzin.
-const WORKDAY_HOURS = 8;
+// Ile trwa domyślna dniówka — WORKDAY_HOURS z utils/index.js. Ta sama liczba,
+// którą components/card.js podstawia jako endTime przy odbiciu wejścia, którą
+// utils/DifferenceTime traktuje jako granicę nadgodzin i z której
+// services/dayBoard.js liczy planowane wyjście.
 
 const stmtOpen = db.prepare(`
   SELECT id, userID, name, surname, section, data, startTime
