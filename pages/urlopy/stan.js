@@ -7,6 +7,7 @@ import AbsenceTabs from "../../components/absenceTabs";
 import DayNav from "../../components/dayNav";
 import DayTimeline from "../../components/dayTimeline";
 import LiveDot from "../../components/liveDot";
+import PendingDecisions from "../../components/pendingDecisions";
 import { ProjectMark } from "../../components/projectColors";
 import { absenceLabel, isLive, remarks, stateBadge } from "../../components/dayState";
 import {
@@ -227,7 +228,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
   // Polling TYLKO dla dnia dzisiejszego: przeszłość się nie zmienia, a przyszłość
   // nie ma "teraz". Każde zapytanie do SQLite jest synchroniczne, więc
   // częstotliwość odpytywania jest wprost kosztem dla wszystkich żądań.
-  const { data, error } = useSWR(boardKey(day), fetchLive, {
+  const { data, error, mutate } = useSWR(boardKey(day), fetchLive, {
     fallbackData: initial,
     refreshInterval: initial.isToday ? LIVE_POLL_MS : 0,
   });
@@ -395,6 +396,21 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           godzin, skorygowane o zatwierdzone wnioski o wcześniejsze wyjście i o zostanie dłużej.
           Aplikacja nie zna grafiku pracy, więc to prognoza, nie ustalenie.
         </p>
+      )}
+
+      {/* Wnioski stoją NA KOŃCU, a nie na górze, i to jest kolejność celowa:
+          ekran ma najpierw odpowiedzieć na pytanie „jak dziś stoi zespół”,
+          a dopiero potem dać pracę do wyklikania. Lista nie zależy od wybranego
+          dnia — wniosek czeka na decyzję niezależnie od tego, na który dzień
+          go złożono. */}
+      {sections.length > 0 && (
+        <PendingDecisions
+          absences={board.pending.absences}
+          overtime={board.pending.overtime}
+          leaveLeft={board.leaveLeft}
+          onDecided={mutate}
+          className="mt-6"
+        />
       )}
     </BaseLayout>
   );
