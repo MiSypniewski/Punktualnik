@@ -90,4 +90,20 @@ export const ArrowDownIcon = (props) => (
   </Icon>
 );
 
+// Dzień w tył i w przód na /urlopy/stan. Same groty, bez kresek poziomych —
+// obok stoi pole daty i przycisk „Dziś”, więc strzałka nie musi tłumaczyć, że
+// prowadzi do sąsiedniego dnia, a dwa pełne arrow-left/right przy tej wielkości
+// zlewały się z ArrowUp/Down w panelu kafelków.
+export const ChevronLeftIcon = (props) => (
+  <Icon {...props}>
+    <path d="M10 3.5L5.5 8l4.5 4.5" />
+  </Icon>
+);
+
+export const ChevronRightIcon = (props) => (
+  <Icon {...props}>
+    <path d="M6 3.5L10.5 8 6 12.5" />
+  </Icon>
+);
+
 export default Icon;

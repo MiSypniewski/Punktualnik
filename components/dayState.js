@@ -23,8 +23,14 @@ const STATES = {
   absent_present: { label: "W pracy", tone: "signal" },
   done: { label: "Po pracy", tone: "neutral" },
   absent: { label: "Nieobecność", tone: "neutral" },
-  pending_absence: { label: "Bez karty", tone: "neutral" },
+  // Etykieta mówi o WNIOSKU, nie o karcie: ktoś, kto zgłosił nieobecność na
+  // ten dzień i czeka na decyzję, nie jest "bez karty" — jest przed decyzją.
+  // Ta nazwa czyta się poprawnie i dla dnia minionego, i dla przyszłego.
+  pending_absence: { label: "Wniosek", tone: "accent" },
   no_card: { label: "Bez karty", tone: "neutral" },
+  // Tylko dla dnia przyszłego. "Bez karty" o dniu, w którym karty nie dało się
+  // jeszcze odbić, byłoby zarzutem postawionym całemu zespołowi naraz.
+  expected: { label: "W planie", tone: "neutral" },
 };
 
 /**
@@ -44,7 +50,9 @@ export const stateBadge = (person) => {
   if (person.state === "done" && person.full && !person.autoClosed) {
     return { label: base.label, tone: "ok" };
   }
-  if ((person.state === "no_card" || person.state === "pending_absence") && person.latePunch) {
+  // Tylko `no_card`. `pending_absence` zostaje w tonie wniosku, bo tam brak
+  // karty ma już wyjaśnienie — ktoś zgłosił nieobecność i czeka na decyzję.
+  if (person.state === "no_card" && person.latePunch) {
     return { label: base.label, tone: "danger" };
   }
   return base;
@@ -103,10 +111,11 @@ export const remarks = (person) => {
       title: "Ma zatwierdzoną nieobecność na ten dzień, a jednak odbił kartę",
     });
   }
-  // Wniosek oczekujący dopisujemy niezależnie od stanu, a nie tylko przy
-  // `pending_absence`: ktoś, kto zgłosił urlop na dziś i mimo to odbił kartę,
-  // jest dokładnie tą sytuacją, o której kierownik ma wiedzieć przed decyzją.
-  if (person.absence && person.absence.status === "pending") {
+  // Wniosek oczekujący dopisujemy TYLKO wtedy, gdy nie mówi o nim już chip
+  // stanu — czyli gdy ktoś zgłosił urlop na ten dzień i MIMO TO odbił kartę.
+  // To sytuacja, o której kierownik ma wiedzieć przed decyzją; przy pustej
+  // karcie stan "Wniosek" wystarcza i drugi chip byłby powtórzeniem.
+  if (person.absence && person.absence.status === "pending" && person.state !== "pending_absence") {
     out.push({ label: "wniosek oczekuje", tone: "accent", title: "Nieobecność na ten dzień czeka na decyzję" });
   }
   // Saldo nadgodzin to stan NARASTAJĄCY, bez własnej daty — nie ma nic wspólnego

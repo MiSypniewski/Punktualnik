@@ -222,7 +222,7 @@ export const getDayBoard = ({ day, sections }) => {
     nowMin,
     generatedAt,
     people: [],
-    counts: { working: 0, done: 0, absent: 0, noCard: 0, pending: 0 },
+    counts: { working: 0, done: 0, absent: 0, noCard: 0, expected: 0, pending: 0 },
     pending: { absences: [], overtime: [] },
     leaveLeft: {},
   };
@@ -265,7 +265,7 @@ export const getDayBoard = ({ day, sections }) => {
   // z godzinami.
   const balanceByUser = new Map(getOvertimeBalances(list).map((r) => [r.id, r.balance]));
 
-  const counts = { working: 0, done: 0, absent: 0, noCard: 0, pending: 0 };
+  const counts = { working: 0, done: 0, absent: 0, noCard: 0, expected: 0, pending: 0 };
 
   const rows = people.map((person) => {
     const rawCard = cardByUser.get(person.userID);
@@ -275,11 +275,16 @@ export const getDayBoard = ({ day, sections }) => {
     const { earlyLeaveMin = 0, stayLongerMin = 0 } = shiftByUser.get(person.userID) || {};
     const shiftMin = stayLongerMin - earlyLeaveMin;
 
+    // `expected` istnieje tylko dla dnia PRZYSZŁEGO i to jest rozstrzygnięcie,
+    // nie kosmetyka: "nie odbił karty" o dniu, w którym nie dało się jej jeszcze
+    // odbić, byłoby zarzutem postawionym całemu zespołowi naraz. Aplikacja nie
+    // zna grafiku, więc jedyne, co o jutrze wie, to KTO NIE MA nieobecności —
+    // i dokładnie to ten stan mówi.
     let state;
     if (card) state = approvedAbsence ? "absent_present" : isOpen(card) ? "working" : "done";
     else if (approvedAbsence) state = "absent";
     else if (absence) state = "pending_absence";
-    else state = "no_card";
+    else state = isFuture ? "expected" : "no_card";
 
     // Planowane wyjście: start + 8 h ± zatwierdzone zgody. To PROGNOZA, nie plan
     // z grafiku — aplikacja nie wie, o której kto ma zaczynać ani kończyć, więc
@@ -317,6 +322,7 @@ export const getDayBoard = ({ day, sections }) => {
     if (state === "working" || state === "absent_present") counts.working += 1;
     else if (state === "done") counts.done += 1;
     else if (state === "absent") counts.absent += 1;
+    else if (state === "expected") counts.expected += 1;
     else counts.noCard += 1;
 
     return {

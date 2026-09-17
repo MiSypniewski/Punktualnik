@@ -3,6 +3,7 @@ import useSWR from "swr";
 import classNames from "classnames";
 import { getToken } from "next-auth/jwt";
 import BaseLayout from "../../components/baseLayout";
+import DayNav from "../../components/dayNav";
 import LiveDot from "../../components/liveDot";
 import { ProjectMark } from "../../components/projectColors";
 import { absenceLabel, isLive, remarks, stateBadge } from "../../components/dayState";
@@ -121,7 +122,7 @@ const RunningCell = ({ running, drift }) => {
   );
 };
 
-const PersonRow = ({ person, showRunning, drift, isMe }) => {
+const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
   const badge = stateBadge(person);
   const live = isLive(person);
   const worked = live ? person.workedSec + drift : person.workedSec;
@@ -142,13 +143,17 @@ const PersonRow = ({ person, showRunning, drift, isMe }) => {
         </span>
         {person.absence && <span className="block mt-1 text-xs text-muted">{absenceLabel(person)}</span>}
       </Td>
-      <Num>{hourCell(person.startHm)}</Num>
-      <Num>
-        {hourCell(person.endHm)}
-        {/* Gwiazdka znaczy "wyliczone, nie zmierzone" — legenda stoi pod tabelą. */}
-        {person.endIsPlanned && <span className="text-signal-strong">*</span>}
-      </Num>
-      <Num>{person.startHm ? formatDuration(worked) : "—"}</Num>
+      {showHours && (
+        <>
+          <Num>{hourCell(person.startHm)}</Num>
+          <Num>
+            {hourCell(person.endHm)}
+            {/* Gwiazdka znaczy "wyliczone, nie zmierzone" — legenda stoi pod tabelą. */}
+            {person.endIsPlanned && <span className="text-signal-strong">*</span>}
+          </Num>
+          <Num>{person.startHm ? formatDuration(worked) : "—"}</Num>
+        </>
+      )}
       {showRunning && (
         <Td className="max-w-xs text-sm">
           <RunningCell running={person.running} drift={drift} />
@@ -166,7 +171,7 @@ const PersonRow = ({ person, showRunning, drift, isMe }) => {
  * po każdym wierszu — ten sam powód i ten sam podział co w liście wpisów
  * w raporcie zadań.
  */
-const PersonCard = ({ person, showRunning, drift, isMe }) => {
+const PersonCard = ({ person, showHours, showRunning, drift, isMe }) => {
   const badge = stateBadge(person);
   const live = isLive(person);
   const worked = live ? person.workedSec + drift : person.workedSec;
@@ -189,17 +194,19 @@ const PersonCard = ({ person, showRunning, drift, isMe }) => {
         </span>
       </div>
 
-      <p className="mt-1 font-mono text-sm tabular-nums text-muted">
-        {person.startHm ? (
-          <>
-            {person.startHm} → {hourCell(person.endHm)}
-            {person.endIsPlanned && <span className="text-signal-strong">*</span>} ·{" "}
-            {formatDuration(worked)}
-          </>
-        ) : (
-          "bez karty czasu"
-        )}
-      </p>
+      {showHours && (
+        <p className="mt-1 font-mono text-sm tabular-nums text-muted">
+          {person.startHm ? (
+            <>
+              {person.startHm} → {hourCell(person.endHm)}
+              {person.endIsPlanned && <span className="text-signal-strong">*</span>} ·{" "}
+              {formatDuration(worked)}
+            </>
+          ) : (
+            "bez karty czasu"
+          )}
+        </p>
+      )}
 
       {person.absence && <p className="mt-1 text-sm text-muted">{absenceLabel(person)}</p>}
 
@@ -251,6 +258,10 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
   // Kolumna "Teraz robi" ma sens wyłącznie dziś. Dla innych dat znika razem
   // z nagłówkiem, zamiast stać pusta i sugerować brak raportowania.
   const showRunning = isToday;
+  // Kolumny godzin dla dnia przyszłego stałyby puste w każdym wierszu —
+  // ta sama zasada co przy "Teraz robi": kolumna bez treści znika razem
+  // z nagłówkiem, zamiast sugerować brak danych tam, gdzie ich nie może być.
+  const showHours = !isFuture;
   const planned = people.some((p) => p.endIsPlanned);
 
   return (
@@ -267,7 +278,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
         </Alert>
       )}
 
-      <p className="mb-4 font-mono text-sm tabular-nums text-muted">{day}</p>
+      <DayNav day={day} today={board.today} />
 
       {isFuture && (
         <Alert tone="info" className="mb-4">
@@ -277,17 +288,25 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
         </Alert>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <Stat label="W pracy" value={counts.working} tone={counts.working > 0 ? "signal" : "default"} />
-        <Stat label="Po pracy" value={counts.done} />
-        <Stat label="Nieobecności" value={counts.absent} />
-        <Stat
-          label="Bez karty"
-          value={counts.noCard}
-          tone={counts.noCard > 0 && !isFuture ? "danger" : "default"}
-        />
-        <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
-      </div>
+      {/* Kafle dnia przyszłego liczą coś innego niż kafle dnia minionego, bo
+          o jutrze aplikacja wie tylko tyle, kto nie ma nieobecności — godzin
+          jeszcze nie ma skąd wziąć. "W pracy 0" byłoby prawdą, która nic nie
+          mówi. */}
+      {isFuture ? (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+          <Stat label="W planie" value={counts.expected} hint="bez zgłoszonej nieobecności" />
+          <Stat label="Nieobecności" value={counts.absent} hint="zatwierdzone" />
+          <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+          <Stat label="W pracy" value={counts.working} tone={counts.working > 0 ? "signal" : "default"} />
+          <Stat label="Po pracy" value={counts.done} />
+          <Stat label="Nieobecności" value={counts.absent} />
+          <Stat label="Bez karty" value={counts.noCard} tone={counts.noCard > 0 ? "danger" : "default"} />
+          <Stat label="Wnioski" value={counts.pending} hint="czekają na decyzję" />
+        </div>
+      )}
 
       <Plate className="mb-6 overflow-hidden">
         <PlateHeader className="bg-raised">
@@ -312,9 +331,13 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
                   <Tr>
                     <Th>Pracownik</Th>
                     <Th>Stan</Th>
-                    <Th align="right">Wejście</Th>
-                    <Th align="right">Wyjście</Th>
-                    <Th align="right">Czas</Th>
+                    {showHours && (
+                      <>
+                        <Th align="right">Wejście</Th>
+                        <Th align="right">Wyjście</Th>
+                        <Th align="right">Czas</Th>
+                      </>
+                    )}
                     {showRunning && <Th>Teraz robi</Th>}
                     <Th>Uwagi</Th>
                   </Tr>
@@ -324,6 +347,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
                     <PersonRow
                       key={person.userID}
                       person={person}
+                      showHours={showHours}
                       showRunning={showRunning}
                       drift={drift}
                       isMe={Number(person.userID) === Number(currentUserID)}
@@ -338,6 +362,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
                 <PersonCard
                   key={person.userID}
                   person={person}
+                  showHours={showHours}
                   showRunning={showRunning}
                   drift={drift}
                   isMe={Number(person.userID) === Number(currentUserID)}
