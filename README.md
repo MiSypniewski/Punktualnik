@@ -879,6 +879,25 @@ Dla wczoraj i jutra **polling jest wyłączony**: przeszłość się nie zmienia
 a przyszłość nie ma „teraz”. Dziś odświeża się co `LIVE_POLL_MS` (45 s,
 `utils/live.js`) — tym samym cyklem co tablica kiosku i „Teraz w toku”.
 
+#### Szerokości kolumn
+
+Tabela ma **układ stały** (`table-fixed`) z jawnymi szerokościami w `<colgroup>`,
+a nie automatyczny. W automatycznym szerokości ustawiała treść: podpis
+nieobecności („wniosek: Urlop do 2026-09-17”) rozpychał kolumnę STAN na ćwierć
+tabeli, a nadwyżkę przeglądarka rozkładała równo na wszystkie kolumny — stąd rów
+między STAN i WEJŚCIEM. Klasy `w-*` na komórkach tego nie naprawiają: przy
+`w-full` na jednej z nich reszta i tak schodzi do szerokości treści.
+
+Ostatnia kolumna **nie ma zadanej szerokości i dlatego bierze całą resztę** —
+to „Teraz robi”, a w dniach bez niej pusty zbiornik na nadwyżkę. Zbiornik musi
+być, bo inaczej nadwyżka rozkłada się proporcjonalnie na pozostałe kolumny
+i rów wraca, tylko dla wczoraj i jutra. Zwężenie samej tabeli nie jest
+wyjściem: linie wierszy urywają się wtedy w połowie płyty.
+
+Skutek uboczny, który był potrzebny: `truncate` na opisie zadania zaczęło
+działać. Bez zadanej szerokości kolumny nie miało czego przycinać i długi opis
+rozpychał tabelę.
+
 #### Bez kolumny „Uwagi”
 
 Pierwsza wersja miała siódmą kolumnę z rządkiem chipów wersalikami (`auto`,
@@ -1725,6 +1744,12 @@ Powłokę daje `BaseLayout` (strażnik sesji) → `AppShell` (pasek, kontener, s
 Szerokość strony ustawia się propsem: `<BaseLayout width="narrow">` dla
 formularzy, `"wide"` dla raportów, `"full"` dla kiosku, domyślnie `"page"`.
 Ekrany sprzed zalogowania używają `AuthLayout`.
+
+**`"full"` należy wyłącznie do kiosku** (`/time/[id]`) — tam treść ogląda się
+z drugiego końca hali. Kontener `max-w-none` jest szerszy od paska stacyjnego
+i stopki, które stoją w `max-w-wide`, więc każdy inny ekran dostaje na nim
+widoczny rozjazd krawędzi. Panel kierownika, choćby z szeroką tabelą, bierze
+`"wide"`.
 
 Pozycje menu buduje `navItems` w `components/stationRail.js` — widoczność idzie
 przez predykaty z `services/roles.js`, a nie przez ręczne porównania ról. Pełny

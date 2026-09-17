@@ -174,7 +174,9 @@ const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
           {live && <LiveDot />}
           <Badge tone={badge.tone}>{badge.label}</Badge>
         </span>
-        {person.absence && <span className="block mt-1 text-xs text-muted">{absenceLabel(person)}</span>}
+        {person.absence && (
+          <span className="block mt-1 text-xs leading-tight text-muted">{absenceLabel(person)}</span>
+        )}
       </Td>
       {showHours && (
         <>
@@ -185,10 +187,12 @@ const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
           <Num>{person.startHm ? formatDuration(worked) : "—"}</Num>
         </>
       )}
-      {showRunning && (
-        <Td className="max-w-xs text-sm">
+      {showRunning ? (
+        <Td className="text-sm">
           <RunningCell running={person.running} drift={drift} />
         </Td>
+      ) : (
+        <Td aria-hidden="true" />
       )}
     </Tr>
   );
@@ -290,7 +294,14 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
   const planned = people.some((p) => p.endIsPlanned);
 
   return (
-    <BaseLayout width="full">
+    // "wide", nie "full", i to jest zmiana wobec pierwszej wersji tego ekranu:
+    // `full` (max-w-none) ma w tej aplikacji JEDEN uprawniony użytkownik —
+    // kiosk (/time/[id]), bo tam treść jest oglądana z drugiego końca hali.
+    // Panel kierownika czyta się z bliska i ma stać w tej samej szerokości co
+    // sąsiedni ekran modułu (/urlopy/zarzadzaj) oraz korekta kart czasu.
+    // Przy okazji znika rozjazd, w którym treść była szersza od paska
+    // stacyjnego i stopki — te stoją w max-w-wide.
+    <BaseLayout width="wide">
       <PageHeader
         title="Aktualny stan"
         description="Dzień zespołu: obecność z kart czasu, nieobecności i zgody na zmianę godzin — w jednym miejscu."
@@ -375,7 +386,45 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
         ) : (
           <>
             <TableWrap className="hidden lg:block">
-              <Table>
+              {/* Układ STAŁY, nie automatyczny, i to jest rozstrzygnięcie.
+                  W układzie automatycznym szerokości ustawiała treść: podpis
+                  nieobecności ("wniosek: Urlop do 2026-09-17") rozpychał kolumnę
+                  STAN na ćwierć tabeli, a nadwyżkę przeglądarka rozkładała
+                  równo na wszystkie kolumny — stąd rów między STAN i WEJŚCIEM.
+                  Klasy `w-*` na komórkach tego nie naprawiały: przy `w-full`
+                  na jednej z nich reszta i tak schodzi do treści.
+
+                  Przy okazji zaczyna działać `truncate` na opisie zadania —
+                  bez zadanej szerokości kolumny nie miał czego przycinać
+                  i długi opis rozpychał tabelę. */}
+              <Table className="table-fixed">
+                <colgroup>
+                  {/* Nazwisko z sekcją pod nim — tyle, żeby najdłuższe
+                      w firmie zmieściło się w jednej linii. */}
+                  <col className="w-56" />
+                  {/* Chip stanu i podpis nieobecności pod nim; podpis się łamie
+                      i już nie dyktuje szerokości. */}
+                  <col className="w-40" />
+                  {showHours && (
+                    <>
+                      <col className="w-20" />
+                      {/* Szersza od wejścia, bo obok godziny stoją znaczniki
+                          karty ("13:50 auto"). */}
+                      <col className="w-28" />
+                      <col className="w-32" />
+                    </>
+                  )}
+                  {/* Kolumna bez zadanej szerokości bierze w układzie stałym
+                      CAŁĄ resztę — i tu idzie miejsce odzyskane z kolumny STAN.
+                      Jest obecna ZAWSZE, także w dniach bez "Teraz robi",
+                      i wtedy jest pustym zbiornikiem na nadwyżkę. Bez niej
+                      nadwyżka rozkładała się proporcjonalnie na pozostałe
+                      kolumny i odtwarzała ten sam rów między STAN i WEJŚCIEM,
+                      tylko dla wczoraj i jutra. Zwężenie samej tabeli też nie
+                      jest wyjściem: linie wierszy urywały się wtedy w połowie
+                      płyty. */}
+                  <col />
+                </colgroup>
                 <thead>
                   <Tr>
                     <Th>Pracownik</Th>
@@ -387,7 +436,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
                         <Th align="right">Czas</Th>
                       </>
                     )}
-                    {showRunning && <Th>Teraz robi</Th>}
+                    {showRunning ? <Th>Teraz robi</Th> : <Th aria-hidden="true" />}
                   </Tr>
                 </thead>
                 <tbody>
