@@ -56,8 +56,8 @@ const navItems = (user) => {
   // Dzień zespołu na jednym ekranie. Pozycja jest PIERWSZOPLANOWA, choć moduł
   // ma już swoją ("Nieobecności" niżej): tamta prowadzi do obiegu wniosków,
   // czyli do pracy zaplanowanej, a ta do spojrzenia rzucanego codziennie rano.
-  // Oba ekrany wiąże pasek podzakładek (components/absenceTabs.js), więc
-  // kierownik nie musi wracać do paska stacyjnego, żeby przejść między nimi.
+  // Między oboma ekranami przechodzi się tym paskiem — osobnego paska
+  // podzakładek w module nie ma.
   if (canApproveLeave(role)) {
     items.push({ href: "/urlopy/stan", match: "/urlopy/stan", label: "Aktualny stan" });
     items.push({ href: "/urlopy/zarzadzaj", match: "/urlopy/zarzadzaj", label: "Nieobecności" });
