@@ -384,7 +384,7 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                 {person.endIsPlanned && person.endMin !== null && (
                   <span
                     aria-hidden="true"
-                    className="absolute top-0 bottom-0 w-0.5 bg-signal-strong"
+                    className="absolute top-0 bottom-0 w-0.5 bg-signal-strong pointer-events-none"
                     style={{ left: `${pct(person.endMin)}%` }}
                   />
                 )}
@@ -421,8 +421,18 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                     );
                   })}
 
+                {/* Napis leży NAD torem zadań, więc nie może łapać myszy —
+                    inaczej zadania osoby bez karty (np. kierownika
+                    z nieregularnym czasem pracy) byłyby na osi widoczne,
+                    ale bez dymka. Przy torze zajmuje tylko górną część,
+                    tam gdzie stałaby belka. */}
                 {!hasCard && !person.absence && (
-                  <span className="absolute inset-0 flex items-center px-2 text-xs text-faint">
+                  <span
+                    className={classNames(
+                      "absolute inset-x-0 flex items-center px-2 text-xs text-faint pointer-events-none",
+                      withTasks ? "top-0 h-6" : "inset-y-0"
+                    )}
+                  >
                     {person.state === "expected" ? "bez zgłoszonej nieobecności" : "bez karty czasu"}
                   </span>
                 )}
@@ -432,7 +442,7 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                 {isToday && (
                   <span
                     aria-hidden="true"
-                    className="absolute top-0 bottom-0 w-px bg-signal-strong"
+                    className="absolute top-0 bottom-0 w-px bg-signal-strong pointer-events-none"
                     style={{ left: `${pct(nowLive)}%` }}
                   />
                 )}
