@@ -1,7 +1,7 @@
 import classNames from "classnames";
 import LiveDot from "./liveDot";
 import { absenceLabel, isLive } from "./dayState";
-import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR } from "../utils";
+import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatMinutes } from "../utils";
 
 // Oś czasu dnia: jedna belka na osobę, od wejścia do wyjścia, ze znacznikiem
 // „teraz” i kreską planowanego wyjścia.
@@ -31,6 +31,13 @@ const MINUTES_PER_DAY = 24 * 60;
 // w połowie cyfry.
 const LABEL_FITS_PCT = 14;
 
+// Od jakiej szerokości odcinek „wcześniejsze wyjście” dostaje napis. Próg
+// niższy niż dla godzin, bo napis ma `truncate`: przy dwóch godzinach zgody
+// na najwęższym torze skróci się do „wcześniejsze wyj…”, co wciąż się czyta.
+// Poniżej progu (około półtorej godziny) zostaje bez napisu — to samo mówią
+// dymek i legenda.
+const LEAVE_LABEL_FITS_PCT = 10;
+
 /**
  * Kolor belki i tekstu na niej.
  *
@@ -43,6 +50,10 @@ const LABEL_FITS_PCT = 14;
  * więc nie wolno jej pomalować ani na zielono („przepracowane i pełne”), ani
  * na czerwono („za krótko”) — o niej nie wiadomo nic poza tym, że nikt karty
  * nie zamknął.
+ *
+ * Zieleń znaczy „dniówka rozliczona”, nie tylko „przepracowana”: serwer liczy
+ * `full` z doliczeniem zatwierdzonego wcześniejszego wyjścia, a same godziny
+ * zgody rysuje osobny, blady odcinek za belką.
  */
 const barStyle = (person, running) => {
   if (running) return { bar: "bg-signal", ink: "text-signal-ink" };
@@ -65,6 +76,7 @@ const windowFor = (people, nowMin, isToday) => {
   people.forEach((p) => {
     if (p.startMin !== null) values.push(p.startMin);
     if (p.endMin !== null) values.push(p.endMin);
+    if (p.leaveEndMin !== null && p.leaveEndMin !== undefined) values.push(p.leaveEndMin);
   });
   if (isToday) values.push(nowMin);
 
@@ -146,6 +158,13 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
           const span = `${person.startHm} – ${person.endHm}${person.endIsPlanned ? "*" : ""}`;
           const inside = barTo - barFrom >= LABEL_FITS_PCT;
 
+          // Odcinek zatwierdzonego wcześniejszego wyjścia, doklejony za belką.
+          // Serwer ustawia leaveEndMin tylko dla karty zamkniętej i zmierzonej.
+          const hasLeave = hasCard && person.leaveEndMin !== null && person.leaveEndMin !== undefined;
+          const leaveTo = hasLeave ? pct(person.leaveEndMin) : barTo;
+          // Godziny stojące OBOK krótkiej belki idą za odcinkiem, nie na nim.
+          const outsideFrom = hasLeave ? leaveTo : barTo;
+
           return (
             <div key={person.userID} className="flex items-center gap-3">
               {/* Miejsce na kropkę „na żywo” jest zarezerwowane w KAŻDYM
@@ -214,12 +233,24 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
                         belce kończącej się u krawędzi okna po lewej, bo tor ma
                         overflow-hidden i napis wystający za prawy brzeg
                         zostałby ucięty w połowie. */}
+                    {hasLeave && (
+                      <span
+                        className="absolute top-0.5 bottom-0.5 rounded-sm flex items-center overflow-hidden bg-ok-soft border border-dashed border-ok"
+                        style={{ left: `${barTo}%`, width: `${Math.max(leaveTo - barTo, 0.4)}%` }}
+                        title={`Zatwierdzone wcześniejsze wyjście: ${formatMinutes(person.earlyLeaveMin)}`}
+                      >
+                        {leaveTo - barTo >= LEAVE_LABEL_FITS_PCT && (
+                          <span className="px-1.5 text-xs text-ok-strong truncate">wcześniejsze wyjście</span>
+                        )}
+                      </span>
+                    )}
+
                     {!inside && (
                       <span
                         className="absolute top-0 bottom-0 flex items-center font-mono text-xs tabular-nums whitespace-nowrap text-muted"
                         style={
-                          barTo <= 78
-                            ? { left: `${barTo}%`, paddingLeft: "0.375rem" }
+                          outsideFrom <= 78
+                            ? { left: `${outsideFrom}%`, paddingLeft: "0.375rem" }
                             : { right: `${100 - barFrom}%`, paddingRight: "0.375rem" }
                         }
                       >
@@ -270,6 +301,10 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-danger" /> dniówka niepełna
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-ok-soft border border-dashed border-ok" />{" "}
+          wcześniejsze wyjście (zatwierdzone)
         </span>
         <span
           className="flex items-center gap-1.5"

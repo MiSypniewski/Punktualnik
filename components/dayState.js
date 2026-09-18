@@ -124,6 +124,11 @@ export const exitNote = (person) => {
     }
   }
 
+  // Przy karcie zamkniętej zgoda nie przesuwa już żadnej godziny, ale wciąż
+  // tłumaczy, czemu krótsza dniówka jest zielona.
+  if (!person.endIsPlanned && !person.autoClosed && person.earlyLeaveMin > 0) {
+    parts.push(`Zatwierdzone wcześniejsze wyjście: ${formatMinutes(person.earlyLeaveMin)}, wliczone do dniówki.`);
+  }
   if (person.autoClosed) {
     parts.push(
       "Kartę domknęło zadanie nocne na osiem godzin od wejścia — ta godzina jest założona, nie zmierzona."
