@@ -39,7 +39,7 @@ const SIZES = { sm: "w-2 h-2", md: "w-2.5 h-2.5", lg: "w-3.5 h-3.5" };
 // PUSTY, a nie szary. Bez tego wyglądałby identycznie jak projekt w kolorze
 // `slate`, bo projectColor() zwraca dla nieznanego klucza FALLBACK — czyli
 // właśnie slate. Kontur czyta się jako „miejsce jeszcze niewypełnione”.
-const EMPTY_MARK = "border border-dashed border-line-strong bg-transparent";
+export const EMPTY_MARK = "border border-dashed border-line-strong bg-transparent";
 
 /** Kwadratowy znacznik koloru projektu — w listach wpisów, tabelach raportów
  *  i przy wyborze projektu. `color` puste znaczy „bez projektu”. */

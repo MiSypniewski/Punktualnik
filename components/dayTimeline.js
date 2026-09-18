@@ -1,7 +1,9 @@
+import { useRef, useState } from "react";
 import classNames from "classnames";
 import LiveDot from "./liveDot";
 import { absenceLabel, isLive } from "./dayState";
-import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatMinutes } from "../utils";
+import { EMPTY_MARK, ProjectMark, projectColor } from "./projectColors";
+import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatDuration, formatMinutes } from "../utils";
 
 // Oś czasu dnia: jedna belka na osobę, od wejścia do wyjścia, ze znacznikiem
 // „teraz” i kreską planowanego wyjścia.
@@ -20,6 +22,13 @@ import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatMinutes } from "../utils";
 // obecnej i kreska planowanego wyjścia. Belka zamknięta jest zielona przy
 // pełnej dniówce i neutralna w pozostałych przypadkach — tak samo jak chip
 // stanu w tabeli (components/dayState.js).
+//
+// Tor zadań (opcjonalny, checkbox na stronie) to OSOBNY, niższy pas pod belką,
+// a nie przemalowanie belki kolorami projektów. Paleta projektów ma amber,
+// emerald i rose — dokładnie te odcienie, którymi belka mówi „w pracy”,
+// „pełna dniówka” i „niepełna”. Zadanie projektu `rose` na belce czytałoby się
+// jak niepełna dniówka. W osobnym pasie kolor znaczy tylko „który projekt”,
+// a puste miejsce pod belką — czas obecności bez zaraportowanego zadania.
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -71,12 +80,23 @@ const barStyle = (person, running) => {
  * wyszedł poza nie (zmiana nocna, wejście przed piątą), i zawsze do pełnej
  * godziny.
  */
-const windowFor = (people, nowMin, isToday) => {
+const windowFor = (people, nowMin, isToday, tasksByUser) => {
   const values = [];
   people.forEach((p) => {
     if (p.startMin !== null) values.push(p.startMin);
     if (p.endMin !== null) values.push(p.endMin);
     if (p.leaveEndMin !== null && p.leaveEndMin !== undefined) values.push(p.leaveEndMin);
+    // Zadania też rozszerzają okno — wpis sprzed wejścia (praca z domu) ma być
+    // widoczny, a nie ucięty krawędzią. Domknięty automatycznie rozszerza
+    // okno tylko POCZĄTKIEM: kończy się o 3:00 następnej doby z definicji
+    // i rozciągałby oś o pół wykresu dla godziny, której nikt nie zmierzył.
+    // Godzina za początkiem wystarcza, żeby odcinek był widoczny i dał się
+    // najechać — sam początek dawałby pasek szerokości kilku pikseli.
+    ((tasksByUser && tasksByUser[p.userID]) || []).forEach((t) => {
+      if (t.startMin === null || t.endMin === null) return;
+      values.push(t.startMin);
+      values.push(t.autoClosed ? Math.min(t.endMin, t.startMin + 60) : t.endMin);
+    });
   });
   if (isToday) values.push(nowMin);
 
@@ -91,9 +111,90 @@ const windowFor = (people, nowMin, isToday) => {
   };
 };
 
-const Timeline = ({ people, isToday, nowMin, drift }) => {
+/**
+ * Dymek ze szczegółami wpisu. Własny, a nie atrybut `title`: natywny dymek
+ * pojawia się po około sekundzie, nie da się go sformatować i nie działa
+ * z klawiatury. Renderowany na poziomie całej osi, bo tor ma overflow-hidden
+ * i dymek osadzony w odcinku zostałby przycięty.
+ */
+const TaskTooltip = ({ hovered, drift }) => {
+  if (!hovered) return null;
+  const { entry, x, y, align } = hovered;
+  const seconds = entry.seconds + (entry.running ? drift : 0);
+
+  return (
+    <div
+      role="tooltip"
+      className={classNames(
+        "absolute z-20 w-72 pointer-events-none rounded-md border border-line bg-raised shadow-plate p-3 text-sm",
+        align === "start" ? "translate-x-0" : align === "end" ? "-translate-x-full" : "-translate-x-1/2"
+      )}
+      style={{ left: x, top: y }}
+    >
+      <p className="flex items-center gap-2 font-medium">
+        <ProjectMark color={entry.projectColor} />
+        <span className="truncate">
+          {entry.projectName || "(bez projektu)"}
+          {entry.projectClient && <span className="text-muted font-normal"> · {entry.projectClient}</span>}
+        </span>
+      </p>
+      <p className={classNames("mt-1 break-words", !entry.description && "text-faint")}>
+        {entry.description || "(bez opisu)"}
+      </p>
+      <p className="mt-1.5 font-mono text-xs tabular-nums text-muted">
+        {entry.startHm} – {entry.running ? "trwa" : entry.endHm} · {formatDuration(seconds)}
+      </p>
+      {entry.autoClosed && (
+        <p className="mt-1 text-xs text-muted">Domknięty automatycznie — koniec jest założony, nie zmierzony.</p>
+      )}
+      {entry.editedByName && <p className="mt-1 text-xs text-muted">Poprawił: {entry.editedByName}</p>}
+    </div>
+  );
+};
+
+const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
   const live = people.filter(isLive).length;
-  const { from, to } = windowFor(people, nowMin, isToday);
+  const withTasks = Boolean(tasksByUser);
+  const { from, to } = windowFor(people, nowMin, isToday, tasksByUser);
+
+  const rootRef = useRef(null);
+  const [hovered, setHovered] = useState(null);
+
+  // Pozycja dymka liczona względem całej osi: pod odcinkiem, wyśrodkowany,
+  // a przy krawędziach dosunięty do środka, żeby nie wystawał za stronę.
+  const showTask = (entry, target) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const box = root.getBoundingClientRect();
+    const seg = target.getBoundingClientRect();
+    const center = seg.left + seg.width / 2 - box.left;
+    const half = 144; // połowa w-72
+    const align = center < half ? "start" : center > box.width - half ? "end" : "center";
+    const x = align === "start" ? Math.max(0, seg.left - box.left) : align === "end" ? seg.right - box.left : center;
+    setHovered({ entry, x, y: seg.bottom - box.top + 6, align });
+  };
+  const hideTask = () => setHovered(null);
+
+  // Projekty występujące tego dnia — do legendy toru. Kolor nie identyfikuje
+  // projektu jednoznacznie (siedem odcieni na dowolnie wiele projektów), więc
+  // legenda podaje nazwy, a dymek szczegóły.
+  const dayProjects = [];
+  let hasNoProject = false;
+  if (withTasks) {
+    const seen = new Set();
+    people.forEach((p) =>
+      (tasksByUser[p.userID] || []).forEach((t) => {
+        if (!t.projectName) {
+          hasNoProject = true;
+          return;
+        }
+        if (seen.has(t.projectName)) return;
+        seen.add(t.projectName);
+        dayProjects.push({ name: t.projectName, color: t.projectColor });
+      })
+    );
+    dayProjects.sort((a, b) => a.name.localeCompare(b.name, "pl"));
+  }
   const span = Math.max(60, to - from);
 
   const pct = (minutes) => ((Math.min(Math.max(minutes, from), to) - from) / span) * 100;
@@ -113,8 +214,13 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
   // Bez własnego marginesu dolnego: rytm strony ustawia strona
   // (pages/urlopy/stan.js), inaczej dwa marginesy konkurowałyby i podniesienie
   // odstępu na stronie po cichu ograniczałby margines z tego komponentu.
+  // Przy torze zadań wiersz rośnie, a belka obecności zajmuje górną część —
+  // tej samej wysokości co bez toru, więc godziny w belce czytają się tak samo.
+  const barPos = withTasks ? "top-0.5 h-5" : "top-0.5 bottom-0.5";
+  const labelPos = withTasks ? "top-0 h-6" : "top-0 bottom-0";
+
   return (
-    <div>
+    <div ref={rootRef} className="relative">
       {/* Skala godzin. Podpis jest przesunięty w lewo o pół swojej szerokości,
           żeby stał NAD kreską, a nie za nią. */}
       <div className="flex items-end gap-3 mb-1">
@@ -178,7 +284,12 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
                 </p>
               </div>
 
-              <div className="relative flex-grow h-6 rounded-sm bg-surface border border-line-subtle overflow-hidden">
+              <div
+                className={classNames(
+                  "relative flex-grow rounded-sm bg-surface border border-line-subtle overflow-hidden",
+                  withTasks ? "h-10" : "h-6"
+                )}
+              >
                 {/* Linie pełnych godzin — włosowe, pod belkami. */}
                 {hours.map((h) => (
                   <span
@@ -209,7 +320,8 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
                   <>
                     <span
                       className={classNames(
-                        "absolute top-0.5 bottom-0.5 rounded-sm flex items-center overflow-hidden",
+                        "absolute rounded-sm flex items-center overflow-hidden",
+                        barPos,
                         barStyle(person, running).bar
                       )}
                       style={{ left: `${barFrom}%`, width: `${Math.max(barTo - barFrom, 0.4)}%` }}
@@ -235,7 +347,10 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
                         zostałby ucięty w połowie. */}
                     {hasLeave && (
                       <span
-                        className="absolute top-0.5 bottom-0.5 rounded-sm flex items-center overflow-hidden bg-ok-soft border border-dashed border-ok"
+                        className={classNames(
+                          "absolute rounded-sm flex items-center overflow-hidden bg-ok-soft border border-dashed border-ok",
+                          barPos
+                        )}
                         style={{ left: `${barTo}%`, width: `${Math.max(leaveTo - barTo, 0.4)}%` }}
                         title={`Zatwierdzone wcześniejsze wyjście: ${formatMinutes(person.earlyLeaveMin)}`}
                       >
@@ -247,7 +362,10 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
 
                     {!inside && (
                       <span
-                        className="absolute top-0 bottom-0 flex items-center font-mono text-xs tabular-nums whitespace-nowrap text-muted"
+                        className={classNames(
+                          "absolute flex items-center font-mono text-xs tabular-nums whitespace-nowrap text-muted",
+                          labelPos
+                        )}
                         style={
                           outsideFrom <= 78
                             ? { left: `${outsideFrom}%`, paddingLeft: "0.375rem" }
@@ -270,6 +388,38 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
                     style={{ left: `${pct(person.endMin)}%` }}
                   />
                 )}
+
+                {/* Tor zadań: niski pas pod belką. Odcinki rozdziela
+                    jednopikselowa szczelina, żeby dwa kolejne wpisy tego
+                    samego projektu nie zlały się w jeden. */}
+                {withTasks &&
+                  (tasksByUser[person.userID] || []).map((t) => {
+                    if (t.startMin === null || t.endMin === null) return null;
+                    // Biegnący kończy się TERAZ, tym samym driftem co belka.
+                    const end = t.running ? Math.max(nowLive, t.startMin) : t.endMin;
+                    const left = pct(t.startMin);
+                    const width = Math.max(pct(end) - left, 0.3);
+                    return (
+                      <span
+                        key={t.id}
+                        tabIndex={0}
+                        aria-label={`${t.projectName || "bez projektu"}: ${t.description || "bez opisu"}, ${t.startHm} – ${
+                          t.running ? "trwa" : t.endHm
+                        }`}
+                        onMouseEnter={(e) => showTask(t, e.currentTarget)}
+                        onMouseLeave={hideTask}
+                        onFocus={(e) => showTask(t, e.currentTarget)}
+                        onBlur={hideTask}
+                        className={classNames(
+                          "absolute bottom-0.5 h-3 rounded-sm cursor-default outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                          t.projectColor ? projectColor(t.projectColor).bar : EMPTY_MARK,
+                          t.autoClosed && "opacity-50",
+                          hovered && hovered.entry.id === t.id && "ring-2 ring-body/60"
+                        )}
+                        style={{ left: `${left}%`, width: `calc(${width}% - 1px)` }}
+                      />
+                    );
+                  })}
 
                 {!hasCard && !person.absence && (
                   <span className="absolute inset-0 flex items-center px-2 text-xs text-faint">
@@ -321,6 +471,29 @@ const Timeline = ({ people, isToday, nowMin, drift }) => {
           {isToday && " i chwila obecna"}
         </span>
       </p>
+
+      {withTasks && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          <span className="font-bold uppercase tracking-signage">Zadania:</span>
+          {dayProjects.map((p) => (
+            <span key={p.name} className="flex items-center gap-1.5">
+              <ProjectMark color={p.color} /> {p.name}
+            </span>
+          ))}
+          {hasNoProject && (
+            <span className="flex items-center gap-1.5">
+              <ProjectMark color={null} /> bez projektu
+            </span>
+          )}
+          {dayProjects.length === 0 && !hasNoProject && <span>tego dnia nikt nie raportował zadań</span>}
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-surface border border-line-subtle" /> brak
+            zaraportowanego zadania
+          </span>
+        </p>
+      )}
+
+      <TaskTooltip hovered={hovered} drift={drift} />
     </div>
   );
 };
