@@ -11,8 +11,8 @@
 
 // Zakres liczby kafelków — oraz ZERO, czyli "nie pokazuj ich wcale".
 //
-// Górna granica bierze się z ekranu, nie z bazy: dwadzieścia kafelków to na
-// telefonie dwadzieścia rzędów i dalej lista przestaje być listą skrótów.
+// Górna granica bierze się z ekranu, nie z bazy: trzydzieści dwa kafelki to na
+// telefonie trzydzieści dwa rzędy i dalej lista przestaje być listą skrótów.
 // (Podpowiedzi z historii jest najwyżej pięćdziesiąt — services/entrySuggestions.js
 // — więc do MAX_TILES jest jeszcze zapas.)
 //
@@ -23,7 +23,7 @@
 // dokładnie to, co było (patrz saveTilePrefs w services/resumeTiles.js, gdzie
 // przy zerze nie obowiązuje limit miejsc).
 export const MIN_TILES = 4;
-export const MAX_TILES = 20;
+export const MAX_TILES = 32;
 export const DEFAULT_TILES = 6;
 export const TILES_OFF = 0;
 

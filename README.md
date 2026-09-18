@@ -1220,7 +1220,7 @@ rutyna wypada wyżej niż coś zrobionego raz.
 
 **Kafelki „Wznów” pracownik ustawia sobie sam.** Domyślnie jest ich sześć, ale
 w panelu „Ustaw kafelki” (przy nagłówku, nad samymi kafelkami) da się wybrać
-dowolną liczbę **od 4 do 20** — a niektóre z nich **przypiąć**. Kafelek przypięty
+dowolną liczbę **od 4 do 32** — a niektóre z nich **przypiąć**. Kafelek przypięty
 stoi zawsze na początku, w kolejności ustawionej strzałkami, i nie znika, choćby
 tego zadania nie było w historii ani razu: opis i projekt wpisuje się ręcznie,
 więc da się przypiąć czynność, którą się dopiero zaczyna robić. Pozostałe miejsca
@@ -1270,7 +1270,7 @@ więc nie ma czego tłumaczyć.
 Na **telefonie kafelek zajmuje całą szerokość ekranu**; od `sm` w górę kafelki
 układają się w siatkę (2, 3 i 4 kolumny) o równych szerokościach. Wcześniej był
 to `flex-wrap`, w którym każdy kafelek miał szerokość swojego napisu, przez co
-rzędy się strzępiły — przy dwudziestu kafelkach byłoby to nie do czytania.
+rzędy się strzępiły — przy trzydziestu dwóch kafelkach byłoby to nie do czytania.
 
 **Opis zadania zawija się na dwie linie**, nadmiar ucina wielokropek (pełna treść
 zostaje w dymku i w panelu ustawień), a **nazwa projektu ma własną linię i nie
@@ -1782,7 +1782,7 @@ Nowy ekran składa się z `components/ui/`, nie z klas pisanych na miejscu:
 | kafla z liczbą | `Stat` |
 | `<h1>` z opisem strony | `PageHeader` |
 | „brak danych” | `EmptyState` |
-| podzakładek w module (dwie strony jednego obiegu) | `TabNav`; listę pozycji trzyma jeden plik per moduł, np. `components/absenceTabs.js`. Dziś używa go tylko `/urlopy/zarzadzaj` — na `/urlopy/stan` pasek zdjęto, bo ten ekran jest oglądany codziennie rano i ma zaczynać się od dnia zespołu, nie od wyboru, gdzie pójść |
+| podzakładek w module (dwie strony jednego obiegu) | `TabNav`; listę pozycji trzyma jeden plik per moduł. Dziś nie używa go żaden moduł — z Nieobecności pasek zdjęto z obu ekranów (`/urlopy/stan` i `/urlopy/zarzadzaj`), bo oba mają własne pozycje w pasku stacyjnym |
 | emoji jako ikony | `components/ui/icons.js` |
 
 Powłokę daje `BaseLayout` (strażnik sesji) → `AppShell` (pasek, kontener, stopka).
