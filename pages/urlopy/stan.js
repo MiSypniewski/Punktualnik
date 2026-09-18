@@ -156,7 +156,9 @@ const PersonRow = ({ person, showHours, showRunning, drift, isMe }) => {
 
   return (
     <Tr className={classNames(live && "bg-signal-soft")}>
-      <Td>
+      {/* pl-3 = px-3 nagłówka płyty: nazwisko stoi równo z "Zespół", a nie
+          przyklejone do krawędzi. Ten sam wcięty początek ma nagłówek kolumny. */}
+      <Td className="pl-3">
         {/* Dymek przy nazwisku niesie ujemne saldo nadgodzin. Saldo jest stanem
             narastającym, bez własnej daty, więc nie ma czego robić w wierszu
             opisującym JEDEN dzień — ale przy rozmowie z pracownikiem przydaje
@@ -400,8 +402,10 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
               <Table className="table-fixed">
                 <colgroup>
                   {/* Nazwisko z sekcją pod nim — tyle, żeby najdłuższe
-                      w firmie zmieściło się w jednej linii. */}
-                  <col className="w-56" />
+                      w firmie zmieściło się w jednej linii. Z w-56 na w-60
+                      razem z wcięciem pl-3: bez tego najdłuższe nazwisko
+                      dotykało kolumny STAN. */}
+                  <col className="w-60" />
                   {/* Chip stanu i podpis nieobecności pod nim; podpis się łamie
                       i już nie dyktuje szerokości. */}
                   <col className="w-40" />
@@ -427,7 +431,7 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
                 </colgroup>
                 <thead>
                   <Tr>
-                    <Th>Pracownik</Th>
+                    <Th className="pl-3">Pracownik</Th>
                     <Th>Stan</Th>
                     {showHours && (
                       <>
