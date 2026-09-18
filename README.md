@@ -921,6 +921,31 @@ zielona, a z dwiema zostaje czerwona, z bladym odcinkiem obok. Karty domkniętej
 nocą to nie dotyczy: jej ósemka jest założona, więc nie dostaje ani odcinka,
 ani koloru.
 
+#### Zadania na osi (opcjonalnie)
+
+Checkbox **„Pokaż zadania na osi”** nad osią dokłada pod każdą belką niski
+**tor zadań**: wpisy z `TaskEntries` tego dnia jako odcinki od–do w kolorze
+projektu (wpis bez projektu — przerywany kontur). Po najechaniu myszą albo
+fokusie z klawiatury dymek pokazuje projekt, klienta, opis, godziny, czas
+trwania i dopiski „domknięty automatycznie” / „poprawił”. Puste miejsce
+w torze pod belką to czas obecności bez zaraportowanego zadania.
+
+**Kolory projektów idą do osobnego toru, a nie na belkę.** Paleta projektów
+ma `amber`, `emerald` i `rose` — dokładnie te odcienie, którymi belka mówi
+„w pracy”, „pełna dniówka” i „niepełna”. Zadanie projektu `rose` pomalowane na
+belce czytałoby się jak niepełna dniówka. Kolor nie identyfikuje też projektu
+jednoznacznie (siedem odcieni na dowolnie wiele projektów), dlatego nazwy
+podaje legenda pod osią, a szczegóły dymek.
+
+Dane idą **osobnym endpointem** `/api/entries/day?dzien=` (bramka
+`canSeeTeamTasks`, zasięg po `Users.section` jak cały ekran), pytanym tylko przy
+włączonym checkboksie — wyłączony nie kosztuje serwera ani jednego zapytania.
+Wybór jest pamiętany per przeglądarka (`localStorage`). Serwis
+(`services/dayTasks.js`) wyłącznie czyta: timer zapomniany wczoraj NIE jest
+tu domykany, tylko rysowany tak, jak będzie wyglądał po domknięciu (do 3:00,
+półprzezroczysty). Wpis sprzed wejścia (np. praca z domu) rozszerza okno osi,
+żeby nie został ucięty.
+
 #### Dzień przyszły i dzień miniony
 
 Dzień przyszły liczy się inaczej i wygląda inaczej, bo o jutrze wiadomo tylko

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import classNames from "classnames";
 import { getToken } from "next-auth/jwt";
@@ -20,6 +20,7 @@ import {
 import {
   Alert,
   Badge,
+  Checkbox,
   Plate,
   PlateHeader,
   Table,
@@ -54,6 +55,11 @@ import { LIVE_POLL_MS, fetchLive } from "../../utils/live";
 // przyszłego: dopóki nikt nie odbije wejścia, nie ma od czego liczyć.
 
 const boardKey = (day) => `/api/absences/board?dzien=${encodeURIComponent(day)}`;
+const tasksKey = (day) => `/api/entries/day?dzien=${encodeURIComponent(day)}`;
+
+// Checkbox "Pokaż zadania na osi" pamiętany per przeglądarka, jak motyw —
+// to preferencja oglądającego, nie dana do bazy.
+const SHOW_TASKS_KEY = "punktualnik:stan:zadania";
 
 export async function getServerSideProps(ctx) {
   const token = await getToken({ req: ctx.req });
@@ -264,6 +270,41 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
   const board = data ?? initial;
   const { people, counts, isToday, isFuture } = board;
 
+  // Tor zadań na osi. Start zawsze od "wyłączony", decyzja z localStorage
+  // dopiero w useEffect — render serwera i pierwszy render klienta muszą być
+  // identyczne (ten sam zabieg co w components/installHint.js).
+  const [showTasks, setShowTasks] = useState(false);
+  useEffect(() => {
+    try {
+      setShowTasks(localStorage.getItem(SHOW_TASKS_KEY) === "1");
+    } catch {
+      // Tryb prywatny albo zablokowane dane witryny — zostaje wyłączony.
+    }
+  }, []);
+  const toggleTasks = (event) => {
+    const next = event.target.checked;
+    setShowTasks(next);
+    try {
+      localStorage.setItem(SHOW_TASKS_KEY, next ? "1" : "0");
+    } catch {
+      // j.w.
+    }
+  };
+
+  // Klucz null = SWR nie pyta w ogóle. Wyłączony checkbox nie kosztuje serwera
+  // ani jednego zapytania, a to on jest stanem domyślnym.
+  const { data: tasksData } = useSWR(showTasks && !isFuture ? tasksKey(day) : null, fetchLive, {
+    refreshInterval: isToday ? LIVE_POLL_MS : 0,
+  });
+  const tasksByUser = useMemo(() => {
+    if (!showTasks || !tasksData) return null;
+    const byUser = {};
+    tasksData.entries.forEach((t) => {
+      (byUser[t.userID] = byUser[t.userID] || []).push(t);
+    });
+    return byUser;
+  }, [showTasks, tasksData]);
+
   // Sekundy dorobione lokalnie od chwili odebrania danych — wzorzec
   // z components/liveBoard.js. Startuje od zera, więc pierwszy render klienta
   // jest identyczny z HTML-em z serwera i nie ma ostrzeżenia o hydracji.
@@ -366,7 +407,16 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
           jeszcze nie ma skąd wziąć. */}
       {people.length > 0 && !isFuture && (
         <div className="hidden lg:block mb-10">
-          <DayTimeline people={people} isToday={isToday} nowMin={board.nowMin} drift={drift} />
+          <div className="flex justify-end mb-2">
+            <Checkbox label="Pokaż zadania na osi" checked={showTasks} onChange={toggleTasks} />
+          </div>
+          <DayTimeline
+            people={people}
+            isToday={isToday}
+            nowMin={board.nowMin}
+            drift={drift}
+            tasksByUser={tasksByUser}
+          />
         </div>
       )}
 
