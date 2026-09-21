@@ -264,12 +264,17 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
           const span = `${person.startHm} – ${person.endHm}${person.endIsPlanned ? "*" : ""}`;
           const inside = barTo - barFrom >= LABEL_FITS_PCT;
 
-          // Odcinek zatwierdzonego wcześniejszego wyjścia, doklejony za belką.
-          // Serwer ustawia leaveEndMin tylko dla karty zamkniętej i zmierzonej.
+          // Odcinek zatwierdzonego wcześniejszego wyjścia. Przy karcie
+          // zamkniętej doklejony za belką, przy otwartej za kreską planowanego
+          // wyjścia — belka biegnąca kończy się TERAZ, więc do kreski zostaje
+          // przerwa. Serwer nie ustawia leaveEndMin dla karty domkniętej nocą.
           const hasLeave = hasCard && person.leaveEndMin !== null && person.leaveEndMin !== undefined;
+          const leaveFrom = person.endIsPlanned ? pct(person.endMin) : barTo;
           const leaveTo = hasLeave ? pct(person.leaveEndMin) : barTo;
           // Godziny stojące OBOK krótkiej belki idą za odcinkiem, nie na nim.
-          const outsideFrom = hasLeave ? leaveTo : barTo;
+          // Przy karcie otwartej odcinek stoi daleko od belki, więc godziny
+          // zostają przy belce.
+          const outsideFrom = hasLeave && !person.endIsPlanned ? leaveTo : barTo;
 
           return (
             <div key={person.userID} className="flex items-center gap-3">
@@ -318,6 +323,25 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
 
                 {hasCard && (
                   <>
+                    {/* Odcinek rysowany PRZED belką, więc leży pod nią. Kto
+                        mimo zgody pracuje dłużej, niż planował, ma biegnącą
+                        belkę wchodzącą na odcinek — to ma być widać, a nie
+                        chować się pod przerywaną ramką. */}
+                    {hasLeave && (
+                      <span
+                        className={classNames(
+                          "absolute rounded-sm flex items-center overflow-hidden bg-ok-soft border border-dashed border-ok",
+                          barPos
+                        )}
+                        style={{ left: `${leaveFrom}%`, width: `${Math.max(leaveTo - leaveFrom, 0.4)}%` }}
+                        title={`Zatwierdzone wcześniejsze wyjście: ${formatMinutes(person.earlyLeaveMin)}`}
+                      >
+                        {leaveTo - leaveFrom >= LEAVE_LABEL_FITS_PCT && (
+                          <span className="px-1.5 text-xs text-ok-strong truncate">wcześniejsze wyjście</span>
+                        )}
+                      </span>
+                    )}
+
                     <span
                       className={classNames(
                         "absolute rounded-sm flex items-center overflow-hidden",
@@ -345,21 +369,6 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                         belce kończącej się u krawędzi okna po lewej, bo tor ma
                         overflow-hidden i napis wystający za prawy brzeg
                         zostałby ucięty w połowie. */}
-                    {hasLeave && (
-                      <span
-                        className={classNames(
-                          "absolute rounded-sm flex items-center overflow-hidden bg-ok-soft border border-dashed border-ok",
-                          barPos
-                        )}
-                        style={{ left: `${barTo}%`, width: `${Math.max(leaveTo - barTo, 0.4)}%` }}
-                        title={`Zatwierdzone wcześniejsze wyjście: ${formatMinutes(person.earlyLeaveMin)}`}
-                      >
-                        {leaveTo - barTo >= LEAVE_LABEL_FITS_PCT && (
-                          <span className="px-1.5 text-xs text-ok-strong truncate">wcześniejsze wyjście</span>
-                        )}
-                      </span>
-                    )}
-
                     {!inside && (
                       <span
                         className={classNames(

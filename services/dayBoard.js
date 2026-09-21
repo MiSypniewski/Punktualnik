@@ -331,14 +331,16 @@ export const getDayBoard = ({ day, sections }) => {
     const startMin = card ? toMinutes(startHm) : null;
     const endMin = spanEnd(startMin, endHm ? toMinutes(endHm) : null);
 
-    // Odcinek "wcześniejsze wyjście" doklejany na osi za faktycznym wyjściem.
-    // Tylko karta ZAMKNIĘTA i zmierzona: przy otwartej zgoda siedzi już
-    // w godzinie z gwiazdką i w kresce planowanego wyjścia, a przy domkniętej
-    // nocą ósemka jest założona, więc doklejanie do niej czegokolwiek niczego
-    // nie wyjaśnia. Długość to zawsze CAŁA zgoda, także gdy ktoś został dłużej,
-    // niż musiał — dokładnie tyle zeszło z salda nadgodzin.
+    // Odcinek "wcześniejsze wyjście" doklejany na osi za wyjściem: faktycznym
+    // przy karcie zamkniętej, planowanym przy otwartej. Przy otwartej sama
+    // kreska planowanego wyjścia nie mówiła, CZEMU stoi wcześniej niż u innych
+    // — kierownik dowiadywał się tego dopiero po zamknięciu karty. Bez karty
+    // domkniętej nocą: tam ósemka jest założona, więc doklejanie do niej
+    // czegokolwiek niczego nie wyjaśnia. Długość to zawsze CAŁA zgoda, także
+    // gdy ktoś został dłużej, niż musiał — dokładnie tyle zeszło z salda
+    // nadgodzin.
     const leaveEndMin =
-      card && !open && !card.autoClosed && earlyLeaveMin > 0 && endMin !== null ? endMin + earlyLeaveMin : null;
+      card && !card.autoClosed && earlyLeaveMin > 0 && endMin !== null ? endMin + earlyLeaveMin : null;
 
     // Wymiar: karta zamknięta ma go w bazie jako tekst, karta otwarta jeszcze
     // nie — dla niej liczymy sekundy na serwerze, żeby przeglądarka miała od
