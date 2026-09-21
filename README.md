@@ -911,10 +911,12 @@ Kolumna „Czas” też nie jest skracana — karta mierzy obecność, a godzin�
 karcie WCIĄŻ OTWARTEJ to inna sytuacja i ma własny sygnał: godzina wyjścia
 robi się bursztynowa i pogrubiona (zapomniane drugie dotknięcie kafelka).
 
-**Po zamknięciu karty zgoda wraca na oś jako osobny odcinek.** Za belką
-faktycznej obecności dorysowuje się blado-zielony odcinek w przerywanej ramce
-(„wcześniejsze wyjście”) o długości CAŁEJ zatwierdzonej zgody, bo tyle zeszło
-z salda. Kolor belki i chipu liczy się z sumy: dniówka jest pełna, gdy
+**Zgoda jest na osi osobnym odcinkiem.** Blado-zielony odcinek w przerywanej
+ramce („wcześniejsze wyjście”) ma długość CAŁEJ zatwierdzonej zgody, bo tyle
+zeszło z salda. Przy karcie otwartej stoi za kreską planowanego wyjścia, więc
+od chwili zatwierdzenia widać, czemu kreska jest wcześniej. Leży pod belką:
+kto mimo zgody pracuje dłużej, ma biegnącą belkę wchodzącą na odcinek. Po
+zamknięciu karty odcinek przesuwa się za belkę faktycznej obecności. Kolor belki i chipu liczy się z sumy: dniówka jest pełna, gdy
 `przepracowane + zatwierdzone wcześniejsze wyjście ≥ 8 h` (`full`
 w `services/dayBoard.js`). Karta 08:04–13:16 z trzema godzinami zgody jest więc
 zielona, a z dwiema zostaje czerwona, z bladym odcinkiem obok. Karty domkniętej
