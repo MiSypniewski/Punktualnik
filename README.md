@@ -1628,8 +1628,8 @@ jako ręczny:
 W tabeli „Wg pracowników” kolumna **„Poza timerem”** to odsetek trzech pierwszych
 kategorii u danej osoby (rozbicie w podpowiedzi po najechaniu), a w eksporcie wpisów
 kolumna „Pochodzenie”. Na osi dnia w „Aktualnym stanie” (tor zadań) wpis ręczny
-ma ukośne paski i kwadrat **R**, a wpis z edytowanym czasem kwadrat **E** — przy
-początku odcinka, na własnym tle, więc widać go także przy kilkuminutowym zadaniu.
+ma **ukośne paski**, a wpis z edytowanym czasem **kropki** — wzór leży na samym
+odcinku, więc przy krótkich zadaniach niczego nie zasłania; szczegół mówi dymek.
 **Pracownik tego nie widzi**: kolumny `TaskEntries.origin`
 i `timeEdited` czytają wyłącznie `services/entryStats.js` i `services/dayTasks.js`
 (oba za bramką `canSeeTeamTasks`), a do odpowiedzi API pracownika i strony

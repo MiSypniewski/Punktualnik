@@ -33,24 +33,41 @@ import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatDuration, formatMinutes } f
 const MINUTES_PER_DAY = 24 * 60;
 
 // Wpis dopisany ręcznie albo z godzinami zmienianymi przez pracownika
-// (services/entryStats.js: CATEGORY_SQL). Litera na WŁASNYM tle, a nie na
-// odcinku: zadanie na torze ma często kilka pikseli szerokości i dowolny kolor
-// projektu, więc litera położona na nim byłaby albo ucięta, albo nieczytelna.
-// Kolory jak w raporcie /zadania/zarzadzaj — ten sam wpis ma mówić tym samym
-// kolorem na obu ekranach.
+// (services/entryStats.js: CATEGORY_SQL) — oznaczony WZOREM na samym odcinku,
+// a nie literą czy znacznikiem obok. Zadanie na torze ma często kilka pikseli
+// szerokości: litera nie ma gdzie stanąć, a znacznik wystający poza odcinek
+// zasłaniał sąsiednie zadania i przy gęstym dniu zaciemniał cały tor. Wzór
+// zajmuje dokładnie tyle miejsca co wpis i niczego nie przykrywa.
+//
+// Dwa wyraźnie różne kształty, bo kolorem rozróżnić ich nie można — kolor
+// odcinka należy do projektu:
+//  - paski ukośne: ręczny — ta sama konwencja co przerywana ramka
+//    „wcześniejszego wyjścia”: czas zadeklarowany, nie zmierzony;
+//  - kropki: godziny zmieniane — wpis był mierzony, ale ktoś go potem ruszał.
+// Półprzezroczysta biel leży NA kolorze projektu, więc działa w obu motywach.
+// Szczegół i tak mówi dymek; wzór ma tylko kazać na ten wpis najechać.
 const TASK_FLAG = {
-  manual: { letter: "R", chip: "bg-danger text-danger-ink", text: "Dopisany ręcznie — godziny podane, nie zmierzone." },
-  edited: { letter: "E", chip: "bg-accent text-accent-ink", text: "Pracownik zmieniał godzinę startu albo końca." },
+  manual: {
+    style: {
+      backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.55) 0 2px, transparent 2px 5px)",
+    },
+    label: "dopisany ręcznie",
+    text: "Dopisany ręcznie — godziny podane, nie zmierzone.",
+  },
+  edited: {
+    style: {
+      backgroundImage: "radial-gradient(circle, rgb(255 255 255 / 0.75) 1px, transparent 1.5px)",
+      backgroundSize: "4px 4px",
+    },
+    label: "godziny zmieniane",
+    text: "Pracownik zmieniał godzinę startu albo końca.",
+  },
 };
 
-// Ukośne paski na całym odcinku wpisu ręcznego — ta sama konwencja co
-// przerywana ramka „wcześniejszego wyjścia”: czas zadeklarowany, nie zmierzony.
-// Półprzezroczysta biel leży NA kolorze projektu, więc działa w obu motywach.
-// Od którego miejsca toru (w procentach) znacznik przechodzi na koniec odcinka.
-// 16 px na najwęższym torze (~790 px, patrz LABEL_FITS_PCT) to około 2%.
-const FLAG_FLIP_PCT = 97;
-
-const HATCH = "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.55) 0 2px, transparent 2px 5px)";
+/** Próbka wzoru do legendy i dymku — na neutralnym tle, bo nie należy do projektu. */
+const FlagSwatch = ({ category }) => (
+  <span aria-hidden="true" className="w-4 h-2.5 shrink-0 rounded-sm bg-muted" style={TASK_FLAG[category].style} />
+);
 
 // Od jakiej szerokości belki napis „06:45 – 15:45*” mieści się w niej samej.
 // Trzynaście znaków monospace przy text-xs to około 90 px, a najwęższy tor
@@ -169,7 +186,7 @@ const TaskTooltip = ({ hovered, drift }) => {
       )}
       {TASK_FLAG[entry.category] && (
         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-          <FlagChip category={entry.category} />
+          <FlagSwatch category={entry.category} />
           {TASK_FLAG[entry.category].text}
         </p>
       )}
@@ -177,28 +194,6 @@ const TaskTooltip = ({ hovered, drift }) => {
     </div>
   );
 };
-
-// Dwa rozmiary: na torze 16 px — tyle, ile jest od dołu toru do dolnej krawędzi
-// belki obecności, więc znacznik wypełnia szczelinę między nimi i niczego nie
-// zasłania; w legendzie i dymku mniejszy, w linii z tekstem.
-const FLAG_SIZE = {
-  track: "w-4 h-4 text-[0.6875rem]",
-  inline: "w-3.5 h-3.5 text-[0.625rem]",
-};
-
-const FlagChip = ({ category, size = "inline", className }) => (
-  <span
-    aria-hidden="true"
-    className={classNames(
-      "inline-flex shrink-0 items-center justify-center rounded-sm font-sans font-bold leading-none",
-      FLAG_SIZE[size],
-      TASK_FLAG[category].chip,
-      className
-    )}
-  >
-    {TASK_FLAG[category].letter}
-  </span>
-);
 
 const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
   const live = people.filter(isLive).length;
@@ -465,7 +460,7 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                         tabIndex={0}
                         aria-label={`${t.projectName || "bez projektu"}: ${t.description || "bez opisu"}, ${t.startHm} – ${
                           t.running ? "trwa" : t.endHm
-                        }${flag ? `, ${t.category === "manual" ? "dopisany ręcznie" : "godziny zmieniane"}` : ""}`}
+                        }${flag ? `, ${flag.label}` : ""}`}
                         onMouseEnter={(e) => showTask(t, e.currentTarget)}
                         onMouseLeave={hideTask}
                         onFocus={(e) => showTask(t, e.currentTarget)}
@@ -476,30 +471,8 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                           t.autoClosed && "opacity-50",
                           hovered && hovered.entry.id === t.id && "ring-2 ring-body/60"
                         )}
-                        style={{
-                          left: `${left}%`,
-                          width: `calc(${width}% - 1px)`,
-                          ...(t.category === "manual" && { backgroundImage: HATCH }),
-                        }}
-                      >
-                        {/* Znacznik przy POCZĄTKU odcinka, wyrównany do jego dołu.
-                            Przy zadaniu węższym niż sam znacznik wystaje w prawo
-                            — lepiej zasłonić kawałek sąsiada, niż go zgubić.
-                            Tuż przy prawym brzegu okna wystawałby za tor
-                            (overflow-hidden) i był ucięty, więc tam przechodzi
-                            na koniec odcinka i wystaje w lewo.
-                            Obwódka w kolorze toru oddziela go od koloru projektu. */}
-                        {flag && (
-                          <FlagChip
-                            category={t.category}
-                            size="track"
-                            className={classNames(
-                              "absolute bottom-0 ring-1 ring-surface",
-                              left > FLAG_FLIP_PCT ? "right-0" : "left-0"
-                            )}
-                          />
-                        )}
-                      </span>
+                        style={{ left: `${left}%`, width: `calc(${width}% - 1px)`, ...flag?.style }}
+                      />
                     );
                   })}
 
@@ -582,12 +555,12 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
               objaśnia to, co widać, a nie wszystko, co mogłoby się pojawić. */}
           {flagsSeen.has("manual") && (
             <span className="flex items-center gap-1.5">
-              <FlagChip category="manual" /> dopisany ręcznie
+              <FlagSwatch category="manual" /> dopisany ręcznie
             </span>
           )}
           {flagsSeen.has("edited") && (
             <span className="flex items-center gap-1.5">
-              <FlagChip category="edited" /> godziny zmieniane
+              <FlagSwatch category="edited" /> godziny zmieniane
             </span>
           )}
           <span className="flex items-center gap-1.5">
