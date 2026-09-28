@@ -2,7 +2,9 @@ import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
 import { installRuntimeGuards } from "./runtime";
-import { logInfo, logError } from "./log";
+import { logInfo, logWarn, logError } from "./log";
+import { EMPTY_PROJECT_NAME } from "../utils/emptyTimer";
+import { now as appNow, TS_FORMAT } from "./workday";
 // Parametry haseł czytamy WPROST z .cjs, a nie przez services/password.js —
 // db.js wchodzi do każdego bundla serwerowego i nie ma powodu ciągnąć za sobą
 // modułu liczącego PBKDF2 tylko po jedną stałą.
@@ -110,6 +112,9 @@ const ENTRY_INDEXES = `
 
 // Kolumny TaskEntries wymienione z nazwy — przepisanie tabeli nie może zależeć
 // od ich kolejności w schemacie.
+//
+// Bez emptyStage: ta migracja przebudowuje tabelę sprzed jej powstania, a kolumnę
+// dokłada dopiero migrateEmptyTimer, która leci później.
 const ENTRY_COLUMNS = `id, userID, projectID, description, data, startedAt, endedAt,
        seconds, section, autoClosed, createdAt, editedAt, editedBy, editedByName`;
 
@@ -254,6 +259,51 @@ const migrateUserPasswordParams = (db) => {
     db.exec(`ALTER TABLE Users ADD COLUMN passwordParams TEXT NOT NULL DEFAULT '${LEGACY_PARAMS}'`);
     logInfo("db", "migracja: dodano Users.passwordParams", { default: LEGACY_PARAMS });
   }
+};
+
+/**
+ * Pusty timer: TaskEntries.emptyStage i Projects.isSystem, plus sam projekt
+ * systemowy "do usunięcia" (services/emptyTimerJob.js).
+ *
+ * Kolumny jak w migracjach wyżej — ALTER TABLE ADD COLUMN z NOT NULL DEFAULT,
+ * bez przepisywania wierszy. Projekt szukamy po FLADZE, nie po nazwie: nazwę
+ * kierownik mógł już zająć własnym projektem i przejęcie go schowałoby cudzą
+ * pracę z list wyboru. Wtedy systemowy dostaje sufiks, a log o tym mówi.
+ *
+ * Idempotentna i sterowana STANEM BAZY, jak migracje wyżej — ale w transakcji
+ * IMMEDIATE, i to nie jest ozdobnik. `next build` otwiera bazę z kilku workerów
+ * NARAZ (komentarz przy busy_timeout w createDb): dwa sprawdzały "projektu
+ * systemowego jeszcze nie ma" w tej samej chwili i drugi INSERT wywracał build
+ * na UNIQUE(name). Blokada zapisu brana PRZED pierwszym odczytem sprawia, że
+ * drugi worker czeka na busy_timeout i widzi już gotowy stan.
+ */
+const migrateEmptyTimer = (db) => db.transaction(() => migrateEmptyTimerLocked(db)).immediate();
+
+const migrateEmptyTimerLocked = (db) => {
+  const entryCols = db.prepare(`PRAGMA table_info(TaskEntries)`).all().map((c) => c.name);
+  if (!entryCols.includes("emptyStage")) {
+    db.exec(`ALTER TABLE TaskEntries ADD COLUMN emptyStage INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  const projectCols = db.prepare(`PRAGMA table_info(Projects)`).all().map((c) => c.name);
+  if (!projectCols.includes("isSystem")) {
+    db.exec(`ALTER TABLE Projects ADD COLUMN isSystem INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  if (db.prepare(`SELECT id FROM Projects WHERE isSystem = 1`).get()) return;
+
+  const taken = db.prepare(`SELECT id FROM Projects WHERE name = ? COLLATE NOCASE`);
+  let name = EMPTY_PROJECT_NAME;
+  if (taken.get(name)) {
+    name = `${EMPTY_PROJECT_NAME} (system)`;
+    logWarn("db", "nazwa projektu systemowego zajęta, użyto sufiksu", { name });
+  }
+
+  db.prepare(
+    `INSERT INTO Projects (name, client, color, isActive, createdAt, createdBy, isSystem)
+     VALUES (?, NULL, 'slate', 1, ?, NULL, 1)`
+  ).run(name, appNow().format(TS_FORMAT));
+  logInfo("db", "migracja: założono projekt systemowy", { name });
 };
 
 const createDb = () => {
@@ -443,6 +493,10 @@ const createDb = () => {
       isActive  INTEGER NOT NULL DEFAULT 1,
       createdAt TEXT    NOT NULL,
       createdBy INTEGER,
+      -- Projekt SYSTEMOWY ("do usunięcia"), na który budzik zamyka puste timery
+      -- (services/emptyTimerJob.js). Nie ma go na żadnej liście wyboru i nie da
+      -- się na niego nic zaraportować — patrz canUseProject w services/projects.js.
+      isSystem  INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (createdBy) REFERENCES Users(id)
     );
 
@@ -501,6 +555,10 @@ const createDb = () => {
       editedAt     TEXT,
       editedBy     INTEGER,
       editedByName TEXT,
+      -- Pusty timer (bez opisu i projektu): 1 = kierownik dostał mail po 20 min,
+      -- 2 = budzik zamknął wpis po 30 min (services/emptyTimerJob.js). Stan
+      -- w wierszu, a nie zapadka w JobRuns, bo dotyczy pojedynczego wpisu.
+      emptyStage   INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (userID)    REFERENCES Users(id),
       FOREIGN KEY (projectID) REFERENCES Projects(id)
     );
@@ -585,6 +643,7 @@ const createDb = () => {
   migrateTimesAudit(db);
   migrateUserResumeTiles(db);
   migrateUserPasswordParams(db);
+  migrateEmptyTimer(db);
 
   // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
   // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do

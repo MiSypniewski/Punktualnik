@@ -30,6 +30,7 @@ const stmt = db.prepare(`
      AND e.description <> ''
      AND e.data >= @since
      AND p.isActive = 1
+     AND p.isSystem = 0
    GROUP BY e.projectID, e.description
    ORDER BY uses DESC, lastUsed DESC
    LIMIT ${LIMIT}`);

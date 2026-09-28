@@ -20,7 +20,7 @@ import { TS_FORMAT, now as appNow } from "./workday";
 // w components/projectColors.js.
 export const PROJECT_COLOR_KEYS = ["indigo", "emerald", "amber", "rose", "sky", "violet", "slate"];
 
-const COLUMNS = `p.id, p.name, p.client, p.color, p.isActive, p.createdAt, p.createdBy`;
+const COLUMNS = `p.id, p.name, p.client, p.color, p.isActive, p.createdAt, p.createdBy, p.isSystem`;
 
 const stmtGet = db.prepare(`SELECT ${COLUMNS} FROM Projects p WHERE p.id = ?`);
 const stmtSectionsOf = db.prepare(`SELECT section FROM ProjectSections WHERE projectID = ? ORDER BY section`);
@@ -41,7 +41,12 @@ const stmtNameTaken = db.prepare(`SELECT id FROM Projects WHERE name = ? COLLATE
 // Pojedynczy projekt — jedno dodatkowe zapytanie o jego sekcje.
 const toRow = (row) =>
   row
-    ? { ...row, isActive: Boolean(row.isActive), sections: stmtSectionsOf.all(row.id).map((r) => r.section) }
+    ? {
+        ...row,
+        isActive: Boolean(row.isActive),
+        isSystem: Boolean(row.isSystem),
+        sections: stmtSectionsOf.all(row.id).map((r) => r.section),
+      }
     : undefined;
 
 // Lista projektów — sekcje dla WSZYSTKICH naraz, jednym zapytaniem.
@@ -77,6 +82,7 @@ const toRows = (rows) => {
   return rows.map((row) => ({
     ...row,
     isActive: Boolean(row.isActive),
+    isSystem: Boolean(row.isSystem),
     sections: sections.get(row.id) ?? [],
   }));
 };
@@ -99,10 +105,11 @@ export const projectScope = (token) => {
 // — dokładnie ten sam zabieg co w services/getTimesReport.js.
 const listCache = new Map();
 
-const getListStatement = (sectionCount, includeArchived) => {
-  const key = `${sectionCount}#${includeArchived ? "all" : "act"}`;
+const getListStatement = (sectionCount, includeArchived, includeSystem) => {
+  const key = `${sectionCount}#${includeArchived ? "all" : "act"}#${includeSystem ? "sys" : "nosys"}`;
   if (!listCache.has(key)) {
     const activeClause = includeArchived ? "" : ` AND p.isActive = 1`;
+    const systemClause = includeSystem ? "" : ` AND p.isSystem = 0`;
 
     // Projekt bez ŻADNEGO przypisania jest ogólnofirmowy — stąd NOT EXISTS
     // w pierwszym członie. To odwrotna wartość domyślna niż w ManagerSections
@@ -121,7 +128,7 @@ const getListStatement = (sectionCount, includeArchived) => {
 
     listCache.set(
       key,
-      db.prepare(`SELECT ${COLUMNS} FROM Projects p WHERE 1=1${activeClause}${scopeClause}
+      db.prepare(`SELECT ${COLUMNS} FROM Projects p WHERE 1=1${activeClause}${systemClause}${scopeClause}
                   ORDER BY p.name COLLATE NOCASE`)
     );
   }
@@ -129,15 +136,21 @@ const getListStatement = (sectionCount, includeArchived) => {
 };
 
 /**
- * @param {{sections?: string[], includeArchived?: boolean}} opts
+ * @param {{sections?: string[], includeArchived?: boolean, includeSystem?: boolean}} opts
  *   sections pominięte = bez zawężania (widok pełny, tylko dla zaufanych ścieżek).
+ *   includeSystem dokłada projekt systemowy "do usunięcia" — WYŁĄCZNIE dla
+ *   filtrów raportu, gdzie kierownik ma móc te wpisy wyszukać. Na listach
+ *   wyboru (timer, wpis ręczny, kafelki, panel projektów) go nie ma.
  */
-export const listProjects = ({ sections, includeArchived = false } = {}) => {
+export const listProjects = ({ sections, includeArchived = false, includeSystem = false } = {}) => {
   if (!Array.isArray(sections)) {
+    const where = [includeArchived ? "" : "p.isActive = 1", includeSystem ? "" : "p.isSystem = 0"]
+      .filter(Boolean)
+      .join(" AND ");
     const all = db
       .prepare(
         `SELECT ${COLUMNS} FROM Projects p
-          ${includeArchived ? "" : "WHERE p.isActive = 1"}
+          ${where ? `WHERE ${where}` : ""}
           ORDER BY p.name COLLATE NOCASE`
       )
       .all();
@@ -149,7 +162,7 @@ export const listProjects = ({ sections, includeArchived = false } = {}) => {
     params[`sec${i}`] = String(s);
   });
 
-  return toRows(getListStatement(sections.length, includeArchived).all(params));
+  return toRows(getListStatement(sections.length, includeArchived, includeSystem).all(params));
 };
 
 export const getProject = (id) => toRow(stmtGet.get(Number(id)));
@@ -164,6 +177,10 @@ export const getProject = (id) => toRow(stmtGet.get(Number(id)));
  */
 export const canUseProject = (token, project, { allowArchived = false } = {}) => {
   if (!project) return false;
+  // Projekt systemowy przyjmuje wpisy WYŁĄCZNIE od budzika (services/emptyTimerJob.js).
+  // Także przy poprawianiu wpisu, który już na nim wisi — poprawka ma wskazać
+  // prawdziwy projekt, inaczej "do usunięcia" dałoby się zatwierdzić edycją.
+  if (project.isSystem) return false;
   if (!project.isActive && !allowArchived) return false;
   if (project.sections.length === 0) return true; // ogólnofirmowy
   return project.sections.some((s) => projectScope(token).includes(s));

@@ -244,7 +244,7 @@ const detailStatement = (filters, scope) =>
              -- w starym wpisie — ludzie przechodzą między działami.
              u.section AS userSection,
              p.name AS projectName, p.client AS projectClient, p.color AS projectColor,
-             p.isActive AS projectIsActive
+             p.isActive AS projectIsActive, p.isSystem AS projectIsSystem
         FROM TaskEntries e
         JOIN Users u    ON u.id = e.userID
         LEFT JOIN Projects p ON p.id = e.projectID${where}
@@ -273,6 +273,7 @@ export const getEntries = (filters, scope = "view", { summary } = {}) => {
       ...r,
       autoClosed: Boolean(r.autoClosed),
       projectIsActive: Boolean(r.projectIsActive),
+      projectIsSystem: Boolean(r.projectIsSystem),
     })),
     total,
     limit: DETAIL_LIMIT,
@@ -297,6 +298,11 @@ export function* iterateAllEntries(filters) {
 
   const stmt = detailStatement(filters, "all");
   for (const r of stmt.iterate(paramsOf(filters))) {
-    yield { ...r, autoClosed: Boolean(r.autoClosed), projectIsActive: Boolean(r.projectIsActive) };
+    yield {
+      ...r,
+      autoClosed: Boolean(r.autoClosed),
+      projectIsActive: Boolean(r.projectIsActive),
+      projectIsSystem: Boolean(r.projectIsSystem),
+    };
   }
 }
