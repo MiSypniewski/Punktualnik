@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import db from "./db";
+import { CATEGORY_SQL } from "./entryStats";
 import { now as appNow, WORKDAY_START_HOUR } from "./workday";
 
 // Wpisy zadań zespołu z jednego dnia — tor zadań pod belką obecności na osi
@@ -34,6 +35,7 @@ const stmtEntries = (count) => {
       db.prepare(`
         SELECT e.id, e.userID, e.description, e.startedAt, e.endedAt, e.seconds,
                e.autoClosed, e.editedByName,
+               ${CATEGORY_SQL} AS category,
                p.name AS projectName, p.client AS projectClient, p.color AS projectColor
           FROM TaskEntries e
           JOIN Users u         ON u.id = e.userID
@@ -115,6 +117,9 @@ export const getDayTasks = ({ day, sections }) => {
         running,
         autoClosed: Boolean(e.autoClosed) || stale,
         editedByName: e.editedByName,
+        // Tylko to, co tor pokazuje własnym znacznikiem. "auto" ma już swoje
+        // przygaszenie (autoClosed wyżej), a "clean" nie potrzebuje niczego.
+        category: e.category === "manual" || e.category === "edited" ? e.category : null,
       };
     });
 

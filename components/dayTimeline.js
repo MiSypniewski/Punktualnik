@@ -32,6 +32,43 @@ import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatDuration, formatMinutes } f
 
 const MINUTES_PER_DAY = 24 * 60;
 
+// Wpis dopisany ręcznie albo z godzinami zmienianymi przez pracownika
+// (services/entryStats.js: CATEGORY_SQL) — oznaczony WZOREM na samym odcinku,
+// a nie literą czy znacznikiem obok. Zadanie na torze ma często kilka pikseli
+// szerokości: litera nie ma gdzie stanąć, a znacznik wystający poza odcinek
+// zasłaniał sąsiednie zadania i przy gęstym dniu zaciemniał cały tor. Wzór
+// zajmuje dokładnie tyle miejsca co wpis i niczego nie przykrywa.
+//
+// Dwa wyraźnie różne kształty, bo kolorem rozróżnić ich nie można — kolor
+// odcinka należy do projektu:
+//  - paski ukośne: ręczny — ta sama konwencja co przerywana ramka
+//    „wcześniejszego wyjścia”: czas zadeklarowany, nie zmierzony;
+//  - kropki: godziny zmieniane — wpis był mierzony, ale ktoś go potem ruszał.
+// Półprzezroczysta biel leży NA kolorze projektu, więc działa w obu motywach.
+// Szczegół i tak mówi dymek; wzór ma tylko kazać na ten wpis najechać.
+const TASK_FLAG = {
+  manual: {
+    style: {
+      backgroundImage: "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.55) 0 2px, transparent 2px 5px)",
+    },
+    label: "dopisany ręcznie",
+    text: "Dopisany ręcznie — godziny podane, nie zmierzone.",
+  },
+  edited: {
+    style: {
+      backgroundImage: "radial-gradient(circle, rgb(255 255 255 / 0.75) 1px, transparent 1.5px)",
+      backgroundSize: "4px 4px",
+    },
+    label: "godziny zmieniane",
+    text: "Pracownik zmieniał godzinę startu albo końca.",
+  },
+};
+
+/** Próbka wzoru do legendy i dymku — na neutralnym tle, bo nie należy do projektu. */
+const FlagSwatch = ({ category }) => (
+  <span aria-hidden="true" className="w-4 h-2.5 shrink-0 rounded-sm bg-muted" style={TASK_FLAG[category].style} />
+);
+
 // Od jakiej szerokości belki napis „06:45 – 15:45*” mieści się w niej samej.
 // Trzynaście znaków monospace przy text-xs to około 90 px, a najwęższy tor
 // (kolumna nazwisk odjęta od szerokości okna na progu lg) ma około 790 px —
@@ -147,6 +184,12 @@ const TaskTooltip = ({ hovered, drift }) => {
       {entry.autoClosed && (
         <p className="mt-1 text-xs text-muted">Domknięty automatycznie — koniec jest założony, nie zmierzony.</p>
       )}
+      {TASK_FLAG[entry.category] && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+          <FlagSwatch category={entry.category} />
+          {TASK_FLAG[entry.category].text}
+        </p>
+      )}
       {entry.editedByName && <p className="mt-1 text-xs text-muted">Poprawił: {entry.editedByName}</p>}
     </div>
   );
@@ -180,10 +223,12 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
   // legenda podaje nazwy, a dymek szczegóły.
   const dayProjects = [];
   let hasNoProject = false;
+  const flagsSeen = new Set();
   if (withTasks) {
     const seen = new Set();
     people.forEach((p) =>
       (tasksByUser[p.userID] || []).forEach((t) => {
+        if (t.category) flagsSeen.add(t.category);
         if (!t.projectName) {
           hasNoProject = true;
           return;
@@ -408,13 +453,14 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                     const end = t.running ? Math.max(nowLive, t.startMin) : t.endMin;
                     const left = pct(t.startMin);
                     const width = Math.max(pct(end) - left, 0.3);
+                    const flag = TASK_FLAG[t.category];
                     return (
                       <span
                         key={t.id}
                         tabIndex={0}
                         aria-label={`${t.projectName || "bez projektu"}: ${t.description || "bez opisu"}, ${t.startHm} – ${
                           t.running ? "trwa" : t.endHm
-                        }`}
+                        }${flag ? `, ${flag.label}` : ""}`}
                         onMouseEnter={(e) => showTask(t, e.currentTarget)}
                         onMouseLeave={hideTask}
                         onFocus={(e) => showTask(t, e.currentTarget)}
@@ -425,7 +471,7 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                           t.autoClosed && "opacity-50",
                           hovered && hovered.entry.id === t.id && "ring-2 ring-body/60"
                         )}
-                        style={{ left: `${left}%`, width: `calc(${width}% - 1px)` }}
+                        style={{ left: `${left}%`, width: `calc(${width}% - 1px)`, ...flag?.style }}
                       />
                     );
                   })}
@@ -505,6 +551,18 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
             </span>
           )}
           {dayProjects.length === 0 && !hasNoProject && <span>tego dnia nikt nie raportował zadań</span>}
+          {/* Tylko te znaczniki, które tego dnia faktycznie występują — legenda
+              objaśnia to, co widać, a nie wszystko, co mogłoby się pojawić. */}
+          {flagsSeen.has("manual") && (
+            <span className="flex items-center gap-1.5">
+              <FlagSwatch category="manual" /> dopisany ręcznie
+            </span>
+          )}
+          {flagsSeen.has("edited") && (
+            <span className="flex items-center gap-1.5">
+              <FlagSwatch category="edited" /> godziny zmieniane
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-surface border border-line-subtle" /> brak
             zaraportowanego zadania

@@ -306,6 +306,59 @@ const migrateEmptyTimerLocked = (db) => {
   logInfo("db", "migracja: założono projekt systemowy", { name });
 };
 
+/**
+ * Pochodzenie wpisu: TaskEntries.origin ('timer' | 'manual' | 'manager')
+ * i TaskEntries.timeEdited (pracownik zmieniał godzinę startu albo końca).
+ *
+ * Do tej pory wpis dopisany formularzem ręcznym wyglądał w bazie dokładnie jak
+ * wpis z timera, a zmiana godzin przez pracownika nie zostawiała śladu (podpis
+ * editedBy* zostawia tylko korekta kierownika). Kierownik chce widzieć, jaka
+ * część wpisów powstała "jak trzeba", więc oba fakty trzeba zapisać przy zapisie.
+ *
+ * Wiersze sprzed tej zmiany dostają wartości ODTWORZONE Z PRZYBLIŻENIEM —
+ * tylko w przebiegu, który dodaje kolumny, więc drugi start niczego nie rusza:
+ *  - timer zapisuje createdAt = startedAt, więc wpis utworzony NIE WCZEŚNIEJ niż
+ *    swój koniec musiał zostać dopisany ręcznie;
+ *  - wpis z timera, którego start różni się od chwili utworzenia, miał
+ *    przesuwany początek.
+ * Czego się nie da odtworzyć: samej zmiany KOŃCA (createdAt = startedAt zostaje),
+ * edycji we wpisie poprawianym potem przez kierownika (nie wiadomo, kto ruszył
+ * start — taki wpis zostaje nieoznaczony) i wpisu ręcznego z końcem
+ * w przyszłości (wpadnie do "edytowanych" zamiast do "ręcznych").
+ *
+ * Transakcja IMMEDIATE z tego samego powodu co w migrateEmptyTimer: workery
+ * `next build` otwierają bazę naraz, a backfill ma przejść dokładnie raz.
+ */
+const migrateEntryOrigin = (db) =>
+  db
+    .transaction(() => {
+      const columns = db.prepare(`PRAGMA table_info(TaskEntries)`).all().map((c) => c.name);
+      if (columns.includes("origin") && columns.includes("timeEdited")) return;
+
+      if (!columns.includes("origin")) {
+        db.exec(`ALTER TABLE TaskEntries ADD COLUMN origin TEXT NOT NULL DEFAULT 'timer'`);
+      }
+      if (!columns.includes("timeEdited")) {
+        db.exec(`ALTER TABLE TaskEntries ADD COLUMN timeEdited INTEGER NOT NULL DEFAULT 0`);
+      }
+
+      const manual = db
+        .prepare(
+          `UPDATE TaskEntries SET origin = 'manual'
+            WHERE origin = 'timer' AND endedAt IS NOT NULL AND createdAt >= endedAt`
+        )
+        .run().changes;
+      const edited = db
+        .prepare(
+          `UPDATE TaskEntries SET timeEdited = 1
+            WHERE origin = 'timer' AND createdAt <> startedAt AND editedByName IS NULL`
+        )
+        .run().changes;
+
+      logInfo("db", "migracja: dodano TaskEntries.origin i timeEdited", { manual, edited });
+    })
+    .immediate();
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -559,6 +612,15 @@ const createDb = () => {
       -- 2 = budzik zamknął wpis po 30 min (services/emptyTimerJob.js). Stan
       -- w wierszu, a nie zapadka w JobRuns, bo dotyczy pojedynczego wpisu.
       emptyStage   INTEGER NOT NULL DEFAULT 0,
+      -- Skąd wpis: 'timer' (Start/Stop), 'manual' (formularz "Dodaj wpis
+      -- ręcznie" pracownika), 'manager' (kierownik dopisał za kogoś).
+      -- timeEdited = 1: właściciel zmieniał godzinę startu albo końca; flaga
+      -- nie spada, także po korekcie kierownika. Obie kolumny widzi WYŁĄCZNIE
+      -- panel kierownika (services/entryStats.js) — nie ma ich w COLS
+      -- w services/taskEntries.js, więc nie jadą do przeglądarki pracownika.
+      -- Wiersze sprzed tej zmiany odtworzyła migrateEntryOrigin.
+      origin       TEXT    NOT NULL DEFAULT 'timer',
+      timeEdited   INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (userID)    REFERENCES Users(id),
       FOREIGN KEY (projectID) REFERENCES Projects(id)
     );
@@ -644,6 +706,7 @@ const createDb = () => {
   migrateUserResumeTiles(db);
   migrateUserPasswordParams(db);
   migrateEmptyTimer(db);
+  migrateEntryOrigin(db);
 
   // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
   // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do
