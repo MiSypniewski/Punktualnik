@@ -1446,6 +1446,16 @@ serwera i przeglądarki):
 pusty. Timer z samym projektem albo samym opisem tej reguły nie podlega
 i dalej biegnie do 3:00 — to decyzja, nie przeoczenie.
 
+**Karta przeglądarki miga** od progu 15 minut: co sekundę tytuł przełącza się
+na „⚠ Opisz timer!”, a ikona na czerwony wykrzyknik (`utils/tabBlink.js`,
+wpięte w `components/timerTitle.js`, jedyne miejsce, które ustawia tytuł).
+Działa bez żadnej zgody, na każdej podstronie, i gaśnie w chwili zapisania opisu
+albo projektu. Miganie tyka z Web Workera, nie ze zwykłego `setInterval`:
+Chrome dławi timery w karcie schowanej dłużej niż 5 minut do jednego wybudzenia
+na minutę, a to właśnie karta w tle ma zwrócić na siebie uwagę. Sam próg
+w takiej karcie bywa zauważony do minuty później (licznik tyka na stronie),
+ale kiedy już miga, miga co sekundę.
+
 Dymek systemowy wymaga zgody. Przeglądarka pyta o nią przy kliknięciu **Start**
 pustego timera, bo tylko w odpowiedzi na gest użytkownika w ogóle pozwala zapytać.
 Odmowa niczego nie psuje, zostaje baner. Przed pokazaniem dymka karta dociąga

@@ -26,3 +26,16 @@ export const EMPTY_PROJECT_NAME = "do usunięcia";
 /** Czy wpis jest "pusty" — ta sama reguła co warunek w SQL budzika. */
 export const isEmptyTimer = (entry) =>
   Boolean(entry) && !entry.projectID && !String(entry.description ?? "").trim();
+
+/**
+ * Który próg przypomnienia obowiązuje biegnący timer z /api/entries/timer:
+ * 0 — żaden, 1 — po EMPTY_REMIND_MIN, 2 — po EMPTY_MANAGER_MIN (kierownik wie).
+ * Wspólne dla banera (components/emptyTimerNudge.js) i migającej karty
+ * (components/timerTitle.js), żeby oba zaczynały w tej samej sekundzie.
+ */
+export const emptyStageAt = (running, seconds) => {
+  if (!running?.empty) return 0;
+  if (seconds >= EMPTY_MANAGER_MIN * 60) return 2;
+  if (seconds >= EMPTY_REMIND_MIN * 60) return 1;
+  return 0;
+};

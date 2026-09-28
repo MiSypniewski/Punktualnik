@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { formatClock } from "../utils";
 import { fetchLive, TIMER_POLL_MS } from "../utils/live";
+import { emptyStageAt } from "../utils/emptyTimer";
+import { useTabBlink, setAlertFavicon } from "../utils/tabBlink";
 
 // Timer biegnącego zadania w pasku karty przeglądarki: "1:21:35 · Opis — Punktualnik".
 //
@@ -18,6 +20,10 @@ import { fetchLive, TIMER_POLL_MS } from "../utils/live";
 
 // Tytuł spoza timera — ten sam, który ustawia <Head> w pages/_app.js.
 const BASE_TITLE = "Punktualnik";
+
+// Druga faza migania przy pustym timerze (utils/emptyTimer.js). Krótko i od
+// ostrzeżenia, bo pasek karty ucina tytuł po kilkunastu znakach.
+const ALERT_TITLE = "⚠ Opisz timer! — Punktualnik";
 
 export default function TimerTitle() {
   const { data } = useSWR("/api/entries/timer", fetchLive, {
@@ -53,12 +59,30 @@ export default function TimerTitle() {
     return () => clearInterval(handle);
   }, []);
 
+  // Timer bez opisu i projektu po progu przypomnienia: karta miga tytułem i ikoną,
+  // żeby zwrócić uwagę kogoś, kto siedzi w innej zakładce. Baner na stronie
+  // (components/emptyTimerNudge.js) liczy próg tą samą funkcją.
+  const alerting = Boolean(running) && emptyStageAt(running, running.elapsedSec + drift) > 0;
+  const blink = useTabBlink(alerting);
+
+  useEffect(() => {
+    setAlertFavicon(alerting && blink);
+  }, [alerting, blink]);
+
+  // Przywrócenie ikony przy odmontowaniu (wylogowanie, utrata uprawnień).
+  useEffect(() => () => setAlertFavicon(false), []);
+
   // Tytuł ustawiamy w useEffect, a nie <Head>: przerysowywanie Heada co sekundę
   // byłoby droższe niż jedno przypisanie, a przy okazji ten efekt nadpisuje tytuł
   // z pages/_app.js, który Next przywraca po każdej zmianie trasy.
   useEffect(() => {
     if (!running) {
       document.title = BASE_TITLE;
+      return undefined;
+    }
+
+    if (alerting && blink) {
+      document.title = ALERT_TITLE;
       return undefined;
     }
 
@@ -69,7 +93,7 @@ export default function TimerTitle() {
     return () => {
       document.title = BASE_TITLE;
     };
-  }, [running, drift]);
+  }, [running, drift, alerting, blink]);
 
   return null;
 }

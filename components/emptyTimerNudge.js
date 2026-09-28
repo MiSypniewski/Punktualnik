@@ -2,7 +2,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { fetchLive, TIMER_POLL_MS } from "../utils/live";
-import { EMPTY_REMIND_MIN, EMPTY_MANAGER_MIN, EMPTY_CLOSE_MIN, EMPTY_PROJECT_NAME } from "../utils/emptyTimer";
+import {
+  EMPTY_REMIND_MIN,
+  EMPTY_MANAGER_MIN,
+  EMPTY_CLOSE_MIN,
+  EMPTY_PROJECT_NAME,
+  emptyStageAt as stageOf,
+} from "../utils/emptyTimer";
 
 // Przypomnienie o pustym timerze — biegnącym bez opisu I bez projektu.
 //
@@ -33,13 +39,6 @@ export const askNotificationPermission = () => {
   } catch {
     // Safari na iOS poza aplikacją z ekranu głównego nie ma Notification wcale.
   }
-};
-
-const stageOf = (running, seconds) => {
-  if (!running?.empty) return 0;
-  if (seconds >= EMPTY_MANAGER_MIN * 60) return 2;
-  if (seconds >= EMPTY_REMIND_MIN * 60) return 1;
-  return 0;
 };
 
 export default function EmptyTimerNudge() {
