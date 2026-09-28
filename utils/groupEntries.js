@@ -48,7 +48,11 @@ export const groupEntries = (list) => {
     // bywają bez projektu i bez opisu — zwykły Stop wymusza komplet
     // (services/taskEntries.js: assertComplete) — więc zlewałyby się w bezużyteczny
     // worek "(bez opisu)". Każdy taki wpis dostaje własną, jednoelementową grupę.
-    const grouped = !entry.autoClosed;
+    //
+    // Tak samo wpis zamknięty przez budzik jako pusty (projekt systemowy "do
+    // usunięcia"): każdy ma inne godziny i każdy trzeba poprawić osobno, a grupa
+    // pokazywałaby jeden czerwony wiersz z licznikiem zamiast listy do przejrzenia.
+    const grouped = !entry.autoClosed && !entry.projectIsSystem;
     const key = grouped ? keyOf(entry) : `auto${SEP}${entry.id}`;
     const found = grouped ? map.get(key) : undefined;
 

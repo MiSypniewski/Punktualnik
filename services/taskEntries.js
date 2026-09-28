@@ -11,6 +11,7 @@ import {
   now as appNow,
 } from "./workday";
 import { logWarn } from "./log";
+import { EMPTY_MANAGER_MIN, EMPTY_CLOSE_MIN, EMPTY_DESCRIPTION } from "../utils/emptyTimer";
 
 // Wpisy czasu: "ile czasu i na czym zeszło".
 //
@@ -21,14 +22,22 @@ import { logWarn } from "./log";
 
 const COLS = `
   e.id, e.userID, e.projectID, e.description, e.data, e.startedAt, e.endedAt,
-  e.seconds, e.section, e.autoClosed, e.createdAt, e.editedAt, e.editedBy, e.editedByName`;
+  e.seconds, e.section, e.autoClosed, e.createdAt, e.editedAt, e.editedBy, e.editedByName,
+  e.emptyStage`;
 
 const SELECT_ONE = `SELECT ${COLS} FROM TaskEntries e WHERE e.id = ?`;
 
 const stmtById = db.prepare(SELECT_ONE);
 const stmtRunning = db.prepare(`SELECT ${COLS} FROM TaskEntries e WHERE e.userID = ? AND e.endedAt IS NULL`);
 
-const toRow = (r) => (r ? { ...r, autoClosed: Boolean(r.autoClosed) } : undefined);
+const toRow = (r) =>
+  r
+    ? {
+        ...r,
+        autoClosed: Boolean(r.autoClosed),
+        ...("projectIsSystem" in r && { projectIsSystem: Boolean(r.projectIsSystem) }),
+      }
+    : undefined;
 
 const secondsBetween = (start, end) => Math.max(0, dayjs(end).diff(dayjs(start), "second"));
 
@@ -123,6 +132,103 @@ const stmtAutoClosedForDay = db.prepare(`
 /** @param {string} day doba robocza 'YYYY-MM-DD' */
 export const getAutoClosedEntries = (day) => stmtAutoClosedForDay.all(day);
 
+// --- pusty timer -------------------------------------------------------------
+
+// Timer biegnący bez opisu I bez projektu (utils/emptyTimer.js). Zapytania żyją
+// tutaj, a nie w services/emptyTimerJob.js, bo zamknięcie ustawia `seconds` —
+// a ta kolumna ma być przeliczana wyłącznie w tym pliku (komentarz na górze).
+//
+// Warunki "nadal biegnie" i "nadal pusty" siedzą w SAMYM SQL, jak w stmtRetag:
+// opis dopisany w ostatniej sekundzie wygrywa z budzikiem, bo UPDATE po prostu
+// nie trafi w wiersz. Oba zapytania idą przez częściowy indeks
+// idx_entries_running, więc koszt rośnie z liczbą BIEGNĄCYCH timerów, a nie wpisów.
+const EMPTY_WHERE = `endedAt IS NULL AND projectID IS NULL AND TRIM(description) = ''`;
+
+// Zamknięcie na start + EMPTY_CLOSE_MIN, a nie na "teraz": wynik nie zależy od
+// tego, czy budzik tyknął minutę później albo proces leżał godzinę. autoClosed
+// zostaje 0 — ta flaga znaczy "domknięty na granicy doby" i uruchamia nocny
+// mail o niezakończonym zadaniu, który tu mówiłby nieprawdę.
+const stmtCloseEmpty = db.prepare(`
+  UPDATE TaskEntries
+     SET endedAt     = datetime(startedAt, '+' || @minutes || ' minutes'),
+         seconds     = @minutes * 60,
+         projectID   = @projectID,
+         description = @description,
+         emptyStage  = 2
+   WHERE ${EMPTY_WHERE}
+     AND startedAt <= @cutoff`);
+
+const stmtSystemProject = db.prepare(`SELECT id FROM Projects WHERE isSystem = 1`);
+
+// Czysty odczyt przed zapisami. UPDATE, który nie trafi w żaden wiersz, i tak
+// bierze w SQLite blokadę zapisu — a budzik tyka co minutę, przez całą dobę.
+// Blokady zapisu bez powodu to dokładnie ten wzorzec, który położył serwer
+// 21.08.2026 (README, "Kiedy aplikacja muli"), więc zapis rusza dopiero, gdy
+// jest kogo powiadomić albo co zamknąć.
+const stmtHasEmptyDue = db.prepare(`
+  SELECT 1 FROM TaskEntries
+   WHERE ${EMPTY_WHERE}
+     AND ((emptyStage = 0 AND startedAt <= @mailCutoff) OR startedAt <= @closeCutoff)
+   LIMIT 1`);
+
+/** Czy któryś pusty timer czeka na mail albo na zamknięcie. */
+export const hasEmptyDue = (now = appNow()) =>
+  Boolean(
+    stmtHasEmptyDue.get({
+      mailCutoff: toStamp(now.subtract(EMPTY_MANAGER_MIN, "minute")),
+      closeCutoff: toStamp(now.subtract(EMPTY_CLOSE_MIN, "minute")),
+    })
+  );
+
+/** @returns {number} ile pustych timerów zamknięto (zwykle 0) */
+export const closeEmptyEntries = (now = appNow()) => {
+  const project = stmtSystemProject.get();
+  // Brak projektu systemowego to błąd migracji (services/db.js: migrateEmptyTimer),
+  // nie powód, żeby zamknąć wpis bez projektu — taki byłby nie do odróżnienia
+  // od zwykłego niekompletnego.
+  if (!project) throw new Error("Brak projektu systemowego dla pustych timerów.");
+
+  return stmtCloseEmpty.run({
+    minutes: EMPTY_CLOSE_MIN,
+    projectID: project.id,
+    description: EMPTY_DESCRIPTION,
+    cutoff: toStamp(now.subtract(EMPTY_CLOSE_MIN, "minute")),
+  }).changes;
+};
+
+// Stan zapisujemy PRZED wysyłką i w tym samym zapytaniu, które wybiera adresatów
+// (RETURNING). Restart procesu między zapisem a mailem kosztuje jeden mail,
+// a odwrotna kolejność — mail powtarzany co minutę.
+//
+// Dolna granica (startedAt > cutoff zamknięcia) odcina wpisy, które budzik i tak
+// zaraz zamknie: po przestoju procesu spóźniony mail "zostanie zamknięty za
+// 10 minut" przychodziłby o wpisie zamkniętym chwilę wcześniej.
+const stmtMarkEmpty = db.prepare(`
+  UPDATE TaskEntries
+     SET emptyStage = 1
+   WHERE ${EMPTY_WHERE}
+     AND emptyStage = 0
+     AND startedAt <= @cutoff
+     AND startedAt >  @closeCutoff
+  RETURNING id, userID, data, startedAt, section`);
+
+const stmtUserName = db.prepare(`SELECT name, surname FROM Users WHERE id = ?`);
+
+/**
+ * Puste timery, o których kierownik jeszcze nie wie — od razu oznaczone.
+ * @returns {{id, userID, data, startedAt, section, userName, userSurname}[]}
+ */
+export const takeEmptyForManager = (now = appNow()) =>
+  stmtMarkEmpty
+    .all({
+      cutoff: toStamp(now.subtract(EMPTY_MANAGER_MIN, "minute")),
+      closeCutoff: toStamp(now.subtract(EMPTY_CLOSE_MIN, "minute")),
+    })
+    .map((r) => {
+      const u = stmtUserName.get(r.userID) ?? {};
+      return { ...r, userName: u.name, userSurname: u.surname };
+    });
+
 // --- odczyt -----------------------------------------------------------------
 
 export const getEntry = (id) => toRow(stmtById.get(Number(id)));
@@ -148,7 +254,8 @@ export const getRunningEntryDetail = (userID) => toRow(stmtRunningDetail.get(Num
 export const runningSeconds = (entry, now = appNow()) => secondsBetween(entry.startedAt, toStamp(now));
 
 const stmtForUser = db.prepare(`
-  SELECT ${COLS}, p.name AS projectName, p.color AS projectColor, p.client AS projectClient
+  SELECT ${COLS}, p.name AS projectName, p.color AS projectColor, p.client AS projectClient,
+         p.isSystem AS projectIsSystem
     FROM TaskEntries e
     LEFT JOIN Projects p ON p.id = e.projectID
    WHERE e.userID = @userID AND e.data BETWEEN @from AND @to

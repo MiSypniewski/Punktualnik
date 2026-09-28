@@ -462,7 +462,8 @@ Budzik jest **jeden na wszystkie zadania okresowe** i tyka co minutę; zadania s
 tanie, bo każde zaczyna od porównania własnej zapadki. Drugie takie samo
 `setInterval` w drugim pliku byłoby drugim miejscem, w którym da się przeoczyć
 guard na `globalThis`, pominięcie fazy builda albo `unref()`. Obok nocnego chodzi
-[cotygodniowe przypomnienie o niedogodzinach](#nadgodziny).
+[cotygodniowe przypomnienie o niedogodzinach](#nadgodziny) i
+[pilnowanie pustych timerów](#pusty-timer--przypomnienia-i-zamknięcie-po-30-min).
 
 | Sytuacja | Co się dzieje |
 |---|---|
@@ -660,7 +661,7 @@ z jej nieobecnością. Kierownik będący jednocześnie bohaterem sprawy dostaje
 wiadomość raz, nie dwa. **Wyjątkiem są powiadomienia „do rozpatrzenia"** — te
 idą wyłącznie do kierowników (niżej).
 
-Jedenaście powiadomień w pięciu grupach:
+Dwanaście powiadomień w sześciu grupach:
 
 **Do rozpatrzenia** — jedyne powiadomienia idące WYŁĄCZNIE do kierowników, w polu
 `To`. Adresatem jest tu osoba, która ma coś zrobić, a pracownik przed sekundą sam
@@ -692,6 +693,12 @@ i cofnięcie przez kierownika zostają poza tym kanałem.
 |---|---|
 | **Brak odbicia wyjścia** — karta domknięta o 3:00 | dzień, godzina wejścia, wpisana godzina wyjścia z zaznaczeniem, że jest ZAŁOŻONA, link do korekty |
 | **Niezakończone zadanie** — timer domknięty o 3:00 | projekt, opis, start, wymiar po domknięciu, link do `/zadania` |
+
+**Pusty timer** — `To` = pracownik, `Cc` = kierownicy sekcji.
+
+| Kiedy | Treść |
+|---|---|
+| **Timer bez opisu i projektu** — 20 min od startu | dzień, godzina startu, godzina, o której wpis zostanie zamknięty, i co się z nim stanie — zob. [Pusty timer](#pusty-timer--przypomnienia-i-zamknięcie-po-30-min) |
 
 **Zadanie tygodniowe** — `To` = pracownik, `Cc` = kierownicy sekcji.
 
@@ -1421,6 +1428,56 @@ timer zostawiony w piątek zamknie się w sobotę o 3:00, a nie w poniedziałek.
 Wpis dostaje flagę „domknięty automatycznie" i żółty pasek; edycja jest
 potwierdzeniem i flagę zdejmuje. Nie ma tu crona — domykanie dzieje się przy okazji
 wejścia na stronę, więc działa też na Mikrusie.
+
+### Pusty timer — przypomnienia i zamknięcie po 30 min
+
+Start bez opisu i projektu jest dozwolony, ale timer zapomniany w tym stanie
+biegł do 3:00 i zostawiał wpis, z którego raport nic nie wyczyta. Teraz liczą
+się trzy progi od godziny startu (stałe w `utils/emptyTimer.js`, wspólne dla
+serwera i przeglądarki):
+
+| Po | Co się dzieje | Kto to robi |
+|---|---|---|
+| 15 min | czerwony baner pod paskiem „W toku” na każdej stronie i dymek systemowy przeglądarki | przeglądarka (`components/emptyTimerNudge.js`) |
+| 20 min | baner z dopiskiem „kierownik dostał powiadomienie”, drugi dymek i mail: `To` = pracownik, `Cc` = kierownicy sekcji | budzik (`services/emptyTimerJob.js`) |
+| 30 min | wpis zamknięty na **start + 30 min** z opisem „brak opisanej czynności” w projekcie „do usunięcia” | budzik |
+
+„Pusty” znaczy **oba pola puste**: brak projektu i opis z samych spacji albo
+pusty. Timer z samym projektem albo samym opisem tej reguły nie podlega
+i dalej biegnie do 3:00 — to decyzja, nie przeoczenie.
+
+Dymek systemowy wymaga zgody. Przeglądarka pyta o nią przy kliknięciu **Start**
+pustego timera, bo tylko w odpowiedzi na gest użytkownika w ogóle pozwala zapytać.
+Odmowa niczego nie psuje, zostaje baner. Przed pokazaniem dymka karta dociąga
+świeży stan timera — karta w tle nie odpytuje serwera i bez tego alarmowałaby
+o timerze opisanym przed chwilą w innej karcie.
+
+**Projekt „do usunięcia” jest systemowy** (`Projects.isSystem = 1`, zakłada się
+sam przy starcie). Nie ma go w selektach timera, wpisu ręcznego, edycji ani
+kafelków, w podpowiedziach ani na `/zadania/projekty`; nie da się go
+przemianować ani zarchiwizować (`403 system_project`). API odrzuca go także przy
+POPRAWIANIU wpisu, który już na nim wisi — poprawka ma wskazać prawdziwy projekt.
+Jest natomiast w filtrze raportu kierownika, bo tam trzeba te wpisy znaleźć.
+
+**Nic nie kasuje się samo.** Wpis stoi na liście dnia na czerwono, z opisem, co
+się stało, bez przycisku „wznów” i poza grupowaniem. Pracownik (dziś i wczoraj)
+albo kierownik (bez limitu) poprawia go edycją albo usuwa.
+
+Szczegóły, które łatwo przeoczyć:
+
+- **Zamknięcie ma koniec o start + 30 min, nie „teraz”** — wynik nie zależy od
+  tego, kiedy budzik tyknął ani czy proces leżał. Flaga `autoClosed` zostaje 0:
+  ona znaczy „domknięty na granicy doby” i wysyła nocny mail, który tu mówiłby
+  nieprawdę.
+- **Stan jest w wierszu** (`TaskEntries.emptyStage`: 1 = mail poszedł,
+  2 = zamknięty), nie w `JobRuns` — dotyczy pojedynczego wpisu, nie okresu.
+  Ustawiany PRZED wysyłką, więc restart nie wyśle maila drugi raz.
+- **Opis wpisany w ostatniej sekundzie wygrywa**: warunki „biegnie” i „pusty”
+  siedzą w samym `UPDATE`, jak przy `retag`.
+- **Po przestoju procesu** wpis mający już 30 minut zostaje tylko zamknięty,
+  bez spóźnionego maila „zostanie zamknięty”.
+- Przesunięcie godziny startu wstecz liczy się jak każda inna: pusty timer
+  przestawiony na 40 minut temu zamknie się przy najbliższym tyknięciu.
 
 **Powtórzenia da się zwinąć — „Grupuj takie same zadania”.** Checkbox nad listą
 dni skleja wpisy o **tym samym opisie i tym samym projekcie** w jeden wiersz

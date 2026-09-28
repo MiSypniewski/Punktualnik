@@ -78,9 +78,15 @@ export async function getServerSideProps(ctx) {
   // lista dla sekcji `s` to projekty ogólnofirmowe plus przypisane do `s`,
   // a to widać w polu `sections` każdego wiersza.
   const summary = getSummary(query);
-  const allProjects = listProjects({ sections: projectScope(token), includeArchived: true });
+  //
+  // Projekt systemowy "do usunięcia" jest w filtrze (kierownik ma móc te wpisy
+  // wyszukać), ale NIE na listach edycji: API i tak by go odrzuciło, bo poprawka
+  // ma wskazać prawdziwy projekt (services/projects.js: canUseProject).
+  const allProjects = listProjects({ sections: projectScope(token), includeArchived: true, includeSystem: true });
   const visibleIn = (section) =>
-    allProjects.filter((p) => p.isActive && (p.sections.length === 0 || p.sections.includes(section)));
+    allProjects.filter(
+      (p) => p.isActive && !p.isSystem && (p.sections.length === 0 || p.sections.includes(section))
+    );
 
   return {
     props: {
@@ -829,7 +835,9 @@ const EntryCard = ({
 const projectOptions = (available, entry) =>
   // Wpis bez projektu nie ma czego dokładać do listy — dostaje pustą pozycję
   // w samym <select> i musi zostać przypisany, żeby dało się go zapisać.
-  !entry.projectID || available.some((p) => p.id === entry.projectID)
+  // Tak samo wpis w projekcie systemowym "do usunięcia": poprawka ma wskazać
+  // prawdziwy projekt, a API systemowego i tak nie przyjmie.
+  !entry.projectID || entry.projectIsSystem || available.some((p) => p.id === entry.projectID)
     ? available
     : [
         { id: entry.projectID, name: entry.projectName, isActive: entry.projectIsActive },
@@ -853,7 +861,7 @@ const EntryEditor = ({ entry, projects, busy, onCancel, onSave }) => (
 
 const EntryForm = ({ entry, projects, busy, onCancel, onSave }) => {
   const [form, setForm] = useState({
-    projectID: entry.projectID,
+    projectID: entry.projectIsSystem ? "" : entry.projectID,
     description: entry.description,
     data: entry.data,
     from: hhmm(entry.startedAt),

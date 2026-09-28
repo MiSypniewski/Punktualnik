@@ -6,6 +6,12 @@ import { absenceKindLabel, requiresCertificate } from "./absenceKinds";
 import { kindLabel, signedMinutes } from "./overtimeKinds";
 import getOvertimeBalance from "./getOvertimeBalance";
 import { appTime } from "./workday";
+import {
+  EMPTY_MANAGER_MIN,
+  EMPTY_CLOSE_MIN,
+  EMPTY_DESCRIPTION,
+  EMPTY_PROJECT_NAME,
+} from "../utils/emptyTimer";
 import { formatMinutes, formatDuration, formatDate, formatDateRange, hhmm } from "../utils";
 
 dayjs.locale("pl");
@@ -198,6 +204,41 @@ export const notifyUnfinishedTask = async (entry) => {
     cc,
     subject: `Punktualnik: niezakończone zadanie — ${formatDate(entry.data)}`,
     kind: "niezakonczone-zadanie",
+    ...body,
+  });
+};
+
+// --- 2a. pusty timer ----------------------------------------------------------
+
+/**
+ * Timer biegnie EMPTY_MANAGER_MIN minut bez opisu i bez projektu
+ * (services/emptyTimerJob.js). Pracownik widział już baner w aplikacji; ten mail
+ * jest drugim przypomnieniem i zarazem sygnałem dla kierowników sekcji.
+ *
+ * Godzinę zamknięcia podajemy wprost — "za 10 minut" w skrzynce przeczytanej
+ * po kwadransie byłoby nieprawdą.
+ */
+export const notifyEmptyTimer = async (entry) => {
+  const { to, cc } = recipients(entry.userID, entry.section);
+  const closesAt = dayjs(entry.startedAt).add(EMPTY_CLOSE_MIN, "minute").format("YYYY-MM-DD HH:mm:ss");
+
+  const body = compose([
+    `Timer biegnie od ${EMPTY_MANAGER_MIN} minut bez opisu i bez projektu.`,
+    null,
+    ["Pracownik", `${entry.userName} ${entry.userSurname}`],
+    ["Dzień", dzien(entry.data)],
+    ["Start", godzinaZadania(entry.startedAt)],
+    ["Zamknięcie", `${godzinaZadania(closesAt)}, jeśli nic się nie zmieni`],
+    null,
+    `Uzupełnij opis albo projekt w pasku timera. Inaczej o ${godzinaZadania(closesAt)} wpis zostanie zamknięty z opisem „${EMPTY_DESCRIPTION}” w projekcie „${EMPTY_PROJECT_NAME}” i trzeba będzie go poprawić albo usunąć ręcznie.`,
+    linkLine("/zadania", "Moje zadania"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: timer bez opisu — ${entry.userName} ${entry.userSurname}`,
+    kind: "pusty-timer",
     ...body,
   });
 };

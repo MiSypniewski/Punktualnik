@@ -1,6 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { getRunningEntryDetail, runningSeconds, sweepStaleEntries } from "../../../services/taskEntries";
 import { canTrackTasks } from "../../../services/roles";
+import { isEmptyTimer } from "../../../utils/emptyTimer";
 
 // Timer w tytule karty przeglądarki (components/timerTitle.js) — WŁASNY biegnący
 // wpis, jedno zdanie danych.
@@ -44,6 +45,10 @@ export default async (req, res) => {
           description: entry.description,
           projectName: entry.projectName,
           elapsedSec: runningSeconds(entry),
+          // Bez opisu I bez projektu — baner i powiadomienie w
+          // components/emptyTimerNudge.js. Liczone z tego samego wiersza,
+          // bez dodatkowego zapytania.
+          empty: isEmptyTimer(entry),
         }
       : null,
   });

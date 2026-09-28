@@ -7,6 +7,7 @@ import Logo from "./logo";
 import StationClock from "./stationClock";
 import ThemeToggle from "./themeToggle";
 import RunningStrip from "./runningStrip";
+import EmptyTimerNudge from "./emptyTimerNudge";
 import {
   canEditTimes,
   canApproveOvertime,
@@ -274,6 +275,8 @@ export default function StationRail({ user }) {
       {/* Bursztynowa linia z biegnącym zadaniem. Sama znika, gdy timer nie leci;
           kiosk nie raportuje zadań, więc nie ma czego odpytywać. */}
       {canTrackTasks(user.role) && <RunningStrip />}
+      {/* Pod nim przypomnienie o timerze bez opisu i projektu (15/20 min). */}
+      {canTrackTasks(user.role) && <EmptyTimerNudge />}
     </header>
   );
 }

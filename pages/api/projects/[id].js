@@ -30,6 +30,12 @@ export default async (req, res) => {
   if (!project) {
     return res.status(404).json({ error: "not_found" });
   }
+  // Projekt systemowy "do usunięcia" należy do budzika (services/emptyTimerJob.js):
+  // przemianowany albo zarchiwizowany dalej przyjmowałby puste timery, tylko pod
+  // nazwą, której nikt nie rozpozna, albo zniknąłby z filtrów raportu.
+  if (project.isSystem) {
+    return res.status(403).json({ error: "system_project" });
+  }
 
   const allowed = projectScope(token);
 

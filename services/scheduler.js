@@ -1,5 +1,6 @@
 import { tickNightly } from "./nightlyJob";
 import { tickWeeklyUndertime } from "./weeklyUndertimeJob";
+import { tickEmptyTimers } from "./emptyTimerJob";
 import { logError, logInfo } from "./log";
 
 // JEDEN budzik dla wszystkich zadań okresowych.
@@ -24,9 +25,14 @@ const globalForScheduler = globalThis;
 
 // Kolejność ma znaczenie tylko o tyle, że przy pierwszym tyknięciu po północy
 // z wtorku obie zapadki mogą wypaść naraz — wtedy najpierw idą maile o kartach.
+//
+// "pusty-timer" jedyny naprawdę pracuje co minutę (progi 20 i 30 min od startu
+// timera) — ale zaczyna od odczytu po częściowym indeksie biegnących wpisów
+// i przy braku pustych timerów na nim kończy, bez żadnego zapisu.
 const JOBS = [
   ["nightly", tickNightly],
   ["niedogodziny", tickWeeklyUndertime],
+  ["pusty-timer", tickEmptyTimers],
 ];
 
 const tickAll = (phase) => {

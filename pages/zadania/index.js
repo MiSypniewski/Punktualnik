@@ -28,10 +28,12 @@ import { getEntriesForUser, getRunningEntry, sweepStaleEntries } from "../../ser
 import { getSuggestions, suggestionsByProject } from "../../services/entrySuggestions";
 import { getTilePrefs } from "../../services/resumeTiles";
 import TaskSuggest from "../../components/taskSuggest";
+import { askNotificationPermission } from "../../components/emptyTimerNudge";
 import { canTrackTasks, boundByEditWindow } from "../../services/roles";
 import { workDay, minEditableDay } from "../../services/workday";
 import { formatDuration, hhmm, keepSeconds, timePart } from "../../utils";
 import { groupEntries } from "../../utils/groupEntries";
+import { EMPTY_CLOSE_MIN } from "../../utils/emptyTimer";
 // Z utils/, nie z services/resumeTiles: te rzeczy są potrzebne TAKŻE
 // w przeglądarce (pole "ile kafelków", stan kłódki), a import z services
 // wciągnąłby do bundla klienta better-sqlite3 razem z `fs`.
@@ -587,6 +589,10 @@ const RunningTimer = ({ running, projects, suggestions, busy, call, onError }) =
       stored.current = next;
       onError("");
       setSaved(true);
+      // Pasek "W toku", tytuł karty i baner pustego timera (components/emptyTimerNudge.js)
+      // jadą na tym kluczu. Bez tego baner "timer bez opisu" wisiałby jeszcze do
+      // minuty po wpisaniu opisu.
+      mutate("/api/entries/timer");
     },
     [running.id, onError]
   );
@@ -830,6 +836,10 @@ const TimerBar = ({ running, projects, suggestions, busy, call, onError }) => {
   // zastanawiać. Kompletu pilnuje dopiero Stop (services/taskEntries.js:
   // assertComplete), a jedno i drugie da się dopisać w biegu.
   const start = () => {
+    // Pusty start to jedyny moment, w którym przypomnienie o timerze bez opisu
+    // może się przydać — i jedyny gest, na który przeglądarka pozwoli zapytać
+    // o zgodę na dymki (components/emptyTimerNudge.js).
+    if (!projectID && !description.trim()) askNotificationPermission();
     call("/api/entries", {
       method: "POST",
       body: JSON.stringify({ action: "start", projectID: projectID || null, description }),
@@ -1599,7 +1609,10 @@ const GroupRow = ({ group, editable, projects, descByProject, busy, call, runnin
 const EntryRow = ({ entry, editable, projects, descByProject, busy, call, running, onResume }) => {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    projectID: entry.projectID,
+    // Wpis zamknięty przez budzik jako pusty (projekt systemowy "do usunięcia")
+    // startuje z pustym projektem: poprawka ma wskazać prawdziwy, a API
+    // systemowego i tak nie przyjmie (services/projects.js: canUseProject).
+    projectID: entry.projectIsSystem ? "" : entry.projectID,
     description: entry.description,
     data: entry.data,
     from: hhmm(entry.startedAt),
@@ -1690,7 +1703,8 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
     <li
       className={classNames(
         "py-2.5 border-b border-line-subtle",
-        entry.autoClosed && "px-2 -mx-2 rounded bg-signal-soft"
+        entry.autoClosed && "px-2 -mx-2 rounded bg-signal-soft",
+        entry.projectIsSystem && "px-2 -mx-2 rounded bg-danger-soft"
       )}
     >
       {/* Rząd BEZ flex-wrap. Wcześniej wiersz był jednym `flex flex-wrap` i długi
@@ -1746,8 +1760,14 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
 
           <span className="flex gap-1">
             <IconButton
-              disabled={busy}
-              label={running ? "Przełącz się na to zadanie" : "Wznów to zadanie"}
+              disabled={busy || entry.projectIsSystem}
+              label={
+                entry.projectIsSystem
+                  ? "Tego wpisu nie da się wznowić — najpierw go popraw"
+                  : running
+                  ? "Przełącz się na to zadanie"
+                  : "Wznów to zadanie"
+              }
               onClick={() => onResume(entry)}
             >
               <PlayIcon />
@@ -1778,6 +1798,12 @@ const EntryRow = ({ entry, editable, projects, descByProject, busy, call, runnin
       {entry.autoClosed && (
         <p className="mt-1 text-xs text-signal-strong">
           Timer domknął się automatycznie na koniec doby — sprawdź czas i popraw wpis.
+        </p>
+      )}
+      {entry.projectIsSystem && (
+        <p className="mt-1 text-xs text-danger-strong">
+          Timer biegł bez opisu i projektu, więc zamknął się sam po {EMPTY_CLOSE_MIN} minutach.
+          Popraw wpis (opis, projekt, godziny) albo go usuń.
         </p>
       )}
     </li>
