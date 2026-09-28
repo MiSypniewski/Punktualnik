@@ -27,6 +27,7 @@ import { canSeeTeamTasks, canExportTasks } from "../../services/roles";
 import { now as appNow } from "../../services/workday";
 import { visibleSections } from "../../services/scope";
 import { formatDate, formatDuration, hhmm, keepSeconds, timePart, TASK_QUERY_MAX } from "../../utils";
+import { CATEGORY_LABEL, CATEGORY_TAG } from "../../utils/entryCategory";
 
 dayjs.locale("pl");
 
@@ -360,7 +361,7 @@ export default function ZarzadzajZadaniami({
           </div>
         </form>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
           <Kpi label="Zaraportowany czas" value={formatDuration(summary.seconds)} />
           <Kpi label="Liczba wpisów" value={summary.entries} />
           <Kpi label="Raportujących osób" value={summary.people} />
@@ -370,7 +371,18 @@ export default function ZarzadzajZadaniami({
             warn={summary.autoClosed > 0}
             hint={summary.autoClosed > 0 ? "wymagają sprawdzenia" : null}
           />
+          <Kpi
+            label="Prawidłowe wpisy"
+            value={summary.entries > 0 ? `${percent(cleanOf(summary), summary.entries)}%` : "—"}
+            hint={
+              summary.entries > 0
+                ? `ręczne ${summary.manual} · edyt. ${summary.edited} · auto ${summary.flaggedAuto}`
+                : null
+            }
+          />
         </div>
+
+        <QualityBar summary={summary} />
 
         <h2 className="mb-2 text-sm font-bold uppercase tracking-signage">Wg projektów</h2>
         {byProject.length === 0 ? (
@@ -441,7 +453,7 @@ export default function ZarzadzajZadaniami({
           <p className="mb-8 text-sm text-muted">Brak wpisów w tym zakresie.</p>
         ) : (
           <TableWrap className="mb-8">
-          <UiTable className="min-w-[34rem]">
+          <UiTable className="min-w-[40rem]">
             <thead>
               <tr>
                 <Th>Pracownik</Th>
@@ -450,6 +462,7 @@ export default function ZarzadzajZadaniami({
                 <Th align="right">Zaraportowano</Th>
                 <Th align="right">Różnica</Th>
                 <Th align="right">Pokrycie</Th>
+                <Th align="right">Poza timerem</Th>
               </tr>
             </thead>
             <tbody>
@@ -474,6 +487,12 @@ export default function ZarzadzajZadaniami({
                     {u.present === 0 ? "—" : formatDuration(u.diff, { withSign: true })}
                   </Td>
                   <Td className="font-mono text-right tabular-nums">{u.coverage === null ? "—" : `${u.coverage}%`}</Td>
+                  <Td
+                    className={classNames("font-mono text-right tabular-nums", u.flagged === 0 && "text-faint")}
+                    title={`Wpisów: ${u.entries} — ręczne ${u.manual}, czas edytowany ${u.edited}, auto ${u.flaggedAuto}`}
+                  >
+                    {u.flagged === 0 ? "—" : `${percent(u.flagged, u.entries)}%`}
+                  </Td>
                 </tr>
               ))}
             </tbody>
@@ -496,7 +515,9 @@ export default function ZarzadzajZadaniami({
         <p className="text-xs text-muted mb-2">
           Ołówek otwiera wpis do poprawki — projekt, opis, data i godziny. Okno „dziś i wczoraj”, które
           obowiązuje pracownika, kierownika nie dotyczy: poprawisz wpis z dowolnego okresu, także swój
-          własny. Przy cudzym wpisie zostaje twoje nazwisko jako „popr.”.
+          własny. Przy cudzym wpisie zostaje twoje nazwisko jako „popr.”. Znacznik „ręczny” to wpis dopisany
+          formularzem, „edyt.” — wpis, w którym pracownik zmieniał godzinę startu albo końca. Pracownik tych
+          znaczników nie widzi.
         </p>
 
         {detail.total > detail.limit && (
@@ -636,6 +657,7 @@ const EntryRow = ({ entry, busy, onEdit, onDelete }) => (
     <Td>
       {entry.description || <span className="text-faint">(bez opisu)</span>}
       {entry.autoClosed && <span className="ml-2 text-xs font-semibold uppercase tracking-signage text-signal-strong">auto</span>}
+      <CategoryTag entry={entry} />
       {entry.editedByName && <span className="ml-2 text-xs text-muted">popr. {entry.editedByName}</span>}
     </Td>
     <Td
@@ -803,6 +825,7 @@ const EntryCard = ({
       <p className="mt-1 font-medium break-words">
         {entry.description || <span className="text-faint">(bez opisu)</span>}
         {entry.autoClosed && <span className="ml-2 text-xs font-semibold uppercase tracking-signage text-signal-strong">auto</span>}
+        <CategoryTag entry={entry} />
       </p>
 
       <p className="text-sm text-body">
@@ -972,6 +995,76 @@ const Field = ({ label, children }) => (
     {children}
   </label>
 );
+
+// --- jakość wpisów ------------------------------------------------------------
+
+// Kolory kategorii: te same w pasku, legendzie i znacznikach przy wierszach.
+// "auto" dostaje bursztyn, bo tak od początku wygląda znacznik wpisu domkniętego
+// automatycznie — pasek nie może mówić o nim innym kolorem niż lista.
+const CATEGORY_TONE = {
+  clean: { bar: "bg-ok", text: "text-ok-strong" },
+  manual: { bar: "bg-danger", text: "text-danger-strong" },
+  edited: { bar: "bg-accent", text: "text-accent-strong" },
+  auto: { bar: "bg-signal", text: "text-signal-strong" },
+};
+
+const cleanOf = (s) => s.entries - s.manual - s.edited - s.flaggedAuto;
+
+const percent = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+
+/**
+ * Podział wpisów okresu na kategorie (services/entryStats.js: CATEGORY_SQL).
+ * Liczone od LICZBY wpisów, nie od czasu — pytanie brzmi "jak często", a jeden
+ * dopisany ręcznie dzień pracy nie powinien przesłaniać dwudziestu drobnych.
+ */
+const QualityBar = ({ summary }) => {
+  if (summary.entries === 0) return <div className="mb-8" />;
+
+  const parts = [
+    ["clean", cleanOf(summary)],
+    ["manual", summary.manual],
+    ["edited", summary.edited],
+    ["auto", summary.flaggedAuto],
+  ];
+
+  return (
+    <div className="mb-8">
+      <span className="flex h-2 rounded overflow-hidden bg-raised" aria-hidden="true">
+        {parts.map(([key, n]) =>
+          n > 0 ? (
+            <span key={key} className={CATEGORY_TONE[key].bar} style={{ width: `${(n / summary.entries) * 100}%` }} />
+          ) : null
+        )}
+      </span>
+      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+        {parts.map(([key, n]) => (
+          <li key={key} className="flex items-center gap-1.5">
+            <span className={classNames("inline-block w-2 h-2 rounded-sm", CATEGORY_TONE[key].bar)} />
+            {key === "clean" ? "z timera" : CATEGORY_LABEL[key]}
+            <span className="font-mono tabular-nums text-body">
+              {n} ({percent(n, summary.entries)}%)
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+/**
+ * Znacznik kategorii przy wierszu. Wpis z autoClosed ma już własny, starszy
+ * znacznik "auto" — tu dochodzi on tylko dla pustego timera zamkniętego przez
+ * budzik (emptyStage = 2), który tej flagi nie ma, a w pasku liczy się jako auto.
+ */
+const CategoryTag = ({ entry }) => {
+  const tag = entry.category === "auto" && !entry.autoClosed ? "auto" : CATEGORY_TAG[entry.category];
+  if (!tag) return null;
+  return (
+    <span className={classNames("ml-2 text-xs font-semibold uppercase tracking-signage", CATEGORY_TONE[entry.category].text)}>
+      {tag}
+    </span>
+  );
+};
 
 const Kpi = ({ label, value, warn, hint }) => (
   <Stat label={label} value={value} hint={hint} tone={warn ? "signal" : "default"} />

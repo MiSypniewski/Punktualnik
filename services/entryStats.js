@@ -97,11 +97,40 @@ const paramsOf = (filters) => {
   return params;
 };
 
+// Kategoria wpisu z punktu widzenia kierownika: czy powstał "jak trzeba".
+//
+// Jedno wyrażenie dla kafli, tabeli pracowników, listy i eksportu — gdyby każde
+// miejsce liczyło po swojemu, procent w kaflu rozjechałby się ze znacznikami
+// w wierszach. Kategorie są ROZŁĄCZNE, z pierwszeństwem od góry: wpis ręczny,
+// którego godziny potem poprawiano, liczy się raz, jako ręczny.
+//
+//  - manual — dopisany formularzem przez samego pracownika,
+//  - edited — z timera, ale pracownik zmieniał start albo koniec,
+//  - auto   — domknięty za pracownika: na granicy doby albo jako pusty timer,
+//  - clean  — timer uruchomiony i zatrzymany, godziny nieruszane. Tu wpada też
+//             wpis dopisany przez kierownika za kogoś (origin = 'manager'):
+//             to nie jest zaniedbanie pracownika.
+//
+// Pracownik tych kategorii nie widzi — kolumny origin/timeEdited czyta
+// wyłącznie ten moduł.
+const CATEGORY_SQL = `
+  CASE WHEN e.origin = 'manual'                     THEN 'manual'
+       WHEN e.timeEdited = 1                        THEN 'edited'
+       WHEN e.autoClosed = 1 OR e.emptyStage = 2    THEN 'auto'
+       ELSE 'clean' END`;
+
+const COUNT_CATEGORIES = `
+  COALESCE(SUM(${CATEGORY_SQL} = 'manual'), 0) AS manual,
+  COALESCE(SUM(${CATEGORY_SQL} = 'edited'), 0) AS edited,
+  COALESCE(SUM(${CATEGORY_SQL} = 'auto'), 0)   AS flaggedAuto`;
+
 /** Wspólna bramka: brak dostępnych sekcji = pusty wynik, bez odpytywania bazy. */
 const noScope = (filters) => Array.isArray(filters.sections) && filters.sections.length === 0;
 
 export const getSummary = (filters) => {
-  if (noScope(filters)) return { seconds: 0, entries: 0, people: 0, autoClosed: 0 };
+  if (noScope(filters)) {
+    return { seconds: 0, entries: 0, people: 0, autoClosed: 0, manual: 0, edited: 0, flaggedAuto: 0 };
+  }
 
   return prepared(
     "sum",
@@ -110,7 +139,8 @@ export const getSummary = (filters) => {
       SELECT COALESCE(SUM(e.seconds), 0) AS seconds,
              COUNT(*)                    AS entries,
              COUNT(DISTINCT e.userID)    AS people,
-             COALESCE(SUM(e.autoClosed), 0) AS autoClosed
+             COALESCE(SUM(e.autoClosed), 0) AS autoClosed,
+             ${COUNT_CATEGORIES}
         FROM TaskEntries e${where}`
   ).get(paramsOf(filters));
 };
@@ -206,7 +236,8 @@ export const getByUser = (filters) => {
     (where) => `
       SELECT u.id, u.name, u.surname, u.section,
              SUM(e.seconds) AS reported,
-             COUNT(*)       AS entries
+             COUNT(*)       AS entries,
+             ${COUNT_CATEGORIES}
         FROM TaskEntries e
         JOIN Users u ON u.id = e.userID${where}
        GROUP BY u.id
@@ -219,6 +250,7 @@ export const getByUser = (filters) => {
     const present = attendance[r.id] || 0;
     return {
       ...r,
+      flagged: r.manual + r.edited + r.flaggedAuto,
       present,
       diff: r.reported - present,
       // Pokrycie liczymy tylko wtedy, gdy jest do czego — bez odbitej karty
@@ -237,6 +269,7 @@ const detailStatement = (filters, scope) =>
     (where) => `
       SELECT e.id, e.data, e.startedAt, e.endedAt, e.seconds, e.description,
              e.autoClosed, e.editedByName, e.section, e.userID, e.projectID,
+             ${CATEGORY_SQL} AS category,
              u.name, u.surname,
              -- Sekcja KONTA, nie wpisu: przy poprawianiu wpisu o tym, które
              -- projekty wolno wybrać, decyduje dzisiejsza sekcja pracownika

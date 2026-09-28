@@ -1611,6 +1611,46 @@ wodząc palcem po każdym wierszu. Formularz poprawki jest ten sam w obu układa
 Podsumowania „wg projektów” i „wg pracowników” zostają tabelami, ale w kontenerze
 przewijanym w poziomie — inaczej rozpychały cały dokument szerzej niż ekran.
 
+#### Jak powstał wpis — ręczne, edytowane, auto
+
+Kafel **„Prawidłowe wpisy”** i pasek pod kafelkami dzielą wpisy okresu na cztery
+rozłączne kategorie, liczone **od liczby wpisów** (nie od czasu). Pierwszeństwo
+idzie od góry, więc wpis ręczny, któremu potem poprawiano godziny, liczy się raz,
+jako ręczny:
+
+| Kategoria | Znacznik | Kiedy |
+|---|---|---|
+| ręczny | `RĘCZNY` | pracownik dopisał wpis formularzem „Dodaj wpis ręcznie” |
+| czas edytowany | `EDYT.` | wpis z timera, ale właściciel zmienił godzinę startu (także biegnącego timera) albo końca |
+| auto | `AUTO` | domknięty za pracownika: na granicy doby o 3:00 albo jako pusty timer po 30 min |
+| z timera | — | Start i Stop, godziny nieruszane — „prawidłowy” |
+
+W tabeli „Wg pracowników” kolumna **„Poza timerem”** to odsetek trzech pierwszych
+kategorii u danej osoby (rozbicie w podpowiedzi po najechaniu), a w eksporcie wpisów
+kolumna „Pochodzenie”. **Pracownik tego nie widzi**: kolumny `TaskEntries.origin`
+i `timeEdited` czyta wyłącznie `services/entryStats.js`, a do odpowiedzi API
+i strony `/zadania` nie trafiają (nie ma ich w `COLS` w `services/taskEntries.js`).
+
+Korekta kierownika na cudzym wpisie flagi „edyt.” **nie ustawia** — ma własny
+podpis „popr.” i nie obciąża pracownika — ale też jej **nie zdejmuje**, bo zmiana
+pracownika i tak się wydarzyła. Zmiana samego opisu albo projektu to nie edycja
+czasu. Wpis, który kierownik dopisał za kogoś (`origin = 'manager'`, dziś możliwy
+tylko przez API), liczy się jako prawidłowy.
+
+**Wpisy sprzed wdrożenia mają kategorię odtworzoną w przybliżeniu** (migracja
+`migrateEntryOrigin` w `services/db.js`, jednorazowo): wpis utworzony nie wcześniej
+niż swój koniec to „ręczny”, a wpis z timera z początkiem innym niż chwila
+utworzenia to „edyt.”. Nie da się odtworzyć samej zmiany końca, edycji we wpisie
+poprawianym potem przez kierownika (zostaje nieoznaczony) ani odróżnić wpisu
+ręcznego z końcem w przyszłości (wpada do „edyt.”). Od wdrożenia dane są dokładne.
+
+Wdrożenie tej zmiany **zawiera DDL i backfill** (dwa `ALTER TABLE ADD COLUMN`
+i dwa `UPDATE` na `TaskEntries`), które wykonają się już przy `npm run build`.
+Przed buildem zrób więc kopię (`sqlite3 "$SQLITE_PATH" ".backup kopia.sqlite"`),
+a w logu szukaj wpisu `[db] migracja: dodano TaskEntries.origin i timeEdited`
+z liczbą odtworzonych wpisów. Stary kod nowych kolumn nie zauważy, więc cofnięcie
+wersji nie wymaga przywracania kopii.
+
 ### Eksport
 
 `/api/report/zadania` — jak eksport nadgodzin, CSV albo XLSX (zob.

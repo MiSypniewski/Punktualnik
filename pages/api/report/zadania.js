@@ -7,6 +7,7 @@ import { num } from "../../../utils/csv";
 import { isFormat, sendReport, streamReport } from "../../../utils/report";
 import { formatDuration, timePart, TASK_QUERY_MAX } from "../../../utils";
 import { visibleSections } from "../../../services/scope";
+import { CATEGORY_LABEL } from "../../../utils/entryCategory";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MODES = ["wpisy", "projekty", "porownanie"];
@@ -121,6 +122,8 @@ export default async (req, res) => {
         "Różnica [h]",
         "Różnica",
         "Pokrycie %",
+        "Liczba wpisów",
+        "Poza timerem %",
       ],
       rows: rows.map((u) => [
         u.surname,
@@ -133,6 +136,8 @@ export default async (req, res) => {
         num(u.diff / 3600, HOURS_DECIMALS),
         formatDuration(u.diff, { withSign: true }),
         u.coverage === null ? "" : u.coverage,
+        u.entries,
+        num((u.flagged / u.entries) * 100, 1),
       ]),
     });
   }
@@ -155,6 +160,7 @@ export default async (req, res) => {
     timePart(r.endedAt),
     ...hoursPair(r.seconds),
     r.autoClosed ? "tak" : "nie",
+    CATEGORY_LABEL[r.category] ?? "",
     r.editedByName || "",
   ];
 
@@ -171,6 +177,7 @@ export default async (req, res) => {
     "Czas [h]",
     "Czas",
     "Domknięty automatycznie",
+    "Pochodzenie",
     "Poprawił",
   ];
 

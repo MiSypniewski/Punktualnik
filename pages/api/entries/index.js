@@ -126,6 +126,7 @@ export default async (req, res) => {
         userID: owner.id,
         section: owner.section,
         enforceWindow: owner.self && boundByEditWindow(token.role),
+        origin: owner.self ? "manual" : "manager",
       }
     );
     return res.status(201).json({ status: "created", entry });

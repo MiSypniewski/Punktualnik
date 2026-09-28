@@ -328,9 +328,12 @@ const assertComplete = (entry) => {
 
 // --- zapis ------------------------------------------------------------------
 
+// origin: 'timer' | 'manual' | 'manager' — patrz komentarz przy kolumnie
+// w services/db.js. Kolumny NIE MA w COLS: pochodzenie wpisu widzi wyłącznie
+// panel kierownika, a getEntry zasila odpowiedzi API samego pracownika.
 const stmtInsert = db.prepare(`
-  INSERT INTO TaskEntries (userID, projectID, description, data, startedAt, endedAt, seconds, section, createdAt)
-  VALUES (@userID, @projectID, @description, @data, @startedAt, @endedAt, @seconds, @section, @createdAt)`);
+  INSERT INTO TaskEntries (userID, projectID, description, data, startedAt, endedAt, seconds, section, createdAt, origin)
+  VALUES (@userID, @projectID, @description, @data, @startedAt, @endedAt, @seconds, @section, @createdAt, @origin)`);
 
 const descSchema = Joi.string().trim().max(200).allow("").default("");
 
@@ -361,6 +364,7 @@ export const startEntry = ({ userID, projectID, description, section }, now = ap
       seconds: null,
       section: String(section),
       createdAt: startedAt,
+      origin: "timer",
     });
     return getEntry(info.lastInsertRowid);
   } catch (error) {
@@ -430,8 +434,10 @@ export const retagRunningEntry = ({ id, userID, projectID, description }) => {
   return info.changes > 0 ? getEntry(id) : undefined;
 };
 
+// timeEdited ustawiamy tylko przy faktycznej zmianie — zatwierdzenie tej samej
+// godziny to nie edycja. Flaga nie spada (MAX), patrz services/db.js.
 const stmtSetStart = db.prepare(`
-  UPDATE TaskEntries SET startedAt = @startedAt
+  UPDATE TaskEntries SET startedAt = @startedAt, timeEdited = MAX(timeEdited, @timeEdited)
    WHERE id = @id AND userID = @userID AND endedAt IS NULL`);
 
 const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -488,7 +494,12 @@ export const setRunningStart = ({ id, userID, from }, now = appNow()) => {
     // Wpis biegnący nie ma końca, więc na potrzeby kolizji traktujemy jako koniec
     // chwilę bieżącą — czyli dokładnie ten odcinek, który zadanie już zajmuje.
     assertNoOverlap({ userID: entry.userID, startedAt, endedAt: nowStamp, id: entry.id });
-    const info = stmtSetStart.run({ id: Number(id), userID: Number(userID), startedAt });
+    const info = stmtSetStart.run({
+      id: Number(id),
+      userID: Number(userID),
+      startedAt,
+      timeEdited: startedAt !== entry.startedAt ? 1 : 0,
+    });
     return info.changes > 0 ? getEntry(id) : undefined;
   })();
 };
@@ -594,7 +605,14 @@ const spanFromParts = ({ data, from, to }) => {
   return { startedAt, endedAt, seconds };
 };
 
-export const createManualEntry = (payload, { userID, section, enforceWindow = true, now = appNow() }) => {
+/**
+ * @param {"manual"|"manager"} origin "manager", gdy kierownik dopisuje wpis ZA
+ *   KOGOŚ — taki wpis nie obciąża statystyki pracownika (services/entryStats.js).
+ */
+export const createManualEntry = (
+  payload,
+  { userID, section, enforceWindow = true, origin = "manual", now = appNow() }
+) => {
   const { projectID, description, data, from, to } = Joi.attempt(payload, manualSchema);
   if (enforceWindow) assertInWindow(data, now);
 
@@ -612,6 +630,7 @@ export const createManualEntry = (payload, { userID, section, enforceWindow = tr
       seconds,
       section: String(section),
       createdAt: toStamp(now),
+      origin: origin === "manager" ? "manager" : "manual",
     });
     return getEntry(info.lastInsertRowid);
   })();
@@ -621,7 +640,7 @@ const stmtUpdate = db.prepare(`
   UPDATE TaskEntries
      SET projectID = @projectID, description = @description, data = @data,
          startedAt = @startedAt, endedAt = @endedAt, seconds = @seconds,
-         autoClosed = 0,
+         autoClosed = 0, timeEdited = MAX(timeEdited, @timeEdited),
          editedAt = @editedAt, editedBy = @editedBy, editedByName = @editedByName
    WHERE id = @id`);
 
@@ -632,6 +651,10 @@ const stmtUpdate = db.prepare(`
  *
  * Zdejmuje flagę autoClosed: edycja jest właśnie tym potwierdzeniem, o które
  * prosi żółty pasek przy wpisie domkniętym automatycznie.
+ *
+ * Ustawia timeEdited, gdy WŁAŚCICIEL zmienił start albo koniec. Korekta
+ * kierownika (actor) flagi nie stawia — ma własny podpis "popr." — ale też jej
+ * nie zdejmuje, bo wcześniejsza zmiana pracownika nadal się wydarzyła.
  */
 export const updateEntry = (id, payload, { userID, enforceWindow = true, actor = null, now = appNow() }) => {
   const entry = getEntry(id);
@@ -659,6 +682,7 @@ export const updateEntry = (id, payload, { userID, enforceWindow = true, actor =
       startedAt,
       endedAt,
       seconds,
+      timeEdited: !actor && (startedAt !== entry.startedAt || endedAt !== entry.endedAt) ? 1 : 0,
       editedAt: actor ? toStamp(now) : entry.editedAt,
       editedBy: actor ? Number(actor.userID) : entry.editedBy,
       editedByName: actor ? String(actor.name) : entry.editedByName,
