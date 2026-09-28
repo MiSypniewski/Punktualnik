@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { useSession } from "next-auth/react";
 import { canPunchCards } from "../services/roles";
 import { absenceKindShort } from "../services/absenceKinds";
-import { DifferenceTime, Timer, WORKDAY_HOURS } from "../utils";
+import { DifferenceTime, Timer, WORKDAY_HOURS, formatMinutes, plannedExit } from "../utils";
 import LiveDot from "./liveDot";
 
 import dayjs from "dayjs";
@@ -34,10 +34,23 @@ const STATES = {
     caption: { punch: "Do końca dniówki · dotknij, aby wyjść", watch: "Do końca dniówki" },
     live: true,
   },
+  // Odliczanie doszło do zera. Wcześniej „Nadgodziny · Ponad osiem godzin” —
+  // ale nadgodziny w tym systemie to zatwierdzony wniosek, a nie sam upływ
+  // ósemki, więc etykieta obiecywała coś, czego nikt nie zatwierdził.
   overTime: {
-    label: "Nadgodziny",
+    label: "Czas do domu!",
     plate: "bg-signal border-signal text-signal-ink",
-    caption: { punch: "Ponad osiem godzin · dotknij, aby wyjść", watch: "Ponad osiem godzin" },
+    caption: { punch: "Dotknij, aby wyjść", watch: "Po końcu dniówki" },
+    live: true,
+  },
+  // To samo, ale przy zatwierdzonej zgodzie na wcześniejsze wyjście albo
+  // zostanie dłużej: licznik stanął na PLANOWANYM wyjściu, nie na ósemce.
+  // „Czas do domu!” po sześciu godzinach byłby prawdą, ale „ponad osiem” już
+  // nie — stąd osobny stan zamiast wspólnego napisu.
+  overTimeShifted: {
+    label: "Po czasie",
+    plate: "bg-signal border-signal text-signal-ink",
+    caption: { punch: "Po planowanym wyjściu · dotknij, aby wyjść", watch: "Po planowanym wyjściu" },
     live: true,
   },
   finishFull: {
@@ -92,7 +105,27 @@ const Card = ({ data, onSaved }) => {
   const [totalWorkTime, setTotalWorkTime] = useState(data.totalWorkTime);
   const [displayTime, setDisplayTime] = useState("");
   const [overTime, setOverTime] = useState(false);
-  const [intervalID, setIntervalID] = useState(null);
+
+  // Interwał licznika w REFIE, nie w stanie. Wcześniej siedział w useState
+  // i nikt go nie czyścił przy odmontowaniu, a kafelek przemontowuje się przy
+  // każdej zmianie danych z serwera (klucz w pages/time/[id].js) — także przy
+  // zatwierdzonej w ciągu dnia zgodzie. Każde przemontowanie zostawiało
+  // osierocony setInterval tykający w tle do przeładowania o 3:30.
+  const intervalRef = useRef(null);
+  const stopTicking = () => {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  };
+  useEffect(() => stopTicking, []);
+
+  // Zatwierdzone zgody z tej doby (services/getShiftsForDay.js). Kafelek
+  // odlicza do PLANOWANEGO wyjścia — tego samego, które kierownik widzi na
+  // /urlopy/stan — a nie do sztywnej ósemki. Times.endTime w bazie zostaje
+  // "wejście + 8 h": cel jest wyłącznie wyliczony, nic tu go nie zapisuje.
+  const earlyLeaveMin = data.shift?.earlyLeaveMin ?? 0;
+  const stayLongerMin = data.shift?.stayLongerMin ?? 0;
+  const shiftMin = stayLongerMin - earlyLeaveMin;
+  const target = plannedExit(startTime, shiftMin).format();
 
   // Pierwszy przebieg efektu poniżej NIE zapisuje do bazy.
   //
@@ -185,14 +218,13 @@ const Card = ({ data, onSaved }) => {
     }
   };
 
-  const checker = (endTime) => {
-    if (!intervalID) {
-      const intervalID = setInterval(() => {
-        const res = Timer(endTime);
+  const checker = (target) => {
+    if (!intervalRef.current) {
+      intervalRef.current = setInterval(() => {
+        const res = Timer(target);
         setOverTime(res.overtime);
         setDisplayTime(res.time);
       }, 1000);
-      setIntervalID(intervalID);
     }
   };
 
@@ -210,18 +242,18 @@ const Card = ({ data, onSaved }) => {
         break;
       }
       case "workInProgress": {
-        if (intervalID === null) checker(endTime);
+        checker(target);
         if (overTime) setStatus("overTime");
         const res = DifferenceTime(startTime, endTime);
         persist(startTime, endTime, res.time, status, res.overTime);
         break;
       }
       case "overTime": {
-        if (intervalID === null) checker(endTime);
+        checker(target);
         break;
       }
       case "finishWork": {
-        clearInterval(intervalID);
+        stopTicking();
         const res = DifferenceTime(startTime, endTime);
         setTotalWorkTime(res.time);
         setOverTime(res.overtime);
@@ -249,15 +281,25 @@ const Card = ({ data, onSaved }) => {
   // przemontuje się wtedy ze świeżymi propsami.
   const autoClosed = Boolean(data.autoClosed) && status === "finishWork";
 
+  // Dniówka jest pełna także wtedy, gdy braki pokrywa zatwierdzone wcześniejsze
+  // wyjście — ta sama reguła co `full` w services/dayBoard.js, żeby kiosk
+  // i /urlopy/stan nie malowały jednej karty na dwa kolory. Liczone tu, a nie
+  // z flagi `overTime`: ta trafia do Times.overTime i znaczy "≥ 8 h faktycznie",
+  // więc jej nie ruszamy.
+  const full =
+    dayjs(endTime).diff(dayjs(startTime), "second") + earlyLeaveMin * 60 >= WORKDAY_HOURS * 3600;
+
   const stateKey =
     absence && !punched
       ? "absence"
       : autoClosed
       ? "autoClosed"
       : status === "finishWork"
-      ? overTime
+      ? full
         ? "finishFull"
         : "finishShort"
+      : status === "overTime" && shiftMin !== 0
+      ? "overTimeShifted"
       : status;
   const state = STATES[stateKey] || STATES.wait;
 
@@ -270,9 +312,18 @@ const Card = ({ data, onSaved }) => {
   // czy za dwa tygodnie. Sam dzień i miesiąc, bez roku i bez RRRR-MM-DD: to
   // kafelek na ścianie, a nie wiersz tabeli, i doklejona data ma zmieścić się
   // w jednej linii podpisu obok reszty tekstu.
+  //
+  // Przy zgodzie licznik mówi "do wyjścia" i od razu czemu nie do ósemki —
+  // inaczej kolega obok, z tą samą godziną wejścia i innym licznikiem, wyglądałby
+  // na błąd tablicy.
+  const shiftNote = shiftMin < 0 ? `wcześniej o ${formatMinutes(-shiftMin)}` : `dłużej o ${formatMinutes(shiftMin)}`;
   const caption =
     stateKey === "absence"
       ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${dayjs(absence.dateTo).format("DD.MM")}`
+      : stateKey === "workInProgress" && shiftMin !== 0
+      ? canPunch
+        ? `Do wyjścia · ${shiftNote} · dotknij, aby wyjść`
+        : `Do wyjścia · ${shiftNote}`
       : state.caption[canPunch ? "punch" : "watch"];
 
   return (

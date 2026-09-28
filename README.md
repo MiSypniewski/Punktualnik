@@ -853,8 +853,9 @@ Trzy rzeczy, które łatwo pomylić:
 
 Widok świadomie **nie** bierze zapisanego `Times.endTime` karty otwartej, choć
 tam już stoi „wejście + 8 h”: `components/card.js` wpisuje je przy odbiciu
-i nie zna wniosków o wcześniejsze wyjście, więc dla kogoś z podpisaną zgodą
-kłamałoby o godzinę.
+bez zgód, więc dla kogoś z podpisaną zgodą kłamałoby o godzinę. Wzór jest
+jeden dla tego ekranu i dla kafelka kiosku — `plannedExit` w `utils/index.js`
+(zob. [Kiosk](#kiosk)).
 
 #### Stany
 
@@ -1182,6 +1183,34 @@ a odpytywanie wraca samo.
 **Kafelki nie zmieniają kolejności w ciągu dnia.** Lista idzie zawsze porządkiem
 pracowników, a nie „najpierw ci, którzy odbili” — inaczej przy odświeżaniu czyjś
 kafelek uciekałby spod palca w chwili dotknięcia.
+
+**Licznik odlicza do planowanego wyjścia, nie do sztywnej ósemki.** Zatwierdzone
+na dziś *zostaję dłużej* i *wcześniejsze wyjście* przesuwają cel tym samym
+wzorem co na [dniu zespołu](#aktualny-stan--dzień-zespołu):
+`wejście + 8 h + zostaję dłużej − wcześniejsze wyjście`. Wniosek oczekujący
+i *praca poza godzinami* nic nie zmieniają. Przy zgodzie podpis mówi
+„Do wyjścia · wcześniej o 2h 0min” (albo „dłużej o …”), żeby dwa kafelki
+z tą samą godziną wejścia i różnym licznikiem nie wyglądały na błąd tablicy.
+Zgoda zatwierdzona w ciągu dnia wchodzi z najbliższym odświeżeniem (≤ 45 s).
+
+| Licznik doszedł do zera | Etykieta | Podpis |
+|---|---|---|
+| bez zgody | **Czas do domu!** | Dotknij, aby wyjść |
+| ze zgodą (±) | **Po czasie** | Po planowanym wyjściu |
+
+Dawne „Nadgodziny · Ponad osiem godzin” zniknęło: nadgodziny to w tym systemie
+zatwierdzony wniosek, nie sam upływ ósemki, a przy wcześniejszym wyjściu
+napis pojawiałby się po sześciu godzinach.
+
+Przesunięty cel jest **wyłącznie wyliczany** — `Times.endTime` karty otwartej
+nadal zapisuje się jako „wejście + 8 h”, a zadanie nocne domyka na ósemkę jak
+dotąd. Zapis przesuniętej godziny oznaczałby PUT z każdego kiosku przy każdej
+zmianie zgody. Dane zgód daje `services/getShiftsForDay.js`, tylko do odczytu.
+
+Po odbiciu wyjścia kafelek jest zielony, gdy `przepracowane + zatwierdzone
+wcześniejsze wyjście ≥ 8 h` — ta sama reguła co `full` na dniu zespołu, więc
+kiosk i ekran kierownika nie malują jednej karty na dwa kolory. Kolumna
+`Times.overTime` nadal znaczy „≥ 8 h faktycznie” i trafia tak do eksportu.
 
 Kafelek ze znacznikiem **`auto`** to karta, której nikt nie zamknął — domknęło
 ją zadanie nocne o 3:00 na osiem godzin od wejścia. Zasady i korekta:

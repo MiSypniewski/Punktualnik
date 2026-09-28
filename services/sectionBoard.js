@@ -3,6 +3,7 @@ import "dayjs/locale/pl";
 import getUsers from "./getUsers";
 import getSectionTime from "./getSectionTime";
 import getAbsencesForDay from "./getAbsencesForDay";
+import getShiftsForDay from "./getShiftsForDay";
 import { workDay } from "./workday";
 
 dayjs.locale("pl");
@@ -71,10 +72,21 @@ export const getSectionBoard = async (section) => {
   // Nieobecność dokładamy do GOTOWYCH kart, zamiast wplatać ją wyżej: dotyczy
   // zarówno tych, którzy karty nie odbili, jak i tych, którzy odbili mimo urlopu
   // (ktoś wraca z L4 wcześniej albo wpada na dwie godziny).
-  const absences = getAbsencesForDay(section, workDay());
+  const day = workDay();
+  const absences = getAbsencesForDay(section, day);
+
+  // Zgody przesuwające wyjście — z tego samego powodu dokładane do GOTOWYCH
+  // kart: zgodę na wcześniejsze wyjście można dostać przed odbiciem wejścia,
+  // więc pusty kafelek też musi ją znać, żeby odliczał od pierwszej sekundy.
+  // Times.endTime otwartej karty zostaje "wejście + 8 h"; przesunięty cel liczy
+  // kafelek (components/card.js), bez zapisu.
+  const shifts = getShiftsForDay(section, day);
+
   cards.forEach((card) => {
     const absence = absences[card.userID];
     if (absence) card.absence = absence;
+    const shift = shifts[card.userID];
+    if (shift) card.shift = shift;
   });
 
   return {

@@ -40,6 +40,22 @@ export const Timer = (stop) => {
  */
 export const WORKDAY_HOURS = 8;
 
+/**
+ * Planowane wyjście: wejście + 8 h + „zostaję dłużej” − „wcześniejsze wyjście”.
+ *
+ * PROGNOZA, nie plan — aplikacja nie ma grafiku, więc jedyne, od czego da się
+ * liczyć, to faktyczne odbicie wejścia. Jeden wzór dla ekranu kierownika
+ * (services/dayBoard.js) i kafelka kiosku (components/card.js): dwie kopie
+ * rozjechałyby się przy pierwszej poprawce i kiosk odliczałby do innej godziny,
+ * niż kierownik widzi jako planowane wyjście.
+ *
+ * @param {string} startTime znacznik odbicia wejścia
+ * @param {number} shiftMin zatwierdzone przesunięcie ze znakiem (stay_longer − early_leave)
+ * @returns {import("dayjs").Dayjs}
+ */
+export const plannedExit = (startTime, shiftMin = 0) =>
+  dayjs(startTime).add(WORKDAY_HOURS, "hour").add(Number(shiftMin) || 0, "minute");
+
 export const DifferenceTime = (start, stop) => {
   const workTime = dayjs(stop).diff(dayjs(start), "hours");
   const tmp = dayjs.duration(dayjs(stop).diff(dayjs(start)));
