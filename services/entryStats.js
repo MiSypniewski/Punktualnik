@@ -111,9 +111,10 @@ const paramsOf = (filters) => {
 //             wpis dopisany przez kierownika za kogoś (origin = 'manager'):
 //             to nie jest zaniedbanie pracownika.
 //
-// Pracownik tych kategorii nie widzi — kolumny origin/timeEdited czyta
-// wyłącznie ten moduł.
-const CATEGORY_SQL = `
+// Pracownik tych kategorii nie widzi — kolumny origin/timeEdited czytają
+// wyłącznie ten moduł i tor zadań na osi dnia (services/dayTasks.js), oba
+// za bramką canSeeTeamTasks.
+export const CATEGORY_SQL = `
   CASE WHEN e.origin = 'manual'                     THEN 'manual'
        WHEN e.timeEdited = 1                        THEN 'edited'
        WHEN e.autoClosed = 1 OR e.emptyStage = 2    THEN 'auto'

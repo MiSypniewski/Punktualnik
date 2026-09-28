@@ -1627,9 +1627,13 @@ jako ręczny:
 
 W tabeli „Wg pracowników” kolumna **„Poza timerem”** to odsetek trzech pierwszych
 kategorii u danej osoby (rozbicie w podpowiedzi po najechaniu), a w eksporcie wpisów
-kolumna „Pochodzenie”. **Pracownik tego nie widzi**: kolumny `TaskEntries.origin`
-i `timeEdited` czyta wyłącznie `services/entryStats.js`, a do odpowiedzi API
-i strony `/zadania` nie trafiają (nie ma ich w `COLS` w `services/taskEntries.js`).
+kolumna „Pochodzenie”. Na osi dnia w „Aktualnym stanie” (tor zadań) wpis ręczny
+ma ukośne paski i kwadrat **R**, a wpis z edytowanym czasem kwadrat **E** — przy
+początku odcinka, na własnym tle, więc widać go także przy kilkuminutowym zadaniu.
+**Pracownik tego nie widzi**: kolumny `TaskEntries.origin`
+i `timeEdited` czytają wyłącznie `services/entryStats.js` i `services/dayTasks.js`
+(oba za bramką `canSeeTeamTasks`), a do odpowiedzi API pracownika i strony
+`/zadania` nie trafiają (nie ma ich w `COLS` w `services/taskEntries.js`).
 
 Korekta kierownika na cudzym wpisie flagi „edyt.” **nie ustawia** — ma własny
 podpis „popr.” i nie obciąża pracownika — ale też jej **nie zdejmuje**, bo zmiana

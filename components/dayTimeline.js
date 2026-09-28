@@ -32,6 +32,26 @@ import { TIMELINE_FROM_HOUR, TIMELINE_TO_HOUR, formatDuration, formatMinutes } f
 
 const MINUTES_PER_DAY = 24 * 60;
 
+// Wpis dopisany ręcznie albo z godzinami zmienianymi przez pracownika
+// (services/entryStats.js: CATEGORY_SQL). Litera na WŁASNYM tle, a nie na
+// odcinku: zadanie na torze ma często kilka pikseli szerokości i dowolny kolor
+// projektu, więc litera położona na nim byłaby albo ucięta, albo nieczytelna.
+// Kolory jak w raporcie /zadania/zarzadzaj — ten sam wpis ma mówić tym samym
+// kolorem na obu ekranach.
+const TASK_FLAG = {
+  manual: { letter: "R", chip: "bg-danger text-danger-ink", text: "Dopisany ręcznie — godziny podane, nie zmierzone." },
+  edited: { letter: "E", chip: "bg-accent text-accent-ink", text: "Pracownik zmieniał godzinę startu albo końca." },
+};
+
+// Ukośne paski na całym odcinku wpisu ręcznego — ta sama konwencja co
+// przerywana ramka „wcześniejszego wyjścia”: czas zadeklarowany, nie zmierzony.
+// Półprzezroczysta biel leży NA kolorze projektu, więc działa w obu motywach.
+// Od którego miejsca toru (w procentach) znacznik przechodzi na koniec odcinka.
+// 16 px na najwęższym torze (~790 px, patrz LABEL_FITS_PCT) to około 2%.
+const FLAG_FLIP_PCT = 97;
+
+const HATCH = "repeating-linear-gradient(135deg, rgb(255 255 255 / 0.55) 0 2px, transparent 2px 5px)";
+
 // Od jakiej szerokości belki napis „06:45 – 15:45*” mieści się w niej samej.
 // Trzynaście znaków monospace przy text-xs to około 90 px, a najwęższy tor
 // (kolumna nazwisk odjęta od szerokości okna na progu lg) ma około 790 px —
@@ -147,10 +167,38 @@ const TaskTooltip = ({ hovered, drift }) => {
       {entry.autoClosed && (
         <p className="mt-1 text-xs text-muted">Domknięty automatycznie — koniec jest założony, nie zmierzony.</p>
       )}
+      {TASK_FLAG[entry.category] && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+          <FlagChip category={entry.category} />
+          {TASK_FLAG[entry.category].text}
+        </p>
+      )}
       {entry.editedByName && <p className="mt-1 text-xs text-muted">Poprawił: {entry.editedByName}</p>}
     </div>
   );
 };
+
+// Dwa rozmiary: na torze 16 px — tyle, ile jest od dołu toru do dolnej krawędzi
+// belki obecności, więc znacznik wypełnia szczelinę między nimi i niczego nie
+// zasłania; w legendzie i dymku mniejszy, w linii z tekstem.
+const FLAG_SIZE = {
+  track: "w-4 h-4 text-[0.6875rem]",
+  inline: "w-3.5 h-3.5 text-[0.625rem]",
+};
+
+const FlagChip = ({ category, size = "inline", className }) => (
+  <span
+    aria-hidden="true"
+    className={classNames(
+      "inline-flex shrink-0 items-center justify-center rounded-sm font-sans font-bold leading-none",
+      FLAG_SIZE[size],
+      TASK_FLAG[category].chip,
+      className
+    )}
+  >
+    {TASK_FLAG[category].letter}
+  </span>
+);
 
 const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
   const live = people.filter(isLive).length;
@@ -180,10 +228,12 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
   // legenda podaje nazwy, a dymek szczegóły.
   const dayProjects = [];
   let hasNoProject = false;
+  const flagsSeen = new Set();
   if (withTasks) {
     const seen = new Set();
     people.forEach((p) =>
       (tasksByUser[p.userID] || []).forEach((t) => {
+        if (t.category) flagsSeen.add(t.category);
         if (!t.projectName) {
           hasNoProject = true;
           return;
@@ -408,13 +458,14 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                     const end = t.running ? Math.max(nowLive, t.startMin) : t.endMin;
                     const left = pct(t.startMin);
                     const width = Math.max(pct(end) - left, 0.3);
+                    const flag = TASK_FLAG[t.category];
                     return (
                       <span
                         key={t.id}
                         tabIndex={0}
                         aria-label={`${t.projectName || "bez projektu"}: ${t.description || "bez opisu"}, ${t.startHm} – ${
                           t.running ? "trwa" : t.endHm
-                        }`}
+                        }${flag ? `, ${t.category === "manual" ? "dopisany ręcznie" : "godziny zmieniane"}` : ""}`}
                         onMouseEnter={(e) => showTask(t, e.currentTarget)}
                         onMouseLeave={hideTask}
                         onFocus={(e) => showTask(t, e.currentTarget)}
@@ -425,8 +476,30 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
                           t.autoClosed && "opacity-50",
                           hovered && hovered.entry.id === t.id && "ring-2 ring-body/60"
                         )}
-                        style={{ left: `${left}%`, width: `calc(${width}% - 1px)` }}
-                      />
+                        style={{
+                          left: `${left}%`,
+                          width: `calc(${width}% - 1px)`,
+                          ...(t.category === "manual" && { backgroundImage: HATCH }),
+                        }}
+                      >
+                        {/* Znacznik przy POCZĄTKU odcinka, wyrównany do jego dołu.
+                            Przy zadaniu węższym niż sam znacznik wystaje w prawo
+                            — lepiej zasłonić kawałek sąsiada, niż go zgubić.
+                            Tuż przy prawym brzegu okna wystawałby za tor
+                            (overflow-hidden) i był ucięty, więc tam przechodzi
+                            na koniec odcinka i wystaje w lewo.
+                            Obwódka w kolorze toru oddziela go od koloru projektu. */}
+                        {flag && (
+                          <FlagChip
+                            category={t.category}
+                            size="track"
+                            className={classNames(
+                              "absolute bottom-0 ring-1 ring-surface",
+                              left > FLAG_FLIP_PCT ? "right-0" : "left-0"
+                            )}
+                          />
+                        )}
+                      </span>
                     );
                   })}
 
@@ -505,6 +578,18 @@ const Timeline = ({ people, isToday, nowMin, drift, tasksByUser = null }) => {
             </span>
           )}
           {dayProjects.length === 0 && !hasNoProject && <span>tego dnia nikt nie raportował zadań</span>}
+          {/* Tylko te znaczniki, które tego dnia faktycznie występują — legenda
+              objaśnia to, co widać, a nie wszystko, co mogłoby się pojawić. */}
+          {flagsSeen.has("manual") && (
+            <span className="flex items-center gap-1.5">
+              <FlagChip category="manual" /> dopisany ręcznie
+            </span>
+          )}
+          {flagsSeen.has("edited") && (
+            <span className="flex items-center gap-1.5">
+              <FlagChip category="edited" /> godziny zmieniane
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span aria-hidden="true" className="w-4 h-2.5 rounded-sm bg-surface border border-line-subtle" /> brak
             zaraportowanego zadania
