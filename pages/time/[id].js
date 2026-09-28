@@ -110,9 +110,13 @@ export default function Home({ board, id, sectionLabel }) {
             // kafelek; kliknięcie na TYM ekranie propsów nie rusza, więc sygnatura
             // zostaje ta sama i odpowiedź pollingu wysłana przed odbiciem nie cofa
             // tego, co pracownik przed chwilą dotknął.
+            //
+            // Zgody (`shift`) też są w sygnaturze: zatwierdzone w ciągu dnia
+            // wcześniejsze wyjście przesuwa cel odliczania, a bez przemontowania
+            // kafelek liczyłby do starego aż do przeładowania o 3:30.
             <Card
               data={card}
-              key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}:${card.autoClosed ? 1 : 0}`}
+              key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}:${card.autoClosed ? 1 : 0}:${card.shift?.earlyLeaveMin ?? 0}:${card.shift?.stayLongerMin ?? 0}`}
               onSaved={() => mutate(boardKey(id))}
             />
           ))}

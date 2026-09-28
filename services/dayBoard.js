@@ -6,7 +6,8 @@ import getAbsences from "./getAbsences";
 import getOvertimeRequests from "./getOvertimeRequests";
 import { getLeaveBalances } from "./leaveBalance";
 import getOvertimeBalances from "./getOvertimeBalances";
-import { WORKDAY_HOURS, parseHmsToSeconds } from "../utils";
+import { SHIFT_KINDS } from "./overtimeKinds";
+import { WORKDAY_HOURS, parseHmsToSeconds, plannedExit } from "../utils";
 
 // Dzień zespołu w jednym miejscu — komplet danych ekranu /urlopy/stan.
 //
@@ -30,16 +31,6 @@ import { WORKDAY_HOURS, parseHmsToSeconds } from "../utils";
 // SERWERZE, mimo że to informacja do pokazania: zegar przeglądarki bywa
 // przestawiony, a od tej granicy zależy, czy wiersz zapala się na czerwono.
 const LATE_PUNCH_HOUR = 9;
-
-// Rodzaje wniosków nadgodzinowych, które przesuwają godzinę wyjścia Z FIRMY.
-//
-// Lista jest tu WYPISANA, a nie wyliczona ze znaku w services/overtimeKinds.js,
-// i to jest świadome: `extra_work` ("praca poza godzinami, np. wieczorem
-// w domu") ma znak dodatni jak `stay_longer`, ale obecności na miejscu nie
-// wydłuża. Wyliczenie po znaku przesuwałoby belkę na osi o czas przepracowany
-// w domu. Nowy rodzaj wniosku trafia tutaj wtedy i tylko wtedy, gdy zmienia
-// godzinę wyjścia z firmy.
-const SHIFT_KINDS = ["stay_longer", "early_leave"];
 
 const placeholders = (count) => Array.from({ length: count }, (_, i) => `@sec${i}`).join(", ");
 
@@ -124,8 +115,9 @@ const stmtAbsences = (count) =>
 // --- zgody przesuwające wyjście --------------------------------------------
 //
 // Tylko `approved`: wniosek oczekujący nie jest jeszcze zgodą, a planowane
-// wyjście ma mówić o tym, co ustalone. Lista rodzajów pochodzi z SHIFT_KINDS,
-// więc interpolacja jest tu bezpieczna — klucze są stałą z tego pliku.
+// wyjście ma mówić o tym, co ustalone. Lista rodzajów pochodzi z SHIFT_KINDS
+// (services/overtimeKinds.js), więc interpolacja jest tu bezpieczna — klucze
+// są stałą w kodzie, nie danymi od użytkownika.
 const SHIFT_KIND_LIST = SHIFT_KINDS.map((k) => `'${k}'`).join(", ");
 
 const stmtShifts = (count) =>
@@ -307,8 +299,9 @@ export const getDayBoard = ({ day, sections }) => {
     //
     // Świadomie NIE bierzemy tu Times.endTime, choć na karcie otwartej ono już
     // stoi: components/card.js wpisuje przy odbiciu wejścia "start + 8 h"
-    // i nie zna wniosków o wcześniejsze wyjście, więc dla kogoś z podpisaną
-    // zgodą kłamałoby o godzinę.
+    // bez zgód (odlicza do przesuniętego celu, ale go nie zapisuje), więc dla
+    // kogoś z podpisaną zgodą kłamałoby o godzinę. Wzór jest wspólny
+    // z kafelkiem — plannedExit w utils/index.js.
     const open = Boolean(card) && isOpen(card);
 
     // "Pracuje TERAZ" wymaga OBU warunków: karty otwartej i oglądanego dnia
@@ -320,10 +313,7 @@ export const getDayBoard = ({ day, sections }) => {
     // widziałby licznik tykający dla dnia, który się skończył, i belkę biegnącą
     // do bieżącej godziny przez cały wykres.
     const live = open && isToday;
-    const plannedStamp =
-      open && card.startTime
-        ? dayjs(card.startTime).add(WORKDAY_HOURS, "hour").add(shiftMin, "minute").format()
-        : null;
+    const plannedStamp = open && card.startTime ? plannedExit(card.startTime, shiftMin).format() : null;
 
     const startHm = card ? appTime(card.startTime) : "";
     const endHm = open ? appTime(plannedStamp) : card && card.endTime ? appTime(card.endTime) : "";

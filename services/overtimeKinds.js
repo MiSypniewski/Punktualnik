@@ -13,6 +13,17 @@ export const OVERTIME_KINDS = {
 
 export const KIND_KEYS = Object.keys(OVERTIME_KINDS);
 
+// Rodzaje wniosków, które przesuwają godzinę wyjścia Z FIRMY — planowane
+// wyjście na /urlopy/stan (services/dayBoard.js) i cel odliczania na kafelku
+// kiosku (components/card.js, dane z services/getShiftsForDay.js).
+//
+// Lista jest WYPISANA, a nie wyliczona ze znaku, i to jest świadome:
+// `extra_work` ("praca poza godzinami, np. wieczorem w domu") ma znak dodatni
+// jak `stay_longer`, ale obecności na miejscu nie wydłuża. Wyliczenie po znaku
+// przesuwałoby wyjście o czas przepracowany w domu. Nowy rodzaj wniosku trafia
+// tutaj wtedy i tylko wtedy, gdy zmienia godzinę wyjścia z firmy.
+export const SHIFT_KINDS = ["stay_longer", "early_leave"];
+
 export const kindLabel = (kind) => OVERTIME_KINDS[kind]?.label ?? kind;
 
 export const kindSign = (kind) => OVERTIME_KINDS[kind]?.sign ?? 1;
