@@ -45,7 +45,7 @@ export default async (req, res) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const { userID, day, start, end } = req.body ?? {};
+  const { userID, day, start, end, open } = req.body ?? {};
 
   const [owner] = await getUserData(userID);
   if (!owner) {
@@ -73,6 +73,7 @@ export default async (req, res) => {
       day,
       start,
       end,
+      open: open === true,
       owner,
       actor: { userID: token.userID, name: token.name },
     });

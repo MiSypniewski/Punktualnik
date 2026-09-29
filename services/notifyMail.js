@@ -597,17 +597,21 @@ export const notifyCardChanged = async (card, action, actor, before) => {
   const { to, cc } = recipients(card.userID, card.section);
   const dzienKarty = formatDate(card.data);
 
-  const godziny = (row) =>
-    row?.startTime && row?.endTime ? `${godzinaKarty(row.startTime)} – ${godzinaKarty(row.endTime)}` : "—";
+  // Karta w toku ma w endTime i totalWorkTime PLAN (wejście + osiem godzin),
+  // a nie pomiar — w wiadomości wyglądałby jak wpisane wyjście.
+  const godziny = (row) => {
+    if (!row?.startTime || !row?.endTime) return "—";
+    if (row.status === "workInProgress") return `${godzinaKarty(row.startTime)} – w toku`;
+    return `${godzinaKarty(row.startTime)} – ${godzinaKarty(row.endTime)} (${row.totalWorkTime})`;
+  };
 
   const body = compose([
     opis.zdanie,
     null,
     ["Pracownik", `${card.name} ${card.surname}`],
     ["Dzień", dzienKarty],
-    ...(before ? [["Było", `${godziny(before)} (${before.totalWorkTime})`]] : []),
-    [action === "deleted" ? "Usunięta karta" : before ? "Jest" : "Godziny",
-      `${godziny(card)} (${card.totalWorkTime})`],
+    ...(before ? [["Było", godziny(before)]] : []),
+    [action === "deleted" ? "Usunięta karta" : before ? "Jest" : "Godziny", godziny(card)],
     ["Kto", `${kto(actor)} — ${opis.czasownik}`],
     null,
     `Jeśli to nie zgadza się z twoją dniówką, zgłoś to kierownikowi.`,

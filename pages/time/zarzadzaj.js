@@ -29,6 +29,7 @@ import {
   FormatChoice,
   UserOptions,
   PageHeader,
+  SegmentedChoice,
   CheckIcon,
   CloseIcon,
   DownloadIcon,
@@ -78,6 +79,11 @@ export async function getServerSideProps(ctx) {
       initial: { cards: getSectionTimes({ from, to, sections }) },
       from,
       to,
+      // Dzień w strefie PROCESU — tej samej, w której powstaje kotwica
+      // Times.data (dayStamp w services/manageTime.js). Decyduje tylko o tym,
+      // czy pokazać przełącznik "w toku"; rozstrzyga i tak serwer, więc strona
+      // otwarta przez północ skończy się czytelną odmową, a nie złym zapisem.
+      today: dayjs().format("YYYY-MM-DD"),
       // Strona wisi na canEditTimes, ale plik wydaje /api/report, które pyta
       // o canExportTimes. Oba predykaty są w services/roles.js świadomie
       // ROZDZIELONE, więc przycisk musi sprawdzać dokładnie ten, który
@@ -93,17 +99,56 @@ const hhmm = (stamp) => (stamp ? dayjs(stamp).format("HH:mm") : "");
 
 const errorText = (payload, fallback) => payload?.message || payload?.error || fallback;
 
+// Karta dzisiejszej doby może zostać otwarta — jak po odbiciu wejścia na
+// kiosku. Starszej nie: nocne domykanie (services/closeOpenCards.js) i tak
+// zamknęłoby ją z flagą "auto".
+const STATE_OPTIONS = [
+  { value: "open", label: "W toku" },
+  { value: "closed", label: "Zakończona" },
+];
+
+const StateChoice = ({ open, onChange, disabled }) => (
+  <SegmentedChoice
+    options={STATE_OPTIONS}
+    value={open ? "open" : "closed"}
+    onChange={(v) => onChange(v === "open")}
+    label="Stan karty"
+    disabled={disabled}
+  />
+);
+
+const isOpenCard = (card) => card.status === "workInProgress";
+
 // --- wiersz -----------------------------------------------------------------
 
-const CardRow = ({ card, onChanged, onError }) => {
+const CardRow = ({ card, today, onChanged, onError }) => {
+  const isToday = String(card.data ?? "").slice(0, 10) === today;
   const [editing, setEditing] = useState(false);
   const [start, setStart] = useState(hhmm(card.startTime));
-  const [end, setEnd] = useState(hhmm(card.endTime));
+  // Karta w toku ma w endTime PLAN (wejście + 8 h). Przy zamykaniu podpowiadamy
+  // więc pustą godzinę, a nie tę planowaną — inaczej jedno kliknięcie
+  // "Zakończona" wpisałoby do ewidencji wyjście, którego nie było.
+  const initialEnd = isOpenCard(card) ? "" : hhmm(card.endTime);
+  const [end, setEnd] = useState(initialEnd);
+  const [open, setOpen] = useState(isOpenCard(card));
   const [busy, setBusy] = useState(false);
 
-  const cancel = () => {
+  // Stan formularza bierzemy z karty przy KAŻDYM wejściu w edycję, nie tylko
+  // przy montażu: tablica odświeża się w tle, a w międzyczasie pracownik mógł
+  // domknąć kartę na kiosku.
+  const reset = () => {
     setStart(hhmm(card.startTime));
-    setEnd(hhmm(card.endTime));
+    setEnd(initialEnd);
+    setOpen(isOpenCard(card));
+  };
+
+  const beginEdit = () => {
+    reset();
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    reset();
     setEditing(false);
   };
 
@@ -112,7 +157,7 @@ const CardRow = ({ card, onChanged, onError }) => {
     const res = await fetch(`/api/time/manage/${card.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start, end }),
+      body: JSON.stringify({ start, end, open: isToday && open }),
     });
     const payload = await res.json().catch(() => ({}));
     setBusy(false);
@@ -167,8 +212,26 @@ const CardRow = ({ card, onChanged, onError }) => {
           <Td className="w-28">
             <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Wejście" />
           </Td>
-          <Td className="w-28">
-            <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="Wyjście" />
+          <Td className={isToday ? "whitespace-nowrap" : "w-28"}>
+            {/* Jeden wiersz: przełącznik obok pola o stałej szerokości. Przy
+                "W toku" miejsce pola zajmuje wyszarzona zaślepka tego samego
+                rozmiaru, żeby przełączanie nie przesuwało kolumny. */}
+            <div className="flex items-stretch justify-end gap-2">
+              {isToday && <StateChoice open={open} onChange={setOpen} disabled={busy} />}
+              {isToday && open ? (
+                <span className="w-28 shrink-0 flex items-center rounded border border-dashed border-line-strong px-3 text-sm text-muted">
+                  w toku
+                </span>
+              ) : (
+                <Input
+                  type="time"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  aria-label="Wyjście"
+                  className={isToday ? "!w-28 shrink-0" : undefined}
+                />
+              )}
+            </div>
           </Td>
           <Num className="text-muted">—</Num>
           <Td className="text-right whitespace-nowrap">
@@ -183,10 +246,11 @@ const CardRow = ({ card, onChanged, onError }) => {
       ) : (
         <>
           <Num>{hhmm(card.startTime) || "—"}</Num>
-          <Num>{card.status === "wait" ? "—" : hhmm(card.endTime) || "—"}</Num>
-          <Num>{card.status === "wait" ? "brak odbicia" : card.totalWorkTime}</Num>
+          {/* Karta w toku ma w endTime i totalWorkTime plan, nie pomiar. */}
+          <Num>{card.status === "wait" ? "—" : isOpenCard(card) ? "w toku" : hhmm(card.endTime) || "—"}</Num>
+          <Num>{card.status === "wait" ? "brak odbicia" : isOpenCard(card) ? "—" : card.totalWorkTime}</Num>
           <Td className="text-right whitespace-nowrap">
-            <IconButton label="Popraw godziny" onClick={() => setEditing(true)} disabled={busy}>
+            <IconButton label="Popraw godziny" onClick={beginEdit} disabled={busy}>
               <PencilIcon />
             </IconButton>
             <IconButton label="Usuń kartę" onClick={remove} disabled={busy} className="ml-1">
@@ -201,17 +265,23 @@ const CardRow = ({ card, onChanged, onError }) => {
 
 // --- dopisanie brakującej karty ---------------------------------------------
 
-const AddCard = ({ users, onChanged, onError }) => {
-  const [open, setOpen] = useState(false);
+const AddCard = ({ users, today, onChanged, onError }) => {
+  const [expanded, setExpanded] = useState(false);
   const [userID, setUserID] = useState("");
   const [day, setDay] = useState(dayjs().format("YYYY-MM-DD"));
   const [start, setStart] = useState("07:00");
   const [end, setEnd] = useState("15:00");
+  const [inProgress, setInProgress] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  if (!open) {
+  // Przełącznik dotyczy tylko dzisiejszej doby; po zmianie dnia jego stan
+  // jest ignorowany, więc nie trzeba go zerować.
+  const isToday = day === today;
+  const open = isToday && inProgress;
+
+  if (!expanded) {
     return (
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button variant="secondary" onClick={() => setExpanded(true)}>
         Dopisz brakującą kartę
       </Button>
     );
@@ -227,7 +297,7 @@ const AddCard = ({ users, onChanged, onError }) => {
     const res = await fetch("/api/time/manage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userID, day, start, end }),
+      body: JSON.stringify({ userID, day, start, end, open }),
     });
     const payload = await res.json().catch(() => ({}));
     setBusy(false);
@@ -236,7 +306,7 @@ const AddCard = ({ users, onChanged, onError }) => {
       onError(errorText(payload, "Nie udało się dopisać karty."));
       return;
     }
-    setOpen(false);
+    setExpanded(false);
     setUserID("");
     onChanged();
   };
@@ -257,15 +327,27 @@ const AddCard = ({ users, onChanged, onError }) => {
         <Field label="Wejście" htmlFor="nowy-start">
           <Input type="time" id="nowy-start" value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>
-        <Field label="Wyjście" htmlFor="nowy-end">
-          <Input type="time" id="nowy-end" value={end} onChange={(e) => setEnd(e.target.value)} />
-        </Field>
+        {open ? (
+          <Field label="Wyjście">
+            <p className="py-2 text-sm text-muted">w toku</p>
+          </Field>
+        ) : (
+          <Field label="Wyjście" htmlFor="nowy-end">
+            <Input type="time" id="nowy-end" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </Field>
+        )}
       </div>
+      {isToday && (
+        <div className="px-3 pb-3 flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-signage text-muted">Stan</span>
+          <StateChoice open={inProgress} onChange={setInProgress} disabled={busy} />
+        </div>
+      )}
       <div className="px-3 pb-3 flex gap-2">
         <Button onClick={submit} disabled={busy}>
           Dopisz kartę
         </Button>
-        <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
+        <Button variant="ghost" onClick={() => setExpanded(false)} disabled={busy}>
           Anuluj
         </Button>
       </div>
@@ -275,7 +357,7 @@ const AddCard = ({ users, onChanged, onError }) => {
 
 // --- strona -----------------------------------------------------------------
 
-export default function ZarzadzajKartami({ users, hasSections, initial, from: from0, to: to0, canExport }) {
+export default function ZarzadzajKartami({ users, hasSections, initial, from: from0, to: to0, today, canExport }) {
   const [from, setFrom] = useState(from0);
   const [to, setTo] = useState(to0);
   const [userID, setUserID] = useState("");
@@ -352,7 +434,7 @@ export default function ZarzadzajKartami({ users, hasSections, initial, from: fr
       </div>
 
       <div className="mb-4">
-        <AddCard users={users} onChanged={refresh} onError={setErr} />
+        <AddCard users={users} today={today} onChanged={refresh} onError={setErr} />
       </div>
 
       <Alert className="mb-4">{err}</Alert>
@@ -386,7 +468,7 @@ export default function ZarzadzajKartami({ users, hasSections, initial, from: fr
               </thead>
               <tbody>
                 {cards.map((card) => (
-                  <CardRow key={card.id} card={card} onChanged={refresh} onError={setErr} />
+                  <CardRow key={card.id} card={card} today={today} onChanged={refresh} onError={setErr} />
                 ))}
               </tbody>
             </Table>
