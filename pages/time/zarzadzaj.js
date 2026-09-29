@@ -212,13 +212,24 @@ const CardRow = ({ card, today, onChanged, onError }) => {
           <Td className="w-28">
             <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Wejście" />
           </Td>
-          <Td className={isToday ? undefined : "w-28"}>
-            <div className="flex flex-col items-end gap-1.5">
+          <Td className={isToday ? "whitespace-nowrap" : "w-28"}>
+            {/* Jeden wiersz: przełącznik obok pola o stałej szerokości. Przy
+                "W toku" miejsce pola zajmuje wyszarzona zaślepka tego samego
+                rozmiaru, żeby przełączanie nie przesuwało kolumny. */}
+            <div className="flex items-stretch justify-end gap-2">
               {isToday && <StateChoice open={open} onChange={setOpen} disabled={busy} />}
               {isToday && open ? (
-                <span className="text-sm text-muted">w toku</span>
+                <span className="w-28 shrink-0 flex items-center rounded border border-dashed border-line-strong px-3 text-sm text-muted">
+                  w toku
+                </span>
               ) : (
-                <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="Wyjście" />
+                <Input
+                  type="time"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  aria-label="Wyjście"
+                  className={isToday ? "!w-28 shrink-0" : undefined}
+                />
               )}
             </div>
           </Td>

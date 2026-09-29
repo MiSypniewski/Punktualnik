@@ -6,7 +6,7 @@ import classNames from "classnames";
 
 const optionClass = (active) =>
   classNames(
-    "px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50",
+    "px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-50",
     active ? "bg-accent text-accent-ink" : "bg-surface text-muted hover:bg-raised hover:text-body"
   );
 
