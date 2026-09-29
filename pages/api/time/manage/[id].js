@@ -62,7 +62,15 @@ export default async (req, res) => {
   }
 
   try {
-    const updated = correctCard({ id, start: req.body?.start, end: req.body?.end, actor });
+    const updated = correctCard({
+      id,
+      start: req.body?.start,
+      end: req.body?.end,
+      // Ściśle `true`: brak pola albo cokolwiek innego to karta zamknięta,
+      // czyli dotychczasowe zachowanie panelu.
+      open: req.body?.open === true,
+      actor,
+    });
 
     // `card` to stan sprzed korekty — odczytany wyżej, na potrzeby kontroli
     // zasięgu. Idzie do wiadomości jako "było", żeby dało się sprawdzić, czy

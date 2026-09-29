@@ -3,8 +3,8 @@ import dayjs from "dayjs";
 import utcPlugin from "dayjs/plugin/utc";
 import timezonePlugin from "dayjs/plugin/timezone";
 import db from "./db";
-import { APP_TZ, WORKDAY_START_HOUR } from "./workday";
-import { DifferenceTime } from "../utils";
+import { APP_TZ, WORKDAY_START_HOUR, now as appNow } from "./workday";
+import { DifferenceTime, WORKDAY_HOURS } from "../utils";
 import { logInfo } from "./log";
 
 dayjs.extend(utcPlugin);
@@ -68,11 +68,25 @@ export const STATUS_FOR = {
   invalid_day: 422,
   bad_span: 422,
   bad_card: 422,
+  not_today: 422,
 };
 
 /** Kotwica doby — ta sama wartość, którą liczy kiosk i services/getTime.js. */
 export const dayStamp = (day) =>
   dayjs(day).hour(WORKDAY_START_HOUR).minute(0).second(0).millisecond(0).format();
+
+/**
+ * Kotwica DZISIEJSZEJ doby — ta, pod którą kiosk zakłada kartę przy odbiciu
+ * wejścia (services/punchCard.js). Tylko taką kartę wolno zostawić otwartą:
+ * otwarta karta z wczoraj i tak zostałaby domknięta nocą z flagą "auto"
+ * (services/closeOpenCards.js), więc jej otwarcie byłoby pułapką.
+ *
+ * Świadomie NIE jest to workDay() z services/workday.js: tamto liczy dobę
+ * roboczą (o 1:00 w nocy wskazuje dzień poprzedni), a tutaj chodzi o kotwicę
+ * w kształcie, w jakim leży w bazie od czasów Airtable. Ujednolicenie tych
+ * dwóch pojęć to osobna zmiana, która rusza dopasowanie wszystkich kart.
+ */
+export const todayStamp = () => dayStamp(dayjs());
 
 /**
  * "HH:mm" wpisane przez kierownika → znacznik ISO w strefie aplikacji.
@@ -119,6 +133,38 @@ const resolveSpan = (day, body) => {
   return { startTime, endTime, ...measure(startTime, endTime) };
 };
 
+/**
+ * Karta "w toku" — w DOKŁADNIE tym kształcie, w jakim zostawia ją odbicie
+ * wejścia na kiosku (openSpan w services/punchCard.js): endTime to PLANOWANE
+ * wyjście (wejście + WORKDAY_HOURS), a totalWorkTime wymiar planowanej dniówki.
+ * Dzięki temu kafelek liczy od poprawionej godziny, drugie dotknięcie domyka
+ * kartę zwykłą ścieżką, a nocne domykanie traktuje ją jak każdą inną otwartą.
+ */
+const resolveOpenSpan = (day, body) => {
+  const { value, error } = schema
+    .fork(["end"], (s) => s.optional().allow("", null))
+    .validate({ start: body?.start, end: body?.end }, { abortEarly: true, convert: false });
+  if (error) fail("invalid_time", "Godzinę wejścia podaj w formacie HH:MM.");
+
+  const startTime = stampFor(day, value.start);
+  if (dayjs(startTime).isAfter(appNow())) {
+    fail("bad_span", "Godzina wejścia nie może być późniejsza niż teraz.");
+  }
+
+  const endTime = dayjs(startTime).tz(APP_TZ).add(WORKDAY_HOURS, "hour").format();
+  return { startTime, endTime, totalWorkTime: measure(startTime, endTime).totalWorkTime, overTime: false };
+};
+
+/** Godziny i status karty — otwartej (tylko dziś) albo zamkniętej. */
+const resolveCard = (day, data, { start, end, open }) => {
+  if (!open) return { ...resolveSpan(day, { start, end }), status: "finishWork" };
+
+  if (data !== todayStamp()) {
+    fail("not_today", "Kartę w toku można ustawić tylko na dzisiejszy dzień.");
+  }
+  return { ...resolveOpenSpan(day, { start, end }), status: "workInProgress" };
+};
+
 // --- odczyt pojedynczej karty ----------------------------------------------
 
 const stmtCard = db.prepare(`SELECT * FROM Times WHERE id = ?`);
@@ -137,7 +183,7 @@ const stmtCorrect = db.prepare(`
          endTime       = @endTime,
          totalWorkTime = @totalWorkTime,
          overTime      = @overTime,
-         status        = 'finishWork',
+         status        = @status,
          autoClosed    = 0,
          editedAt      = @editedAt,
          editedBy      = @editedBy,
@@ -151,18 +197,20 @@ const stmtCorrect = db.prepare(`
  * odbił wyjścia" — a korekta kierownika jest dokładnie tym potwierdzeniem,
  * o które prosiła. Ta sama zasada rządzi wpisami zadań (services/taskEntries.js).
  *
- * Status zawsze 'finishWork': karta, którą ktoś właśnie opisał od wejścia do
- * wyjścia, jest z definicji zamknięta. Zostawienie 'workInProgress' kazałoby
- * kafelkowi wznowić licznik od poprawionej godziny.
+ * Status wybiera kierownik: karta opisana od wejścia do wyjścia jest zamknięta
+ * ('finishWork'), a `open` zostawia ją w toku ('workInProgress') — np. przy
+ * poprawce godziny wejścia komuś, kto wciąż jest w pracy. Otwarta może być
+ * wyłącznie karta dzisiejsza (resolveCard); kafelek wznawia wtedy licznik od
+ * poprawionej godziny, a zamknięcie odbywa się zwykłym dotknięciem na kiosku.
  */
-export const correctCard = ({ id, start, end, actor }) => {
+export const correctCard = ({ id, start, end, open, actor }) => {
   const card = getCard(id);
   if (!card) fail("not_found", "Nie ma takiej karty.");
 
   const day = String(card.data ?? "").slice(0, 10);
   if (!DAY_RE.test(day)) fail("bad_card", "Karta nie ma poprawnej daty.");
 
-  const span = resolveSpan(day, { start, end });
+  const span = resolveCard(day, card.data, { start, end, open });
 
   stmtCorrect.run({
     id: Number(id),
@@ -184,7 +232,7 @@ const stmtInsert = db.prepare(`
   INSERT INTO Times (userID, name, surname, section, location, data, startTime, endTime,
                      totalWorkTime, status, overTime, autoClosed, editedAt, editedBy, editedByName)
   VALUES (@userID, @name, @surname, @section, @location, @data, @startTime, @endTime,
-          @totalWorkTime, 'finishWork', @overTime, 0, @editedAt, @editedBy, @editedByName)`);
+          @totalWorkTime, @status, @overTime, 0, @editedAt, @editedBy, @editedByName)`);
 
 /**
  * Karta za dzień, w którym pracownik w ogóle nie odbił wejścia.
@@ -196,7 +244,7 @@ const stmtInsert = db.prepare(`
  * Podpis (editedBy) stawiamy od razu przy zakładaniu: cała karta jest tu
  * wpisem kierownika, nie tylko jej poprawką.
  */
-export const createCardForUser = ({ userID, day, start, end, owner, actor }) => {
+export const createCardForUser = ({ userID, day, start, end, open, owner, actor }) => {
   const { error } = daySchema.validate({ day, userID }, { abortEarly: true });
   if (error) fail("invalid_day", "Podaj poprawną datę dnia.");
 
@@ -205,7 +253,7 @@ export const createCardForUser = ({ userID, day, start, end, owner, actor }) => 
     fail("card_exists", "Ten pracownik ma już kartę na ten dzień — popraw istniejącą.");
   }
 
-  const span = resolveSpan(day, { start, end });
+  const span = resolveCard(day, data, { start, end, open });
 
   const info = stmtInsert.run({
     userID: Number(userID),

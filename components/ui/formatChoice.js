@@ -1,4 +1,5 @@
 import classNames from "classnames";
+import SegmentedChoice from "./segmentedChoice";
 
 // Wybór formatu pliku dla eksportów: jeden przełącznik na stronę zamiast
 // podwajania przycisków pobierania. Na /zadania/zarzadzaj eksporty są trzy —
@@ -15,12 +16,6 @@ const OPTIONS = [
   { value: "xlsx", label: "Excel" },
 ];
 
-const optionClass = (active) =>
-  classNames(
-    "px-3 py-1.5 text-sm font-medium transition-colors",
-    active ? "bg-accent text-accent-ink" : "bg-surface text-muted hover:bg-raised hover:text-body"
-  );
-
 /**
  * @param {"csv"|"xlsx"} value
  * @param {(format: "csv"|"xlsx") => void} onChange
@@ -28,24 +23,7 @@ const optionClass = (active) =>
 const FormatChoice = ({ value, onChange, className }) => (
   <div className={classNames("flex items-center gap-2", className)}>
     <span className="text-xs font-semibold uppercase tracking-signage text-muted">Format</span>
-    <div
-      role="radiogroup"
-      aria-label="Format pliku"
-      className="inline-flex rounded border border-line-strong overflow-hidden divide-x divide-line-strong"
-    >
-      {OPTIONS.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={optionClass(value === o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedChoice options={OPTIONS} value={value} onChange={onChange} label="Format pliku" />
   </div>
 );
 

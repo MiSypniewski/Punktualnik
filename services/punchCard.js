@@ -4,7 +4,7 @@ import db from "./db";
 import saveTime from "./saveTime";
 import getUserData from "./getUserData";
 import { canSeeUser } from "./scope";
-import { getCard, dayStamp } from "./manageTime";
+import { getCard, todayStamp } from "./manageTime";
 import { now as appNow } from "./workday";
 import { DifferenceTime, WORKDAY_HOURS } from "../utils";
 import { logWarn } from "./log";
@@ -131,20 +131,8 @@ const assertPunchable = async (token, userID) => {
   return owner;
 };
 
-/**
- * Kotwica dzisiejszej doby — wartość kolumny Times.data.
- *
- * Wyrażenie MUSI zostać identyczne z tym, którego używają services/getTime.js,
- * services/sectionBoard.js i services/manageTime.js, bo karty dopasowuje się po
- * tej kolumnie porównaniem DOSŁOWNYM, całym ciągiem ISO razem z offsetem strefy
- * procesu. Stąd import dayStamp zamiast czwartej kopii `dayjs().hour(3)`.
- *
- * Świadomie NIE jest to workDay() z services/workday.js: tamto liczy dobę
- * roboczą (o 1:00 w nocy wskazuje dzień poprzedni), a tutaj chodzi o kotwicę
- * w kształcie, w jakim leży w bazie od czasów Airtable. Ujednolicenie tych
- * dwóch pojęć to osobna zmiana, która rusza dopasowanie wszystkich kart.
- */
-const todayStamp = () => dayStamp(dayjs());
+// Kotwica dzisiejszej doby (Times.data) to todayStamp z services/manageTime.js
+// — to samo wyrażenie, pod którym kierownik otwiera kartę "w toku".
 
 /**
  * Wymiar dniówki liczony TĄ SAMĄ funkcją co kafelek i korekta kierownika
