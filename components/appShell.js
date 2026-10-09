@@ -14,7 +14,12 @@ const WIDTHS = {
 export default function AppShell({ user, width = "page", children }) {
   return (
     <div className="min-h-screen flex flex-col">
-      <StationRail user={user} />
+      {/* `contents`, żeby owijka nie stała się rodzicem lepkiego paska (sticky
+          trzyma się rodzica, a ten miałby wysokość samego paska). Na wydruku
+          raportu miesięcznego nawigacja znika w całości. */}
+      <div className="contents print:hidden">
+        <StationRail user={user} />
+      </div>
 
       <main className={classNames("w-full mx-auto px-4 py-6 sm:py-8 flex-grow", WIDTHS[width])}>
         {children}
@@ -25,9 +30,11 @@ export default function AppShell({ user, width = "page", children }) {
           zamknięta wcześniej). Tutaj, a nie na stronie logowania: instalują ci,
           którzy już aplikacji używają, a nie ci, którzy pierwszy raz wpisują
           hasło. */}
-      <InstallHint />
+      <div className="contents print:hidden">
+        <InstallHint />
+      </div>
 
-      <footer className="border-t border-line-subtle">
+      <footer className="border-t border-line-subtle print:hidden">
         <div className="mx-auto max-w-wide px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-faint">
           <span className="uppercase tracking-signage">Punktualnik</span>
           {/* Fakt z services/workday.js, o który ludzie pytają najczęściej —

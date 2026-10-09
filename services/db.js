@@ -661,7 +661,8 @@ const createDb = () => {
     --
     -- Kolumna lastDay znaczy tyle, ile zadanie w niej zapisze: dla nocnego to doba robocza
     -- (services/nightlyJob.js), dla tygodniowego data ostatniego wtorku
-    -- (services/weeklyUndertimeJob.js). Kolumna zostaje jedna, bo w obu przypadkach
+    -- (services/weeklyUndertimeJob.js), dla miesięcznego pierwszy dzień miesiąca
+    -- (services/monthlyReportJob.js). Kolumna zostaje jedna, bo w każdym przypadku
     -- porównanie jest to samo — "czy zapisana data jest starsza od bieżącego okresu".
     --
     -- W bazie, a nie w pamięci procesu, właśnie dlatego, że chodzi o przeżycie restartu.
@@ -669,6 +670,51 @@ const createDb = () => {
       job     TEXT PRIMARY KEY,
       lastDay TEXT NOT NULL,
       ranAt   TEXT NOT NULL
+    );
+
+    -- Miesięczne podsumowania pracowników (services/monthlyReport.js): migawka,
+    -- po jednym wierszu na osobę i miesiąc ('YYYY-MM').
+    --
+    -- Metryki siedzą w payload jako JSON, a nie w kolumnach: nikt ich nie
+    -- filtruje ani nie sumuje w SQL, a każda nowa liczba w raporcie byłaby
+    -- kolejnym ALTER TABLE. Kolumnami są tylko te pola, po których się szuka.
+    --
+    -- name/surname/section to stan z chwili generowania — raport ma pokazywać
+    -- zespół takim, jaki wtedy był, także po zmianie sekcji albo usunięciu konta.
+    -- generatedBy NULL znaczy "automat 1. dnia miesiąca".
+    CREATE TABLE IF NOT EXISTS MonthlyReports (
+      month           TEXT    NOT NULL,
+      userID          INTEGER NOT NULL,
+      name            TEXT    NOT NULL,
+      surname         TEXT    NOT NULL,
+      section         TEXT    NOT NULL,
+      payload         TEXT    NOT NULL,
+      generatedAt     TEXT    NOT NULL,
+      generatedBy     INTEGER,
+      generatedByName TEXT,
+      PRIMARY KEY (month, userID)
+    );
+    CREATE INDEX IF NOT EXISTS idx_monthly_month_section ON MonthlyReports(month, section);
+
+    -- Ocena miesiąca wpisana przez kierownika (services/monthlyReview.js).
+    --
+    -- OSOBNA tabela, nie pola w MonthlyReports: migawkę przelicza się jednym
+    -- DELETE + INSERT na całą sekcję i osąd kierownika zniknąłby razem z nią.
+    -- Tu siedzi wyłącznie to, czego nie da się policzyć — trzy podoceny (0–10)
+    -- i tekst; regularność i dyscyplinę raport wylicza sam (utils/monthlyScore.js).
+    CREATE TABLE IF NOT EXISTS MonthlyReviews (
+      month         TEXT    NOT NULL,
+      userID        INTEGER NOT NULL,
+      tech          REAL    NOT NULL,
+      docs          REAL    NOT NULL,
+      initiative    REAL    NOT NULL,
+      comment       TEXT    NOT NULL DEFAULT '',
+      actions       TEXT    NOT NULL DEFAULT '',
+      growth        TEXT    NOT NULL DEFAULT '',
+      updatedAt     TEXT    NOT NULL,
+      updatedBy     INTEGER,
+      updatedByName TEXT,
+      PRIMARY KEY (month, userID)
     );
 
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);

@@ -1,6 +1,7 @@
 import { tickNightly } from "./nightlyJob";
 import { tickWeeklyUndertime } from "./weeklyUndertimeJob";
 import { tickEmptyTimers } from "./emptyTimerJob";
+import { tickMonthlyReport } from "./monthlyReportJob";
 import { logError, logInfo } from "./log";
 
 // JEDEN budzik dla wszystkich zadań okresowych.
@@ -29,8 +30,14 @@ const globalForScheduler = globalThis;
 // "pusty-timer" jedyny naprawdę pracuje co minutę (progi 20 i 30 min od startu
 // timera) — ale zaczyna od odczytu po częściowym indeksie biegnących wpisów
 // i przy braku pustych timerów na nim kończy, bez żadnego zapisu.
+//
+// "raport-miesieczny" MUSI stać za "nightly": 1. dnia miesiąca o 3:00 obie
+// zapadki wypadają w tym samym tyknięciu, a raport ma liczyć karty z ostatniego
+// dnia miesiąca już domknięte (domykanie jest synchroniczne, asynchroniczna
+// jest dopiero wysyłka maili).
 const JOBS = [
   ["nightly", tickNightly],
+  ["raport-miesieczny", tickMonthlyReport],
   ["niedogodziny", tickWeeklyUndertime],
   ["pusty-timer", tickEmptyTimers],
 ];

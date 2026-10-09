@@ -23,6 +23,11 @@ const FIXED = [
   "12-26", // drugi dzień Bożego Narodzenia
 ];
 
+// Wigilia jest ustawowo wolna dopiero od 2025 r. Osobno od FIXED, bo wniosek
+// urlopowy z grudnia 2024 ma się liczyć tak, jak liczył się wtedy.
+const CHRISTMAS_EVE = "12-24";
+const CHRISTMAS_EVE_SINCE = 2025;
+
 /**
  * Niedziela wielkanocna w kalendarzu gregoriańskim — algorytm Meeusa/Butchera.
  * Same dzielenia całkowite, bez tablic i bez wyjątków dla konkretnych lat.
@@ -72,6 +77,7 @@ export const polishHolidays = (year) => {
   const easter = dayjs(easterSunday(year));
   const days = new Set([
     ...FIXED.map((md) => `${year}-${md}`),
+    ...(year >= CHRISTMAS_EVE_SINCE ? [`${year}-${CHRISTMAS_EVE}`] : []),
     easter.format("YYYY-MM-DD"), // Niedziela Wielkanocna
     easter.add(1, "day").format("YYYY-MM-DD"), // Poniedziałek Wielkanocny
     easter.add(49, "day").format("YYYY-MM-DD"), // Zielone Świątki

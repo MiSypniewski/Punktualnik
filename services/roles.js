@@ -58,6 +58,11 @@ export const canManageProjects = (role) => role === "manager";
 // sekcyjny nakłada dodatkowo services/scope.js.
 export const canSeeTeamTasks = (role) => role === "manager";
 
+// Miesięczne podsumowania pracowników (/zadania/podsumowanie). Osobny predykat,
+// bo ekran zestawia zadania z kartami czasu i nieobecnościami — żaden z trzech
+// modułów nie jest tu "właścicielem". Zasięg sekcyjny nakłada services/scope.js.
+export const canSeeMonthlyReports = (role) => role === "manager";
+
 // Eksport wpisów — jak przy czasach pracy, wyłącznie kierownik.
 export const canExportTasks = (role) => role === "manager";
 

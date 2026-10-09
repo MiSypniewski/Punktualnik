@@ -137,6 +137,23 @@
 
     --shadow-plate: 0 1px 2px rgb(20 33 61 / 0.07), 0 1px 1px rgb(20 33 61 / 0.04);
     --shadow-rail: 0 1px 0 rgb(20 33 61 / 0.06);
+
+    /* Serie wykresów (components/charts.js) — osiem barw w STAŁEJ kolejności.
+       Kolejność jest tu mechanizmem, nie ozdobą: sąsiednie pozycje dobrano
+       tak, żeby dało się je odróżnić także przy zaburzeniach widzenia barw,
+       więc serie przydziela się po kolei, bez przeskakiwania i bez zapętlania.
+       Dziewiąta seria nie dostaje barwy — zlewa się w „pozostałe”.
+       Osobno od palety projektów (components/projectColors.js): tamta ma
+       siedem kluczy na dwadzieścia kilka projektów i na wykresie dawałaby
+       po kilka segmentów w tym samym kolorze. */
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    --viz-3: #1baf7a;
+    --viz-4: #eda100;
+    --viz-5: #e87ba4;
+    --viz-6: #008300;
+    --viz-7: #6250d6;
+    --viz-8: #e34948;
   }
 
   /* Ciemny — nocna tablica: prawie czarny granat, ciepła biel, ten sam
@@ -182,6 +199,16 @@
        z treścią przy przewijaniu. */
     --shadow-plate: none;
     --shadow-rail: 0 1px 0 rgb(0 0 0 / 0.5);
+
+    /* Te same osiem barw, dobranych osobno pod ciemne tło. */
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #008300;
+    --viz-7: #9085e9;
+    --viz-8: #e66767;
   }
 
   body {
