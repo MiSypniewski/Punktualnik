@@ -207,11 +207,13 @@ export default function MonthlySummary({ month, lastClosed, labels, initial }) {
           {sections.map((section) => {
             const members = people.filter((p) => p.section === section);
             const { team, workingDays } = members[0];
+            const outside = members.filter((p) => p.outsideTeam).length;
             return (
               <Plate key={section}>
                 <PlateHeader title={labels[section] || section} aside={`zapisano ${signature(members)}`}>
                   <p className="text-xs text-muted">
-                    {workingDays} dni roboczych · osób: {team.people} · średnia zespołu{" "}
+                    {workingDays} dni roboczych · osób: {team.people}
+                    {outside > 0 ? ` (+ kierownicy: ${outside}, poza średnią)` : ""} · średnia zespołu{" "}
                     <span className="font-mono tabular-nums text-body">
                       {team.avgDailySeconds !== null ? hm(team.avgDailySeconds) : "—"}
                     </span>

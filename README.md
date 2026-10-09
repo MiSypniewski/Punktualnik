@@ -1757,7 +1757,7 @@ w `services/monthlyReport.js` — siedem zapytań na cały miesiąc, nie na osob
 | Frekwencja | przepracowane / (robocze − nieobecności) — urlop jej nie obniża |
 | Łączne godziny | cały zaraportowany czas miesiąca, z weekendami |
 | Średnia dzienna | czas zaraportowany w dni robocze / dni przepracowane |
-| Średnia zespołu | suma czasu sekcji / suma przepracowanych dni sekcji (ważona; tylko osoby, które zadania raportują) |
+| Średnia zespołu | suma czasu sekcji / suma przepracowanych dni sekcji (ważona; tylko osoby, które zadania raportują; bez kierowników — ci widzą swoją średnią na tle zespołu, ale jej nie tworzą) |
 | Czas prywatny | udział projektu „Prywacizna” w łącznych godzinach |
 | Pokrycie obecności | zaraportowany czas / czas obecności wg kart |
 | Nadgodziny | suma zatwierdzonych wniosków z miesiąca, bez rozliczeń dni (niżej) |

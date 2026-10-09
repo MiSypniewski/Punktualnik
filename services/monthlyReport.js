@@ -20,7 +20,7 @@ import { computeScore } from "../utils/monthlyScore";
 // rząd — dokładnie ten kształt pracy, który 21.08.2026 zatrzymał pętlę zdarzeń.
 
 const stmtPeople = db.prepare(
-  `SELECT id, name, surname, section, isActive
+  `SELECT id, name, surname, section, isActive, role
      FROM Users
     WHERE role <> 'editor'
     ORDER BY surname COLLATE NOCASE, name COLLATE NOCASE`
@@ -149,6 +149,7 @@ export const buildMonth = (month, sections) => {
     name: u.name,
     surname: u.surname,
     section: u.section,
+    manager: u.role === "manager",
     payload: buildPersonReport({
       month,
       cards: cards.get(u.id),
@@ -164,17 +165,23 @@ export const buildMonth = (month, sections) => {
 
   // Wskaźniki zespołu jadą W wierszu każdej osoby: migawka ma być kompletna
   // sama w sobie, także wtedy, gdy kierownik widzi tylko część sekcji firmy.
+  //
+  // Kierownik nie wchodzi do wskaźników zespołu ani do klasyfikacji: jego dzień
+  // to w dużej części praca, której się nie raportuje, więc zaniżałby średnią
+  // ludziom, których ocenia. Sam nadal ogląda siebie na tle zespołu.
   const teams = new Map();
   for (const row of rows) {
     if (!teams.has(row.section)) teams.set(row.section, []);
-    teams.get(row.section).push(row.payload);
+    teams.get(row.section).push(row);
   }
   for (const members of teams.values()) {
-    const stats = teamStats(members);
-    const ranks = rankByAverage(members);
-    members.forEach((payload, i) => {
-      payload.team = { ...stats, rank: ranks[i] };
-    });
+    const staff = members.filter((row) => !row.manager).map((row) => row.payload);
+    const stats = teamStats(staff);
+    const ranks = rankByAverage(staff);
+    for (const { manager, payload } of members) {
+      payload.outsideTeam = manager;
+      payload.team = { ...stats, rank: manager ? null : ranks[staff.indexOf(payload)] };
+    }
   }
 
   return rows;
