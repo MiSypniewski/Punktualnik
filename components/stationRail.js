@@ -16,6 +16,7 @@ import {
   canManageProjects,
   canSeeTeamTasks,
   canApproveLeave,
+  canSeeMonthlyReports,
 } from "../services/roles";
 import { fetchLive, PENDING_KEY, PENDING_POLL_MS } from "../utils/live";
 
@@ -123,6 +124,17 @@ const navItems = (user, pending) => {
       href: "/time/zarzadzaj",
       match: "/time/zarzadzaj",
       label: "Karty czasu",
+      group: "zespol",
+      secondary: true,
+    });
+
+  // Miesięczne podsumowania — otwierane raz w miesiącu, więc na samym końcu
+  // grupy i `secondary`, jak pozostałe narzędzia doraźne.
+  if (canSeeMonthlyReports(role))
+    items.push({
+      href: "/zadania/podsumowanie",
+      match: "/zadania/podsumowanie",
+      label: "Podsumowania",
       group: "zespol",
       secondary: true,
     });

@@ -1707,6 +1707,65 @@ Czas jest w dwóch kolumnach: godziny dziesiętnie (`2,50` — do sumowania
 w arkuszu) i tekst `2h 30min` dla człowieka. Tryb `wpisy` jako jedyny nie ma
 limitu wierszy, więc oba formaty zapisuje STRUMIENIOWO.
 
+## Podsumowania miesięczne — `/zadania/podsumowanie`
+
+Miesiąc każdego pracownika z osobna, wyłącznie dla kierownika i w jego sekcjach
+(`canSeeMonthlyReports` + `services/scope.js`). Pozycja „Podsumowania” stoi na
+końcu grupy „Zespół” — to ekran otwierany raz w miesiącu.
+
+Jedyne miejsce, w którym spotykają się trzy moduły: karty czasu (był w pracy),
+nieobecności (miał prawo nie być) i zadania (co zaraportował). Jak przy kolumnie
+„Pokrycie” w raporcie zadań — to wskazówka dla kierownika, nie podstawa rozliczeń.
+
+### Migawka, nie widok na żywo
+
+Raport jest zapisany w tabeli `MonthlyReports` (wiersz na osobę i miesiąc, metryki
+w kolumnie `payload` jako JSON). Zapisuje go zadanie `raport-miesieczny`
+(`services/monthlyReportJob.js`) na wspólnym budziku — **1. dnia miesiąca o 3:00**,
+za miesiąc poprzedni, po nocnym domknięciu kart. Przestój jest nadrabiany, a przy
+pierwszym uruchomieniu na danej bazie raport powstaje od razu (nic nie wysyła,
+więc wdrożenie nie ma czego się bać).
+
+Dane wsteczne są zmienne — kierownik poprawia karty bez limitu daty, L4 wpisuje
+się po fakcie — dlatego migawkę da się **przeliczyć** przyciskiem na ekranie.
+Przeliczenie obejmuje zawsze całe sekcje kierownika (jedna osoba zmienia średnią
+zespołu) i zostawia podpis: kiedy i kto. Tym samym przyciskiem generuje się
+miesiąc sprzed wdrożenia. Bieżącego, niezamkniętego miesiąca wygenerować się nie da.
+
+### Co znaczą liczby
+
+Rachunek siedzi w `utils/monthlyReport.js` (bez bazy), zapytania
+w `services/monthlyReport.js`.
+
+| Liczba | Definicja |
+|---|---|
+| Dni robocze | poniedziałek–piątek bez świąt (`services/workingDays.js`), jednakowo dla wszystkich |
+| Dni przepracowane | dni robocze z odbitą kartą czasu |
+| Nieobecności | dni robocze **bez karty** objęte zatwierdzonym wnioskiem, z podziałem na rodzaje |
+| Dni bez ewidencji | dni robocze bez karty i bez zatwierdzonej nieobecności |
+| Frekwencja | przepracowane / (robocze − nieobecności) — urlop jej nie obniża |
+| Średnia dzienna | czas zaraportowany w dni robocze / dni przepracowane |
+| Średnia zespołu | suma czasu sekcji / suma przepracowanych dni sekcji (ważona; pracownik jest w niej wliczony) |
+| Projekty | udział w całym zaraportowanym czasie miesiąca; pięć największych, reszta jako „pozostałe” |
+
+Każdy dzień roboczy trafia do dokładnie jednej szufladki: przepracowany,
+nieobecność albo bez ewidencji. **Karta wygrywa z wnioskiem** — kto przyszedł
+mimo zatwierdzonego urlopu, był w pracy.
+
+Czas zaraportowany w weekend albo święto jest pokazany osobno i **nie wchodzi do
+średniej**: godziny trafiłyby do licznika, a dnia w mianowniku by nie było.
+
+„Zespół” to sekcja pracownika z chwili generowania (`Users.section`), nie z dnia
+wpisu. W raporcie jest każdy czynny pracownik oraz każdy były, który zostawił
+w tym miesiącu kartę albo wpis; konta kiosku nie ma.
+
+### Czego ten raport nie wie
+
+Aplikacja nie ma grafiku, wymiaru etatu ani daty zatrudnienia. U osoby na część
+etatu albo przyjętej w trakcie miesiąca „dni bez ewidencji” są zawyżone,
+a frekwencja zaniżona. Nie ma też oceny punktowej ani komentarza — same liczby,
+ocena zostaje u przełożonego.
+
 ## Formaty plików w eksportach
 
 Każdy eksport wydaje ten sam zestaw kolumn w dwóch formatach — wybiera je
