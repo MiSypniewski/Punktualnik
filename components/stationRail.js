@@ -133,7 +133,7 @@ const navItems = (user, pending) => {
   if (canSeeMonthlyReports(role))
     items.push({
       href: "/zadania/podsumowanie",
-      match: "/zadania/podsumowanie",
+      match: ["/zadania/podsumowanie", "/zadania/podsumowanie/[id]"],
       label: "Podsumowania",
       group: "zespol",
       secondary: true,

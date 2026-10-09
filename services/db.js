@@ -696,6 +696,27 @@ const createDb = () => {
     );
     CREATE INDEX IF NOT EXISTS idx_monthly_month_section ON MonthlyReports(month, section);
 
+    -- Ocena miesiąca wpisana przez kierownika (services/monthlyReview.js).
+    --
+    -- OSOBNA tabela, nie pola w MonthlyReports: migawkę przelicza się jednym
+    -- DELETE + INSERT na całą sekcję i osąd kierownika zniknąłby razem z nią.
+    -- Tu siedzi wyłącznie to, czego nie da się policzyć — trzy podoceny (0–10)
+    -- i tekst; regularność i dyscyplinę raport wylicza sam (utils/monthlyScore.js).
+    CREATE TABLE IF NOT EXISTS MonthlyReviews (
+      month         TEXT    NOT NULL,
+      userID        INTEGER NOT NULL,
+      tech          REAL    NOT NULL,
+      docs          REAL    NOT NULL,
+      initiative    REAL    NOT NULL,
+      comment       TEXT    NOT NULL DEFAULT '',
+      actions       TEXT    NOT NULL DEFAULT '',
+      growth        TEXT    NOT NULL DEFAULT '',
+      updatedAt     TEXT    NOT NULL,
+      updatedBy     INTEGER,
+      updatedByName TEXT,
+      PRIMARY KEY (month, userID)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
 

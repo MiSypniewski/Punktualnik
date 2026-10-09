@@ -1,8 +1,8 @@
 import { getToken } from "next-auth/jwt";
-import { generateMonth, getMonth, isClosedMonth } from "../../../services/monthlyReport";
-import { canSeeMonthlyReports } from "../../../services/roles";
-import { visibleSections } from "../../../services/scope";
-import { MONTH_RE } from "../../../utils/monthlyReport";
+import { generateMonth, isClosedMonth, listMonth } from "../../../../services/monthlyReport";
+import { canSeeMonthlyReports } from "../../../../services/roles";
+import { visibleSections } from "../../../../services/scope";
+import { MONTH_RE } from "../../../../utils/monthlyReport";
 
 // Miesięczne podsumowania pracowników.
 //
@@ -49,5 +49,5 @@ export default async (req, res) => {
     });
   }
 
-  return res.status(200).json({ month, people: getMonth(month, sections) });
+  return res.status(200).json({ month, people: listMonth(month, sections) });
 };

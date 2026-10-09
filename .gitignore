@@ -45,3 +45,7 @@ yarn-error.log*
 
 # ręcznie prowadzone salda nadgodzin — dane kadrowe, nie do repozytorium
 /nadgodziny.md
+
+# Raporty HR prawdziwych pracowników — wzór do pracy nad /zadania/podsumowanie,
+# nie część aplikacji.
+/przykladowe_raport/

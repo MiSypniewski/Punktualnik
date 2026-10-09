@@ -1709,62 +1709,125 @@ limitu wierszy, więc oba formaty zapisuje STRUMIENIOWO.
 
 ## Podsumowania miesięczne — `/zadania/podsumowanie`
 
-Miesiąc każdego pracownika z osobna, wyłącznie dla kierownika i w jego sekcjach
-(`canSeeMonthlyReports` + `services/scope.js`). Pozycja „Podsumowania” stoi na
-końcu grupy „Zespół” — to ekran otwierany raz w miesiącu.
+Raport miesiąca dla każdego pracownika z osobna, wyłącznie dla kierownika i w jego
+sekcjach (`canSeeMonthlyReports` + `services/scope.js`). Pozycja „Podsumowania”
+stoi na końcu grupy „Zespół” — to ekran otwierany raz w miesiącu.
 
-Jedyne miejsce, w którym spotykają się trzy moduły: karty czasu (był w pracy),
-nieobecności (miał prawo nie być) i zadania (co zaraportował). Jak przy kolumnie
-„Pokrycie” w raporcie zadań — to wskazówka dla kierownika, nie podstawa rozliczeń.
+Dwa ekrany:
+
+- **lista zbiorcza** (`/zadania/podsumowanie`) — tabela na sekcję, wiersz na osobę,
+  wybór miesiąca i przycisk przeliczenia; nazwisko otwiera raport;
+- **raport pracownika** (`/zadania/podsumowanie/[id]?miesiac=RRRR-MM`) — następca
+  raportów HR składanych dotąd ręcznie z Clockify. Ma własny układ do wydruku
+  („Drukuj / PDF” — nawigacja i formularz oceny znikają).
+
+Jedyne miejsce, w którym spotykają się cztery źródła: karty czasu, nieobecności,
+wnioski o nadgodziny i wpisy zadań. To wskazówka dla kierownika, nie podstawa
+rozliczeń.
 
 ### Migawka, nie widok na żywo
 
 Raport jest zapisany w tabeli `MonthlyReports` (wiersz na osobę i miesiąc, metryki
-w kolumnie `payload` jako JSON). Zapisuje go zadanie `raport-miesieczny`
-(`services/monthlyReportJob.js`) na wspólnym budziku — **1. dnia miesiąca o 3:00**,
-za miesiąc poprzedni, po nocnym domknięciu kart. Przestój jest nadrabiany, a przy
-pierwszym uruchomieniu na danej bazie raport powstaje od razu (nic nie wysyła,
-więc wdrożenie nie ma czego się bać).
+w kolumnie `payload` jako JSON, pole `v` to wersja kształtu). Zapisuje go zadanie
+`raport-miesieczny` (`services/monthlyReportJob.js`) na wspólnym budziku —
+**1. dnia miesiąca o 3:00**, za miesiąc poprzedni, po nocnym domknięciu kart.
+Przestój jest nadrabiany, a przy pierwszym uruchomieniu na danej bazie raport
+powstaje od razu (nic nie wysyła, więc wdrożenie nie ma czego się bać).
 
 Dane wsteczne są zmienne — kierownik poprawia karty bez limitu daty, L4 wpisuje
-się po fakcie — dlatego migawkę da się **przeliczyć** przyciskiem na ekranie.
+się po fakcie — dlatego migawkę da się **przeliczyć** przyciskiem na liście.
 Przeliczenie obejmuje zawsze całe sekcje kierownika (jedna osoba zmienia średnią
 zespołu) i zostawia podpis: kiedy i kto. Tym samym przyciskiem generuje się
 miesiąc sprzed wdrożenia. Bieżącego, niezamkniętego miesiąca wygenerować się nie da.
 
+Wykresy „na tle poprzednich miesięcy” czytają do sześciu ostatnich migawek tej
+samej osoby — miesiąc, którego nikt nie wygenerował, po prostu się na nich nie pojawi.
+
 ### Co znaczą liczby
 
 Rachunek siedzi w `utils/monthlyReport.js` (bez bazy), zapytania
-w `services/monthlyReport.js`.
+w `services/monthlyReport.js` — siedem zapytań na cały miesiąc, nie na osobę.
 
 | Liczba | Definicja |
 |---|---|
 | Dni robocze | poniedziałek–piątek bez świąt (`services/workingDays.js`), jednakowo dla wszystkich |
-| Dni przepracowane | dni robocze z odbitą kartą czasu |
-| Nieobecności | dni robocze **bez karty** objęte zatwierdzonym wnioskiem, z podziałem na rodzaje |
-| Dni bez ewidencji | dni robocze bez karty i bez zatwierdzonej nieobecności |
+| Dni przepracowane | dni robocze z odbitą kartą czasu **albo** z zaraportowanym zadaniem |
+| Nieobecności | dni robocze bez pracy objęte zatwierdzonym wnioskiem, z podziałem na rodzaje; także dzień wolny odebrany z nadgodzin |
+| Dni bez ewidencji | dni robocze bez karty, bez wpisów i bez nieobecności |
 | Frekwencja | przepracowane / (robocze − nieobecności) — urlop jej nie obniża |
+| Łączne godziny | cały zaraportowany czas miesiąca, z weekendami |
 | Średnia dzienna | czas zaraportowany w dni robocze / dni przepracowane |
-| Średnia zespołu | suma czasu sekcji / suma przepracowanych dni sekcji (ważona; pracownik jest w niej wliczony) |
-| Projekty | udział w całym zaraportowanym czasie miesiąca; pięć największych, reszta jako „pozostałe” |
+| Średnia zespołu | suma czasu sekcji / suma przepracowanych dni sekcji (ważona; tylko osoby, które zadania raportują) |
+| Czas prywatny | udział projektu „Prywacizna” w łącznych godzinach |
+| Pokrycie obecności | zaraportowany czas / czas obecności wg kart |
+| Nadgodziny | suma zatwierdzonych wniosków z miesiąca, bez rozliczeń dni (niżej) |
 
-Każdy dzień roboczy trafia do dokładnie jednej szufladki: przepracowany,
-nieobecność albo bez ewidencji. **Karta wygrywa z wnioskiem** — kto przyszedł
-mimo zatwierdzonego urlopu, był w pracy.
+Rzeczy, które wyszły dopiero na danych produkcyjnych i są w rachunku celowo:
 
-Czas zaraportowany w weekend albo święto jest pokazany osobno i **nie wchodzi do
-średniej**: godziny trafiłyby do licznika, a dnia w mianowniku by nie było.
+- **Dzień przepracowany to karta ALBO zadanie.** Dyrekcja kart nie odbija, a zadania
+  raportuje — według samych kart miałaby zero dni pracy. Rozjazd obu źródeł raport
+  pokazuje osobno („karta bez zadań”, „zadania bez karty”).
+- **Praca wygrywa z wnioskiem** — kto pracował w dniu zatwierdzonego urlopu, ma
+  dzień przepracowany, a raport to odnotowuje.
+- **Kto zadań nie raportuje wcale, nie ma średniej** (zamiast „0 h”) i nie ściąga
+  w dół średniej zespołu.
+- **Weekendy i święta nie wchodzą do średniej**: godziny trafiłyby do licznika,
+  a dnia w mianowniku by nie było.
+- **Wniosek nadgodzinowy od 8 h wzwyż to rozliczenie dnia, nie nadgodziny**
+  (`OVERTIME_BOOKKEEPING_MIN`): bilans otwarcia, urlop wymieniony na nadgodziny,
+  dzień wolny odebrany z nadgodzin. Jest na liście, podpisany, ale poza sumą
+  miesiąca; ujemny (wcześniejsze wyjście na cały dzień) liczy się dodatkowo jako
+  nieobecność „odbiór nadgodzin”. To próg, nie pewność — prawdziwe 8 h nadgodzin
+  jednego dnia też tu wpadnie.
+- **Miesiąc startu modułu zadań** (sierpień 2026, wpisy od 17.) liczy średnią
+  i pokrycie tylko z dni, w których moduł już działał.
+- **Czas prywatny rozpoznaje projekt po nazwie** (`PRIVATE_PROJECT`). Zmiana nazwy
+  projektu „Prywacizna” wyzeruje wskaźnik w nowych raportach.
 
 „Zespół” to sekcja pracownika z chwili generowania (`Users.section`), nie z dnia
 wpisu. W raporcie jest każdy czynny pracownik oraz każdy były, który zostawił
 w tym miesiącu kartę albo wpis; konta kiosku nie ma.
 
+### Ocena i obserwacje
+
+**Obserwacje** powstają automatycznie (`observe` w `utils/monthlyScore.js`) —
+każda reguła to jedno zdanie z konkretną liczbą, w trzech tonach: mocna strona,
+do odnotowania, do wyjaśnienia. Nikt ich nie pisze, więc nie mogą rozjechać się
+z danymi.
+
+**Ocena ogólna X/10** łączy rachunek z osądem, tym samym wzorem co raporty ręczne:
+
+| Składowa | Waga | Skąd |
+|---|---|---|
+| Kompetencje techniczne | 30% | kierownik |
+| Regularność | 25% | średnia dzienna: ≥8 h → 10; ≥7,5 → 8,5; ≥7 → 7,5; ≥6,5 → 6; ≥6 → 5; niżej 3 |
+| Dokumentacja | 15% | kierownik |
+| Dyscyplina | 20% | czas prywatny: <2% → 10; <5% → 7,5; <10% → 5; wyżej 4 |
+| Inicjatywa / rozwój | 10% | kierownik |
+
+Trzy podoceny, uzasadnienie i rekomendacje wpisuje kierownik w formularzu na dole
+raportu; trafiają do osobnej tabeli `MonthlyReviews`, więc przeliczenie migawki ich
+nie kasuje. **Bez podocen ocena nie powstaje** — raport pokazuje wtedy „do
+uzupełnienia”, a lista „do oceny”. Formularz podpowiada liczby z ostatniej
+wcześniejszej oceny tej osoby (tekstu nie przenosi). Gwiazdki w tabeli miesięcy
+wynikają z samej średniej dziennej i kierownika nie potrzebują.
+
+### Wykresy
+
+`components/charts.js` — słupki, linie i pierścień bez biblioteki (bloki HTML
+i odrobina SVG), z dymkiem po najechaniu. Barwy serii to zmienne `--viz-1…8`
+w `styles/globals.css`, osobne dla motywu jasnego i ciemnego, przydzielane po
+kolei: kolejność dobrano tak, żeby sąsiednie barwy dało się odróżnić także przy
+zaburzeniach widzenia barw. Barwa idzie za projektem przez cały raport; ósmy
+i dalsze projekty zlewają się w „pozostałe”. Paleta projektów
+(`components/projectColors.js`) tu nie pasuje — ma siedem kluczy na dwadzieścia
+kilka projektów.
+
 ### Czego ten raport nie wie
 
 Aplikacja nie ma grafiku, wymiaru etatu ani daty zatrudnienia. U osoby na część
 etatu albo przyjętej w trakcie miesiąca „dni bez ewidencji” są zawyżone,
-a frekwencja zaniżona. Nie ma też oceny punktowej ani komentarza — same liczby,
-ocena zostaje u przełożonego.
+a frekwencja zaniżona.
 
 ## Formaty plików w eksportach
 

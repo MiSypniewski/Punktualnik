@@ -1,30 +1,29 @@
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
-import BaseLayout from "../../components/baseLayout";
-import { projectColor, ProjectMark } from "../../components/projectColors";
-import Button, { IconButton } from "../../components/ui/button";
-import { Input } from "../../components/ui/field";
-import Plate, { PlateHeader } from "../../components/ui/plate";
-import Alert from "../../components/ui/alert";
-import Stat from "../../components/ui/stat";
-import PageHeader from "../../components/ui/pageHeader";
-import EmptyState from "../../components/ui/emptyState";
-import { ChevronLeftIcon, ChevronRightIcon } from "../../components/ui/icons";
-import { getMonth, lastClosedMonth } from "../../services/monthlyReport";
-import { listSections } from "../../services/sections";
-import { canSeeMonthlyReports } from "../../services/roles";
-import { visibleSections } from "../../services/scope";
-import { absenceKindShort } from "../../services/absenceKinds";
-import { formatMinutes, jsonFetcher } from "../../utils";
-import { MONTH_RE } from "../../utils/monthlyReport";
+import BaseLayout from "../../../components/baseLayout";
+import Button, { IconButton } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/field";
+import Plate, { PlateHeader } from "../../../components/ui/plate";
+import Alert from "../../../components/ui/alert";
+import Badge from "../../../components/ui/badge";
+import PageHeader from "../../../components/ui/pageHeader";
+import EmptyState from "../../../components/ui/emptyState";
+import { TableWrap, Table, Th, Td, Tr, Num } from "../../../components/ui/table";
+import { ChevronLeftIcon, ChevronRightIcon } from "../../../components/ui/icons";
+import { lastClosedMonth, listMonth } from "../../../services/monthlyReport";
+import { listSections } from "../../../services/sections";
+import { canSeeMonthlyReports } from "../../../services/roles";
+import { visibleSections } from "../../../services/scope";
+import { formatMinutes, jsonFetcher } from "../../../utils";
+import { MONTH_RE } from "../../../utils/monthlyReport";
+import { attendanceTone, averageTone, privateTone } from "../../../utils/monthlyScore";
 
 dayjs.locale("pl");
-
-const NO_PROJECT = "(bez projektu)";
 
 const apiKey = (month) => `/api/report/miesieczny?miesiac=${month}`;
 
@@ -51,108 +50,72 @@ export async function getServerSideProps(ctx) {
       month,
       lastClosed,
       labels,
-      initial: { month, people: getMonth(month, visibleSections(token)) },
+      initial: { month, people: listMonth(month, visibleSections(token)) },
     },
   };
 }
 
-// Średnie pokazujemy w minutach, nie w sekundach: to iloraz z całego miesiąca
-// i "6h 41min 07s" udawałoby dokładność, której ta liczba nie ma.
+// Średnie i sumy pokazujemy w minutach, nie w sekundach: to wielkości z całego
+// miesiąca i "6h 41min 07s" udawałoby dokładność, której ta liczba nie ma.
 const hm = (seconds, opts) => formatMinutes(Math.round((seconds || 0) / 60), opts);
-
-const absenceHint = (byKind) =>
-  Object.entries(byKind)
-    .map(([kind, days]) => `${absenceKindShort(kind)} ${days}`)
-    .join(" · ");
-
-const projectLabel = (p) => (p.id === "rest" ? `pozostałe (${p.rest})` : p.name || NO_PROJECT);
-
-const Projects = ({ projects }) => {
-  if (projects.length === 0) {
-    return <p className="text-sm text-muted">Brak zaraportowanego czasu w tym miesiącu.</p>;
-  }
-
-  return (
-    <ul className="space-y-1.5">
-      {projects.map((p) => (
-        <li key={String(p.id)} className="grid grid-cols-[minmax(0,1fr)_5.5rem_2.5rem] sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_5.5rem_2.5rem] items-center gap-x-3 text-sm">
-          <span className="flex items-center gap-2 min-w-0">
-            <ProjectMark color={p.id === "rest" ? "slate" : p.color} />
-            <span className="truncate">{projectLabel(p)}</span>
-          </span>
-          {/* Pasek proporcjonalny do UDZIAŁU, nie do największego projektu —
-              długość ma się zgadzać z procentem stojącym obok. */}
-          <span className="hidden sm:block bg-raised rounded h-2 overflow-hidden">
-            <span
-              className={`block h-2 ${p.id === "rest" ? "bg-line-strong" : projectColor(p.color).bar}`}
-              style={{ width: `${Math.max(2, p.share ?? 0)}%` }}
-            />
-          </span>
-          <span className="font-mono tabular-nums text-right whitespace-nowrap">{hm(p.seconds)}</span>
-          <span className="font-mono tabular-nums text-right text-xs text-muted">{p.share ?? 0}%</span>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const Person = ({ person }) => {
-  const { team } = person;
-  const hasAvg = person.avgDailySeconds !== null;
-  const diff = hasAvg && team.avgDailySeconds !== null ? person.avgDailySeconds - team.avgDailySeconds : null;
-
-  const avgHint = [
-    team.avgDailySeconds !== null && `zespół ${hm(team.avgDailySeconds)}`,
-    diff !== null && `różnica ${hm(diff, { withSign: true })}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <section className="px-3 py-4 border-b border-line-subtle last:border-b-0">
-      <h3 className="font-semibold">
-        {person.surname} {person.name}
-      </h3>
-
-      <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <Stat
-          label="Dni przepracowane"
-          value={`${person.workedDays} / ${person.workingDays}`}
-          hint={person.attendance !== null ? `frekwencja ${person.attendance}%` : undefined}
-        />
-        <Stat
-          label="Nieobecności"
-          value={person.absenceDays}
-          hint={person.absenceDays > 0 ? absenceHint(person.absenceByKind) : "brak zatwierdzonych"}
-        />
-        <Stat
-          label="Dni bez ewidencji"
-          value={person.gapDays}
-          tone={person.gapDays > 0 ? "signal" : "default"}
-          hint="bez karty i bez nieobecności"
-        />
-        <Stat label="Średnia dzienna" value={hasAvg ? hm(person.avgDailySeconds) : "—"} hint={avgHint || undefined} />
-      </div>
-
-      <div className="mt-3">
-        <Projects projects={person.projects} />
-      </div>
-
-      {person.off.days > 0 && (
-        <p className="mt-2 text-xs text-muted">
-          Poza dniami roboczymi: {hm(person.off.seconds)} w {person.off.days}{" "}
-          {person.off.days === 1 ? "dniu" : "dniach"} — poza średnią dzienną.
-        </p>
-      )}
-    </section>
-  );
-};
+const pct = (value) => `${String(value).replace(".", ",")}%`;
 
 const signature = (people) => {
   // Sekcje kierownika powstają razem, ale przeliczyć mógł je każdy z osobna —
   // podpis bierzemy z najświeższego wiersza sekcji.
   const latest = people.reduce((a, b) => (b.generatedAt > a.generatedAt ? b : a));
   return `${latest.generatedAt.slice(0, 16)} · ${latest.generatedByName || "automat"}`;
+};
+
+const Row = ({ person, href }) => {
+  const diff =
+    person.avgDailySeconds !== null && person.team.avgDailySeconds !== null
+      ? person.avgDailySeconds - person.team.avgDailySeconds
+      : null;
+
+  return (
+    <Tr>
+      <Td className="pl-3 whitespace-nowrap">
+        <Link href={href}>
+          <a className="font-semibold underline decoration-line-strong underline-offset-2 hover:decoration-body">
+            {person.surname} {person.name}
+          </a>
+        </Link>
+      </Td>
+      <Num>
+        {person.workedDays} / {person.workingDays}
+      </Num>
+      <Td className="text-right">
+        {person.attendance !== null ? <Badge tone={attendanceTone(person.attendance)}>{person.attendance}%</Badge> : "—"}
+      </Td>
+      <Num>{person.absenceDays || "—"}</Num>
+      <Num className={person.gapDays > 0 ? "text-danger-strong font-medium" : undefined}>{person.gapDays || "—"}</Num>
+      <Num>{person.totalSeconds > 0 ? hm(person.totalSeconds) : "—"}</Num>
+      <Td className="text-right">
+        {person.avgDailySeconds !== null ? (
+          <Badge tone={averageTone(person.avgDailySeconds)} className="font-mono normal-case tracking-normal">
+            {hm(person.avgDailySeconds)}
+          </Badge>
+        ) : (
+          "—"
+        )}
+      </Td>
+      <Num className="text-muted">{diff !== null ? hm(diff, { withSign: true }) : "—"}</Num>
+      <Td className="text-right">
+        {person.totalSeconds > 0 ? <Badge tone={privateTone(person.privateShare)}>{pct(person.privateShare)}</Badge> : "—"}
+      </Td>
+      <Num>{person.overtime.net ? formatMinutes(person.overtime.net, { withSign: true }) : "—"}</Num>
+      <Td className="pr-3 text-right whitespace-nowrap">
+        {person.score !== null ? (
+          <span className="font-mono tabular-nums font-medium">{person.score.toFixed(1).replace(".", ",")} / 10</span>
+        ) : (
+          <Link href={`${href}#ocena`}>
+            <a className="text-xs text-muted underline underline-offset-2">do oceny</a>
+          </Link>
+        )}
+      </Td>
+    </Tr>
+  );
 };
 
 export default function MonthlySummary({ month, lastClosed, labels, initial }) {
@@ -193,12 +156,16 @@ export default function MonthlySummary({ month, lastClosed, labels, initial }) {
   };
 
   const sections = [...new Set(people.map((p) => p.section))];
+  const reportHref = (person) => ({
+    pathname: "/zadania/podsumowanie/[id]",
+    query: { id: person.userID, ...(month !== lastClosed && { miesiac: month }) },
+  });
 
   return (
     <BaseLayout width="wide">
       <PageHeader
         title="Podsumowania miesięczne"
-        description="Miesiąc każdego pracownika z osobna: obecność z kart czasu, zatwierdzone nieobecności i zaraportowany czas. Zapisywane automatycznie 1. dnia miesiąca."
+        description="Raport miesiąca dla każdego pracownika: obecność z kart czasu, nieobecności, zaraportowany czas i projekty. Zapisywany automatycznie 1. dnia miesiąca — nazwisko otwiera pełny raport."
         actions={
           <Button variant="secondary" onClick={recalc} disabled={busy}>
             {busy ? "Przeliczanie…" : people.length ? "Przelicz ponownie" : "Wygeneruj"}
@@ -250,9 +217,32 @@ export default function MonthlySummary({ month, lastClosed, labels, initial }) {
                     </span>
                   </p>
                 </PlateHeader>
-                {members.map((person) => (
-                  <Person key={person.userID} person={person} />
-                ))}
+                <TableWrap>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <Th className="pl-3">Pracownik</Th>
+                        <Th align="right">Dni</Th>
+                        <Th align="right">Frekwencja</Th>
+                        <Th align="right">Nieob.</Th>
+                        <Th align="right">Bez ewid.</Th>
+                        <Th align="right">Godziny</Th>
+                        <Th align="right">Śr. / dzień</Th>
+                        <Th align="right">Do zespołu</Th>
+                        <Th align="right">Prywatne</Th>
+                        <Th align="right">Nadgodz.</Th>
+                        <Th align="right" className="pr-3">
+                          Ocena
+                        </Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((person) => (
+                        <Row key={person.userID} person={person} href={reportHref(person)} />
+                      ))}
+                    </tbody>
+                  </Table>
+                </TableWrap>
               </Plate>
             );
           })}
