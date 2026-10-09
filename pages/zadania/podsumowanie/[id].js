@@ -187,8 +187,8 @@ const ScoreCard = ({ score, review }) => {
   }
 
   return (
-    <div className="mt-4 p-4 flex flex-wrap items-center gap-x-6 gap-y-3 break-inside-avoid rounded bg-accent text-accent-ink dark:bg-black dark:text-white dark:ring-1 dark:ring-line-strong">
-      <div className="w-24 h-24 rounded-full border-2 border-accent-ink/40 dark:border-white/40 flex flex-col items-center justify-center shrink-0">
+    <div className="mt-4 p-4 flex flex-wrap items-center gap-x-6 gap-y-3 break-inside-avoid rounded bg-surface text-body ring-1 ring-line shadow-plate dark:bg-black dark:text-white dark:ring-line-strong">
+      <div className="w-24 h-24 rounded-full border-2 border-body/40 dark:border-white/40 flex flex-col items-center justify-center shrink-0">
         <span className="font-mono text-3xl font-semibold leading-none">{num(score.score)}</span>
         <span className="mt-1 text-xs opacity-80">/ 10</span>
       </div>
