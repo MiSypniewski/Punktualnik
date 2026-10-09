@@ -528,7 +528,8 @@ Osobny moduł rozliczania nadgodzin, niezależny od kart czasu pracy (tabela `Ti
   (dodają do salda) oraz *wcześniejsze wyjście* (odejmuje).
 - `/nadgodziny/zarzadzaj` — wyłącznie rola `manager`: wnioski do rozpatrzenia
   (zatwierdź / odrzuć wraz z notatką), salda wszystkich aktywnych pracowników
-  i historia z filtrami (pracownik, status, zakres dat).
+  i historia z filtrami (pracownik, status, zakres dat). W pasku stacyjnym to
+  zakładka **Nadgodziny** pozycji „Wnioski” — drugą jest panel urlopów.
 
 Zasady:
 
@@ -791,10 +792,12 @@ pozostało), formularz wniosku i historia z możliwością anulowania, dopóki w
 czeka na decyzję.
 
 **Kierownik** ma dwa ekrany, oba z własną pozycją w pasku stacyjnym.
-`/urlopy/zarzadzaj` to **obieg wniosków**: wnioski do rozpatrzenia, wpisywanie
-nieobecności za pracownika, przydzielanie dni i historia z filtrami.
-`/urlopy/stan` to **dzień zespołu** (niżej). Oba widzą wyłącznie swoje sekcje
-(`ManagerSections`, jak przy nadgodzinach).
+`/urlopy/zarzadzaj` to **obieg wniosków** (w pasku: „Wnioski”, zakładka
+**Urlopy**): na wierzchu wnioski do rozpatrzenia i historia z filtrami, a dwa
+rzadziej używane formularze — wpis nieobecności za pracownika i przydział dni
+z puli — rozwijają się przyciskami w nagłówku strony.
+`/urlopy/stan` to **dzień zespołu** (w pasku: „Dziś”, niżej). Oba widzą
+wyłącznie swoje sekcje (`ManagerSections`, jak przy nadgodzinach).
 
 **Zatwierdzony urlop da się cofnąć** — i to jest najczęstszy przypadek użycia:
 pracownik rezygnuje, a sam już nic nie zrobi, bo anulowanie działa tylko na
@@ -804,7 +807,7 @@ Konsekwencje odkręcają się same: dni wracają do puli, kafelek nieobecności 
 z kiosku i sprzed nazwiska w „Teraz w toku”, a ten sam termin da się zgłosić
 ponownie (kontrola nakładania patrzy tylko na *Oczekuje* i *Zatwierdzony*).
 
-### Aktualny stan — dzień zespołu
+### Dzień zespołu
 
 `/urlopy/stan`, wyłącznie `manager`. Jedyny ekran, który zestawia **trzy osie
 ewidencji naraz**: karty czasu (`Times` — kto był i o której), nieobecności
@@ -1186,7 +1189,7 @@ kafelek uciekałby spod palca w chwili dotknięcia.
 
 **Licznik odlicza do planowanego wyjścia, nie do sztywnej ósemki.** Zatwierdzone
 na dziś *zostaję dłużej* i *wcześniejsze wyjście* przesuwają cel tym samym
-wzorem co na [dniu zespołu](#aktualny-stan--dzień-zespołu):
+wzorem co na [dniu zespołu](#dzień-zespołu):
 `wejście + 8 h + zostaję dłużej − wcześniejsze wyjście`. Wniosek oczekujący
 i *praca poza godzinami* nic nie zmieniają. Przy zgodzie podpis mówi
 „Do wyjścia · wcześniej o 2h 0min” (albo „dłużej o …”), żeby dwa kafelki
@@ -1239,7 +1242,7 @@ zawsze zwraca komplet, także gdy widok przyciął listę do 500 pozycji.
 
 - Nie ZAPISUJE nic do tabeli `Times` ani do eksportu kart czasu — urlop nie
   tworzy wpisu obecności. Czyta ją natomiast
-  [Aktualny stan](#aktualny-stan--dzień-zespołu), żeby postawić nieobecność
+  [Dzień zespołu](#dzień-zespołu), żeby postawić nieobecność
   obok godzin.
 - Nie zna grafiku pracy: planowane wyjście na tamtym ekranie jest wyliczane
   z odbicia karty, a nie odczytane z harmonogramu.
@@ -1959,7 +1962,7 @@ Nowy ekran składa się z `components/ui/`, nie z klas pisanych na miejscu:
 | kafla z liczbą | `Stat` |
 | `<h1>` z opisem strony | `PageHeader` |
 | „brak danych” | `EmptyState` |
-| podzakładek w module (dwie strony jednego obiegu) | `TabNav`; listę pozycji trzyma jeden plik per moduł. Dziś nie używa go żaden moduł — z Nieobecności pasek zdjęto z obu ekranów (`/urlopy/stan` i `/urlopy/zarzadzaj`), bo oba mają własne pozycje w pasku stacyjnym |
+| podzakładek pod jedną pozycją paska (dwie strony jednej pracy) | `TabNav`, opcjonalnie z licznikiem (`count`); listę pozycji trzyma jeden plik. Używa go `components/requestTabs.js` — zakładki **Urlopy \| Nadgodziny** pozycji „Wnioski” |
 | emoji jako ikony | `components/ui/icons.js` |
 
 Powłokę daje `BaseLayout` (strażnik sesji) → `AppShell` (pasek, kontener, stopka).
@@ -1976,12 +1979,29 @@ widoczny rozjazd krawędzi. Panel kierownika, choćby z szeroką tabelą, bierze
 Pozycje menu buduje `navItems` w `components/stationRail.js` — widoczność idzie
 przez predykaty z `services/roles.js`, a nie przez ręczne porównania ról. Pełny
 pasek pokazuje się od **1280 px**; niżej pozycje chowają się pod przycisk menu,
-bo przy ośmiu pozycjach kierownika nie mieszczą się obok zegara i konta. Dodając
-kolejną pozycję sprawdź pasek na 1280 px — to tam kończy się miejsce. Po dojściu
-„Aktualnego stanu” (wrzesień 2026) kierownik ma tam **siedem pozycji
-pierwszoplanowych** i mieszczą się bez przewijania, ale zapasu już nie ma:
-następny ekran modułu powinien wejść jako PODZAKŁADKA (`TabNav`), nie jako
-kolejna pozycja paska.
+bo nie mieszczą się obok zegara i konta. Dodając kolejną pozycję sprawdź pasek
+na 1280 px — to tam kończy się miejsce.
+
+Kierownik widzi pasek w **dwóch podpisanych grupach** (od października 2026):
+
+| Grupa | W pasku | Pod przyciskiem menu |
+| --- | --- | --- |
+| **Moje** — własny czas i własne wnioski | Zadania, Nadgodziny, Urlopy | Moja sekcja, Filtr GAM |
+| **Zespół** — cudze dane i decyzje | Dziś, Wnioski, Raport zadań | Projekty, Karty czasu |
+
+Wcześniej wszystko stało w jednym rzędzie na przemian, a wnioski pracowników
+miały dwie pozycje o mylących nazwach: „Wnioski” (tylko nadgodziny)
+i „Nieobecności” (wnioski urlopowe). Teraz jest **jedna pozycja „Wnioski”**
+z zakładkami Urlopy | Nadgodziny i **licznikiem** wniosków czekających na
+decyzję. Licznik czyta `/api/pending` (`services/pendingCounts.js`, dwa `COUNT`
+po indeksie statusu) co minutę, wyłącznie u kierownika; po każdej decyzji
+strona unieważnia go przez `mutate(PENDING_KEY)` — klucz i interwał siedzą
+w `utils/live.js`. Pracownik i kiosk nie mają pozycji zespołowych, więc
+podpisy grup się u nich nie pokazują i nie pytają o licznik.
+
+Sześć pozycji pierwszoplanowych mieści się z zapasem, ale następny ekran
+istniejącego modułu powinien wejść jako PODZAKŁADKA (`TabNav`), nie jako kolejna
+pozycja paska.
 
 Uwaga na `@tailwindcss/forms`: plugin twardo maluje pola na biało selektorami
 atrybutowymi (`[type='text']`), które wygrywają specyficznością z gołym `input`.

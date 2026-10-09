@@ -1,9 +1,11 @@
 import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
+import { mutate } from "swr";
 import classNames from "classnames";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
+import RequestTabs from "../../components/requestTabs";
 import AbsenceBadge from "../../components/absenceBadge";
 import { Input, Select, Textarea } from "../../components/ui/field";
 import Button, { IconButton } from "../../components/ui/button";
@@ -16,6 +18,7 @@ import UserOptions from "../../components/ui/userOptions";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../components/ui/table";
 import { TrashIcon } from "../../components/ui/icons";
 import { formatDateRange, formatDateTime } from "../../utils";
+import { PENDING_KEY } from "../../utils/live";
 import { getAbsences, ABSENCE_LIST_LIMIT } from "../../services/getAbsences";
 import { getLeaveBalances } from "../../services/leaveBalance";
 import getAllUsers from "../../services/getAllUsers";
@@ -100,7 +103,25 @@ export default function Nieobecnosci({
   sections,
 }) {
   const router = useRouter();
-  const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
+  // Propsy strony odświeża router, a licznik wniosków (pasek stacyjny,
+  // zakładki) mutate — on żyje w SWR, nie w propsach, i bez tego stałby na
+  // starej liczbie do końca cyklu odpytywania.
+  const refresh = () =>
+    Promise.all([router.replace(router.asPath, undefined, { scroll: false }), mutate(PENDING_KEY)]);
+
+  // Który z dwóch rzadkich paneli jest rozwinięty: "wpis" | "pula" | null.
+  //
+  // Do października 2026 oba formularze stały na stałe między listą wniosków
+  // a historią, więc kierownik przewijał przez wpis za pracownika i tabelę puli
+  // za każdym razem, gdy chciał sprawdzić, co stało się z czyimś wnioskiem.
+  // Używa się ich raz na jakiś czas (L4, przydział na nowy rok), więc czekają
+  // pod przyciskami w nagłówku.
+  //
+  // Start od `?year=` w adresie: zmiana roku puli to nawigacja z tym
+  // parametrem, a po odświeżeniu strony panel, w którym właśnie wybrano rok,
+  // nie może zniknąć.
+  const [panel, setPanel] = useState(router.query.year ? "pula" : null);
+  const togglePanel = (name) => setPanel((prev) => (prev === name ? null : name));
 
   const [note, setNote] = useState({}); // id wniosku → notatka do decyzji
 
@@ -207,13 +228,35 @@ export default function Nieobecnosci({
     <BaseLayout width="wide">
       <section>
         <PageHeader
-          title="Nieobecności"
+          title="Wnioski urlopowe"
           description={
             sections.length
               ? `Obsługiwane sekcje: ${sections.join(", ")}`
               : "Brak przypisanych sekcji"
           }
+          actions={
+            <>
+              <Button
+                variant="secondary"
+                aria-expanded={panel === "wpis"}
+                aria-controls="panel-wpis"
+                onClick={() => togglePanel("wpis")}
+              >
+                Wpisz nieobecność
+              </Button>
+              <Button
+                variant="secondary"
+                aria-expanded={panel === "pula"}
+                aria-controls="panel-pula"
+                onClick={() => togglePanel("pula")}
+              >
+                Pula dni
+              </Button>
+            </>
+          }
         />
+
+        <RequestTabs />
 
         {sections.length === 0 && (
           <Alert tone="warn" className="mb-6">
@@ -227,6 +270,26 @@ export default function Nieobecnosci({
             {err}
           </Alert>
         )}
+
+        {/* PANELE Z NAGŁÓWKA — wpis za pracownika i pula dni. Stoją NAD listą
+            wniosków, tuż pod przyciskiem, który je rozwinął: panel otwarty
+            pod historią byłby poza ekranem i kliknięcie wyglądałoby na puste. */}
+        <div id="panel-wpis" hidden={panel !== "wpis"}>
+          {panel === "wpis" && <ManualAbsence users={users} busy={busy} call={call} err={err} />}
+        </div>
+        <div id="panel-pula" hidden={panel !== "pula"}>
+          {panel === "pula" && (
+            <Allowances
+              balances={balances}
+              users={users}
+              year={balanceYear}
+              currentYear={currentYear}
+              busy={busy}
+              call={call}
+              onYear={(y) => router.push(`/urlopy/zarzadzaj?year=${y}`)}
+            />
+          )}
+        </div>
 
         {/* 1. DO ROZPATRZENIA ------------------------------------------------ */}
         <h2 className="mb-3 text-sm font-bold uppercase tracking-signage">
@@ -322,21 +385,7 @@ export default function Nieobecnosci({
           </div>
         )}
 
-        {/* 2. WPIS ZA PRACOWNIKA --------------------------------------------- */}
-        <ManualAbsence users={users} busy={busy} call={call} err={err} />
-
-        {/* 3. PULA DNI -------------------------------------------------------- */}
-        <Allowances
-          balances={balances}
-          users={users}
-          year={balanceYear}
-          currentYear={currentYear}
-          busy={busy}
-          call={call}
-          onYear={(y) => router.push(`/urlopy/zarzadzaj?year=${y}`)}
-        />
-
-        {/* 4. HISTORIA -------------------------------------------------------- */}
+        {/* 2. HISTORIA -------------------------------------------------------- */}
         <h2 className="mb-3 text-sm font-bold uppercase tracking-signage">Historia</h2>
 
         <form onSubmit={applyFilters} className="mb-4 flex flex-wrap gap-2 items-end">

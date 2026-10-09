@@ -1,8 +1,10 @@
 import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
+import { mutate } from "swr";
 import classNames from "classnames";
 import BaseLayout from "../../components/baseLayout";
+import RequestTabs from "../../components/requestTabs";
 import OvertimeBadge from "../../components/overtimeBadge";
 import Button, { IconButton } from "../../components/ui/button";
 import { Input, Select } from "../../components/ui/field";
@@ -27,6 +29,7 @@ import {
 import { canApproveOvertime } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
 import { formatMinutes, formatDateTime } from "../../utils";
+import { PENDING_KEY } from "../../utils/live";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -99,6 +102,12 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
     setTo(filters.to);
   }, [filters.userID, filters.status, filters.from, filters.to]);
 
+  // Odświeżenie po każdej akcji: propsy strony przez router, a licznik wniosków
+  // (pasek stacyjny, zakładki) przez mutate — on żyje w SWR, nie w propsach,
+  // i bez tego stałby na starej liczbie do końca cyklu odpytywania.
+  const refresh = () =>
+    Promise.all([router.replace(router.asPath, undefined, { scroll: false }), mutate(PENDING_KEY)]);
+
   const decide = async (id, action) => {
     setBusy(true);
     setErr("");
@@ -116,7 +125,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
             : "Nie udało się zapisać decyzji."
         );
       }
-      await router.replace(router.asPath, undefined, { scroll: false });
+      await refresh();
     } finally {
       setBusy(false);
     }
@@ -158,7 +167,7 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
       } else {
         setRevoking(null);
       }
-      await router.replace(router.asPath, undefined, { scroll: false });
+      await refresh();
     } finally {
       setBusy(false);
     }
@@ -196,7 +205,9 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
     });
 
   return (
-    <BaseLayout>
+    // "wide", jak sąsiednia zakładka (/urlopy/zarzadzaj): przy dwóch różnych
+    // szerokościach przełączenie zakładki przesuwałoby cały układ.
+    <BaseLayout width="wide">
       <section>
         <PageHeader
           title="Wnioski o nadgodziny"
@@ -204,6 +215,8 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
             sections.length > 0 ? `Obsługiwane sekcje: ${sections.join(", ")}` : "Brak przypisanych sekcji"
           }
         />
+
+        <RequestTabs />
 
         {sections.length === 0 && (
           <Alert tone="warn" className="mb-6">

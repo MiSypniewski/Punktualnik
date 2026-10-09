@@ -35,6 +35,22 @@ export const LIVE_POLL_MS = 45_000;
 export const TIMER_POLL_MS = 60_000;
 
 /**
+ * Co ile kierownik odpytuje liczbę wniosków czekających na decyzję
+ * (/api/pending) i pod jakim kluczem SWR.
+ *
+ * Klucz jest stałą, bo czytają go dwa miejsca naraz — pasek stacyjny
+ * (components/stationRail.js) i zakładki paneli wniosków
+ * (components/requestTabs.js) — a po każdej decyzji trzy inne go unieważniają.
+ * Literówka w jednym z nich dałaby drugie zapytanie na cykl albo licznik,
+ * który po zatwierdzeniu wniosku stoi jeszcze minutę.
+ *
+ * Minuta, nie mniej: wniosek nie jest stanem "na żywo", a każde zapytanie do
+ * SQLite blokuje pętlę zdarzeń (patrz LIVE_POLL_MS wyżej).
+ */
+export const PENDING_KEY = "/api/pending";
+export const PENDING_POLL_MS = 60_000;
+
+/**
  * Fetcher dla SWR, który traktuje odpowiedź 4xx/5xx jako BŁĄD.
  *
  * Świadomie nie używamy jsonFetcher z utils/index.js — tamten nie sprawdza
