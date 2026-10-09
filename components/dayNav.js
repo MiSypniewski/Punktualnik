@@ -7,7 +7,7 @@ import { ChevronLeftIcon, ChevronRightIcon, IconButton, Input } from "./ui";
 
 dayjs.locale("pl");
 
-// Wybór dnia dla ekranu "Aktualny stan": strzałki, trzy skróty i pole daty.
+// Wybór dnia dla ekranu "Dzień zespołu" (/urlopy/stan): strzałki, trzy skróty i pole daty.
 //
 // Dzień żyje w ADRESIE (?dzien=RRRR-MM-DD), nie w stanie komponentu — ten sam
 // wzorzec, co filtry w panelu wniosków i w raporcie zadań. Dzięki temu widok da
@@ -15,7 +15,7 @@ dayjs.locale("pl");
 // przyciskiem przeglądarki, a getServerSideProps ma z czego policzyć dane.
 //
 // Dziś zdejmuje parametr z adresu, zamiast wpisywać w niego dzisiejszą datę.
-// Inaczej link wysłany komuś jutro pokazywałby wczoraj — a "Aktualny stan"
+// Inaczej link wysłany komuś jutro pokazywałby wczoraj — a "Dzień zespołu"
 // ma domyślnie znaczyć "teraz".
 
 const OPTIONS = [

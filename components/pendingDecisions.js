@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { mutate } from "swr";
 import Link from "next/link";
 import classNames from "classnames";
 import { ABSENCE_KINDS, absenceKindLabel } from "../services/absenceKinds";
 import { kindLabel as overtimeKindLabel, kindSign } from "../services/overtimeKinds";
 import { Alert, Button, EmptyState, Plate, PlateHeader } from "./ui";
 import { formatDateRange, formatMinutes } from "../utils";
+import { PENDING_KEY } from "../utils/live";
 
 // Wnioski czekające na decyzję — urlopowe i nadgodzinowe w jednej liście.
 //
@@ -187,7 +189,11 @@ const PendingDecisions = ({ absences = [], overtime = [], leaveLeft = {}, onDeci
       // Jedno żądanie wystarcza: /api/absences/board zwraca CAŁY stan ekranu —
       // wiersze, kafle, wnioski i saldo puli — a zatwierdzony urlop na dziś
       // zmienia nie tylko tę listę, ale i stan pracownika w tabeli.
-      if (onDecided) await onDecided();
+      //
+      // Drugie mutate jest dla licznika przy pozycji "Wnioski" w pasku
+      // stacyjnym: ma własny klucz i własny cykl, więc bez tego pokazywałby
+      // starą liczbę jeszcze przez minutę.
+      await Promise.all([onDecided ? onDecided() : null, mutate(PENDING_KEY)]);
     } finally {
       setBusy(false);
     }

@@ -190,7 +190,7 @@ const readDay = (sections, day) => {
 };
 
 /**
- * Komplet danych ekranu "Aktualny stan".
+ * Komplet danych ekranu "Dzień zespołu" (/urlopy/stan).
  *
  * @param {{day: string, sections: string[]}} args
  *   `day` — doba robocza 'YYYY-MM-DD' (walidację robi wołający);

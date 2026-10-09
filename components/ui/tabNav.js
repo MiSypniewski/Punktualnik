@@ -2,13 +2,11 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import classNames from "classnames";
 
-// Podzakładki wewnątrz modułu — pierwszy taki element w aplikacji.
+// Podzakładki wewnątrz jednej pozycji paska stacyjnego.
 //
-// Do tej pory każdy ekran był osobną pozycją w pasku stacyjnym i to działało,
-// dopóki moduł miał jeden ekran dla kierownika. Nieobecności mają dwa: dzień
-// zespołu (/urlopy/stan) i obieg wniosków z historią (/urlopy/zarzadzaj).
-// Bez tego paska kierownik wracałby między nimi przez pasek stacyjny, w którym
-// obie pozycje stoją daleko od siebie i nic nie mówi, że to jeden moduł.
+// Używa ich pozycja „Wnioski” (components/requestTabs.js): panel wniosków
+// urlopowych i panel nadgodzin to dwie strony, ale jedna praca kierownika,
+// więc w pasku stoją pod jedną etykietą, a przechodzi się między nimi tutaj.
 //
 // <Link>, a nie <button> z router.push: to nawigacja między STRONAMI, więc
 // środkowy przycisk myszy ma otwierać nową kartę, a czytnik ekranu ma czytać
@@ -22,7 +20,9 @@ const tabClass = (active) =>
   );
 
 /**
- * @param {{href: string, label: string}[]} items
+ * @param {{href: string, label: string, count?: number}[]} items
+ *   `count` — liczba przy etykiecie (np. wnioski do rozpatrzenia); zero i brak
+ *   wartości nie pokazują niczego
  * @param {string} [label] etykieta nawigacji dla czytników ekranu
  */
 const TabNav = ({ items, label = "Podstrony modułu", className }) => {
@@ -45,6 +45,7 @@ const TabNav = ({ items, label = "Podstrony modułu", className }) => {
           <Link key={item.href} href={item.href}>
             <a aria-current={active ? "page" : undefined} className={tabClass(active)}>
               {item.label}
+              {item.count > 0 && <span className="ml-1.5 font-mono tabular-nums">({item.count})</span>}
             </a>
           </Link>
         );

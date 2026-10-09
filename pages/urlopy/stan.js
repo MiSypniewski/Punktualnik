@@ -346,13 +346,15 @@ export default function AktualnyStan({ initial, day, sections, currentUserID }) 
     // stacyjnego i stopki — te stoją w max-w-wide.
     <BaseLayout width="wide">
       <PageHeader
-        title="Aktualny stan"
-        description="Dzień zespołu: obecność z kart czasu, nieobecności i zgody na zmianę godzin — w jednym miejscu."
+        title="Dzień zespołu"
+        description="Obecność z kart czasu, nieobecności i zgody na zmianę godzin — w jednym miejscu."
       />
 
-      {/* Bez paska podzakładek. Do obiegu wniosków prowadzi pozycja
-          „Nieobecności” w pasku stacyjnym, a ten ekran jest oglądany codziennie
-          rano i ma zaczynać się od dnia zespołu, nie od wyboru, gdzie pójść. */}
+      {/* Bez paska podzakładek. Do obiegu wniosków prowadzi pozycja „Wnioski”
+          w pasku stacyjnym, a ten ekran (w pasku: „Dziś”) jest oglądany
+          codziennie rano i ma zaczynać się od dnia zespołu, nie od wyboru,
+          gdzie pójść. Tytuł to „Dzień zespołu”, nie „Dziś”: datę da się tu
+          zmienić, więc „Dziś” nad wczorajszym dniem byłoby nieprawdą. */}
 
       {sections.length === 0 && (
         <Alert tone="warn" className="mb-6">
