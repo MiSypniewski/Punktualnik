@@ -266,14 +266,17 @@ export const buildPersonReport = ({
   const ends = [...cardByDay.entries()].filter(([day, c]) => working.has(day) && c.endMin !== null && !c.autoClosed);
 
   return {
-    v: 2,
+    v: 3,
     workingDays: working.size,
     workedDays,
     absenceDays,
     absenceByKind,
     gapDays,
-    // Urlop nie obniża frekwencji: mianownikiem są dni, w które pracownik MIAŁ być.
-    attendance: ratio(workedDays, working.size - absenceDays),
+    // Frekwencja to obecność: każda nieobecność, także usprawiedliwiona (urlop,
+    // L4), ją obniża. Do v2 mianownikiem były robocze bez nieobecności — wtedy
+    // wskaźnik powtarzał tylko „dni bez ewidencji”, a osoba na L4 miała 100%.
+    // Luki w ewidencji pokazuje gapDays.
+    attendance: ratio(workedDays, working.size),
     reportedSeconds,
     totalSeconds,
     // Średniej nie ma bez przepracowanego dnia i bez JAKIEGOKOLWIEK wpisu: kto
@@ -338,7 +341,7 @@ export const teamStats = (reports) => {
     people: reports.length,
     reporting: reporting.length,
     avgDailySeconds: days > 0 ? Math.round(sum(reporting, (r) => r.reportedSeconds) / days) : null,
-    attendance: ratio(sum(reports, (r) => r.workedDays), sum(reports, (r) => r.workingDays - r.absenceDays)),
+    attendance: ratio(sum(reports, (r) => r.workedDays), sum(reports, (r) => r.workingDays)),
     privateShare: share1(sum(reports, (r) => r.privateSeconds), sum(reports, (r) => r.totalSeconds)),
     coverage: ratio(sum(covered, (r) => r.reportedSeconds), sum(covered, (r) => r.measuredPresent)),
   };
