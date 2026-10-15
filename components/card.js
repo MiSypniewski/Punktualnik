@@ -316,6 +316,12 @@ const Card = ({ data, onSaved }) => {
   // Przy zgodzie licznik mówi "do wyjścia" i od razu czemu nie do ósemki —
   // inaczej kolega obok, z tą samą godziną wejścia i innym licznikiem, wyglądałby
   // na błąd tablicy.
+  // Godzina wyjścia pod "od". Na karcie otwartej — planowana, ta sama, do
+  // której tyka licznik (i ta sama, którą pokazuje /urlopy/stan). Na zamkniętej
+  // — faktyczna. Przy domkniętej automatycznie żadna: endTime jest tam
+  // zgadnięte ("wejście + 8 h"), a kafelek nie może udawać, że ktoś wyszedł.
+  const exitStamp = status === "finishWork" ? (autoClosed ? null : endTime) : punched ? target : null;
+
   const shiftNote = shiftMin < 0 ? `wcześniej o ${formatMinutes(-shiftMin)}` : `dłużej o ${formatMinutes(shiftMin)}`;
   const caption =
     stateKey === "absence"
@@ -361,7 +367,10 @@ const Card = ({ data, onSaved }) => {
             </span>
           )}
           {punched && (
-            <span className="font-mono text-xs tabular-nums opacity-80">od {dayjs(startTime).format("HH:mm")}</span>
+            <span className="flex flex-col items-end font-mono text-xs tabular-nums opacity-80">
+              <span>od {dayjs(startTime).format("HH:mm")}</span>
+              {exitStamp && <span>do {dayjs(exitStamp).format("HH:mm")}</span>}
+            </span>
           )}
         </span>
       </div>
