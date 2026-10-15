@@ -155,8 +155,14 @@ const resolveOpenSpan = (day, body) => {
   return { startTime, endTime, totalWorkTime: measure(startTime, endTime).totalWorkTime, overTime: false };
 };
 
-/** Godziny i status karty — otwartej (tylko dziś) albo zamkniętej. */
-const resolveCard = (day, data, { start, end, open }) => {
+/**
+ * Godziny i status karty — otwartej (tylko dziś) albo zamkniętej.
+ *
+ * Eksportowane dla services/cardCorrections.js: zgłoszenie pracownika
+ * sprawdzamy już przy składaniu TĄ SAMĄ regułą, którą potem przejdzie zapis
+ * — inaczej kierownik dostawałby wnioski, których nie da się zatwierdzić.
+ */
+export const resolveCard = (day, data, { start, end, open }) => {
   if (!open) return { ...resolveSpan(day, { start, end }), status: "finishWork" };
 
   if (data !== todayStamp()) {

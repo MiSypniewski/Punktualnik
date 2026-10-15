@@ -56,6 +56,24 @@ export const WORKDAY_HOURS = 8;
 export const plannedExit = (startTime, shiftMin = 0) =>
   dayjs(startTime).add(WORKDAY_HOURS, "hour").add(Number(shiftMin) || 0, "minute");
 
+/**
+ * Górna długość powodu w zgłoszeniu korekty karty. W utils/, nie w
+ * services/cardCorrections.js — z tego samego powodu co TASK_QUERY_MAX:
+ * potrzebuje jej formularz w przeglądarce, a import z services/ wciągnąłby
+ * do bundla klienta better-sqlite3.
+ */
+export const CORRECTION_REASON_MAX = 300;
+
+/**
+ * Godziny karty w jednej linii: "07:00 – 15:10", "07:00 – w toku" albo
+ * "brak karty". Wspólne dla zgłoszeń korekty (services/cardCorrections.js):
+ * formularz pracownika, panel kierownika i maile mówią jednym językiem.
+ */
+export const formatCardSpan = (startHm, endHm, open) => {
+  if (!startHm) return "brak karty";
+  return `${startHm} – ${open || !endHm ? "w toku" : endHm}`;
+};
+
 export const DifferenceTime = (start, stop) => {
   const workTime = dayjs(stop).diff(dayjs(start), "hours");
   const tmp = dayjs.duration(dayjs(stop).diff(dayjs(start)));

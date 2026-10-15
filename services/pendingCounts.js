@@ -1,6 +1,7 @@
 import db from "./db";
 
-// Ile wniosków czeka na decyzję kierownika — urlopowych i nadgodzinowych.
+// Ile wniosków czeka na decyzję kierownika — urlopowych, nadgodzinowych
+// i zgłoszeń korekty karty.
 //
 // Osobny serwis, a nie getAbsences({ status: "pending" }).length: tę liczbę
 // pasek stacyjny odpytuje CYKLICZNIE z każdej strony, więc ma kosztować jeden
@@ -26,22 +27,30 @@ const statements = (count) => {
            JOIN Users u ON u.id = t.userID
           WHERE t.status = 'pending' AND ${sectionsCondition(count)}`
       );
-    cache.set(count, { absences: count_("Absences"), overtime: count_("Overtime") });
+    cache.set(count, {
+      absences: count_("Absences"),
+      overtime: count_("Overtime"),
+      corrections: count_("CardCorrections"),
+    });
   }
   return cache.get(count);
 };
 
 /**
  * @param {string[]} sections sekcje w zasięgu kierownika; pusta lista = nikt
- * @returns {{absences: number, overtime: number}}
+ * @returns {{absences: number, overtime: number, corrections: number}}
  */
 export const getPendingCounts = (sections) => {
-  if (!Array.isArray(sections) || sections.length === 0) return { absences: 0, overtime: 0 };
+  if (!Array.isArray(sections) || sections.length === 0) return { absences: 0, overtime: 0, corrections: 0 };
 
   const params = Object.fromEntries(sections.map((s, i) => [`sec${i}`, s]));
   const stmt = statements(sections.length);
 
-  return { absences: stmt.absences.get(params).n, overtime: stmt.overtime.get(params).n };
+  return {
+    absences: stmt.absences.get(params).n,
+    overtime: stmt.overtime.get(params).n,
+    corrections: stmt.corrections.get(params).n,
+  };
 };
 
 export default getPendingCounts;

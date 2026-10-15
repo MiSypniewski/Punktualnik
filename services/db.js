@@ -717,6 +717,39 @@ const createDb = () => {
       PRIMARY KEY (month, userID)
     );
 
+    -- Zgłoszenia korekty DZISIEJSZEJ karty przez pracownika (services/cardCorrections.js).
+    --
+    -- Zgłoszenie nie wskazuje wiersza Times, tylko dzień (data = ta sama kotwica
+    -- co Times.data). Kartę rozstrzyga się dopiero przy zatwierdzeniu: między
+    -- zgłoszeniem a decyzją pracownik mógł odbić się na kiosku, a kierownik coś
+    -- poprawić — wskaźnik na konkretny wiersz albo na jego brak by się zestarzał.
+    --
+    -- startHm/endHm to godziny ścienne "HH:MM" w kształcie, jaki przyjmuje panel
+    -- korekty (services/manageTime.js). endHm NULL i open = 1 to "praca trwa".
+    -- before* to migawka karty z chwili zgłoszenia — wyłącznie do pokazania
+    -- kierownikowi, co pracownik chciał zmienić. NULL = karty nie było.
+    CREATE TABLE IF NOT EXISTS CardCorrections (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      userID        INTEGER NOT NULL,
+      data          TEXT    NOT NULL,
+      startHm       TEXT    NOT NULL,
+      endHm         TEXT,
+      open          INTEGER NOT NULL DEFAULT 0,
+      reason        TEXT    NOT NULL,
+      beforeStart   TEXT,
+      beforeEnd     TEXT,
+      beforeStatus  TEXT,
+      status        TEXT    NOT NULL DEFAULT 'pending',
+      createdAt     TEXT    NOT NULL,
+      decidedAt     TEXT,
+      decidedBy     INTEGER,
+      decidedByName TEXT,
+      decisionNote  TEXT,
+      FOREIGN KEY (userID) REFERENCES Users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_corrections_user   ON CardCorrections(userID, data);
+    CREATE INDEX IF NOT EXISTS idx_corrections_status ON CardCorrections(status);
+
     CREATE INDEX IF NOT EXISTS idx_times_user_data    ON Times(userID, data);
     CREATE INDEX IF NOT EXISTS idx_times_section_data ON Times(section, data);
 
