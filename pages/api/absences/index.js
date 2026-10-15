@@ -10,7 +10,7 @@ import { visibleSections, canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyNewAbsenceRequest } from "../../../services/notifyGChat";
 import { notifyAbsencePending, notifyAbsenceRecorded } from "../../../services/notifyMail";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -146,8 +146,8 @@ export default async (req, res) => {
       logApiError("api/absences", error, 422, { userID: token.userID });
       return res.status(422).json({
         status: "not_created",
-        error: error.code ?? "invalid",
-        message: error.message,
+        error: publicError(error).code ?? "invalid",
+        message: publicError(error).message,
       });
     }
   }

@@ -4,7 +4,7 @@ import { canApproveLeave } from "../../../services/roles";
 import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyAllowanceAdded } from "../../../services/notifyMail";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Przydzielanie dni urlopu. Wyłącznie kierownik i wyłącznie własnym
 // pracownikom — nikt nie dopisuje dni sam sobie.
@@ -69,6 +69,6 @@ export default async (req, res) => {
     return res.status(201).json({ status: "created", allowance });
   } catch (error) {
     logApiError("api/absences/allowance", error, 422, { userID: token.userID });
-    return res.status(422).json({ status: "not_created", error: "invalid", message: error.message });
+    return res.status(422).json({ status: "not_created", error: "invalid", message: publicError(error).message });
   }
 };

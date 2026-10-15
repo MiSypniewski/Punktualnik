@@ -2,6 +2,7 @@ import { getActiveToken } from "../../services/session";
 import db from "../../services/db";
 import { maxEventLoopLag } from "../../services/runtime";
 import { loginLimiterStats } from "../../services/loginRateLimit";
+import { canSeeHealth } from "../../services/roles";
 
 // Stan procesu — do zajrzenia, gdy ktoś zgłasza, że "aplikacja muli".
 //
@@ -23,6 +24,9 @@ export default async (req, res) => {
   const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
+  }
+  if (!canSeeHealth(token.role)) {
+    return res.status(403).json({ error: "permission_denied" });
   }
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");

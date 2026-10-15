@@ -6,7 +6,7 @@ import { canEditTimes } from "../../../../services/roles";
 import { visibleSections, canSeeUser, noteSelfDecision } from "../../../../services/scope";
 import getUserData from "../../../../services/getUserData";
 import { notifyCardChanged } from "../../../../services/notifyMail";
-import { logApiError } from "../../../../services/log";
+import { logApiError, publicError } from "../../../../services/log";
 
 // Panel korekty kart czasu: lista (GET) i dopisanie brakującej karty (POST).
 //
@@ -86,6 +86,6 @@ export default async (req, res) => {
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;
     logApiError("api/time/manage", error, status, { userID, day, by: token.userID });
-    return res.status(status).json({ error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

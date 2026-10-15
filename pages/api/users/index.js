@@ -1,7 +1,7 @@
 import { getActiveToken } from "../../../services/session";
 import createUser from "../../../services/createUser";
 import updateUserPassword from "../../../services/updateUserPassowrd";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Obie metody wymagają zalogowania. Wcześniej sprawdzenie sesji było
 // zakomentowane, czyli endpoint stał otworem dla całego internetu:
@@ -39,7 +39,7 @@ export default async (req, res) => {
         return res.status(200).json({ status: "created", user });
       } catch (error) {
         logApiError("api/users", error, 422, { op: "create" });
-        return res.status(422).json({ status: "not_created", error: error.message });
+        return res.status(422).json({ status: "not_created", error: publicError(error).message });
       }
     }
     case "PUT": {
@@ -54,7 +54,7 @@ export default async (req, res) => {
         return res.status(200).json({ status: "update", user });
       } catch (error) {
         logApiError("api/users", error, 422, { op: "passwd", userID: token.userID });
-        return res.status(422).json({ status: "not_update", error: error.message });
+        return res.status(422).json({ status: "not_update", error: publicError(error).message });
       }
     }
     default: {

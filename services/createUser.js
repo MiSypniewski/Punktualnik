@@ -4,11 +4,14 @@ import { getSection } from "./sections";
 import { makePasswordRecord } from "./password";
 
 const schema = Joi.object({
-  email: Joi.string().email().required(),
-  name: Joi.string().required(),
-  surname: Joi.string().required(),
-  section: Joi.string().required(),
-  location: Joi.string().required(),
+  // Górne limity długości: bez nich POST /api/users przyjmował pola dowolnej
+  // długości (do 1 MB ciała żądania), a te trafiają potem do każdej listy,
+  // maila i eksportu.
+  email: Joi.string().email().max(254).required(),
+  name: Joi.string().max(100).required(),
+  surname: Joi.string().max(100).required(),
+  section: Joi.string().max(40).required(),
+  location: Joi.string().max(100).required(),
   // Do sierpnia 2026 nie było tu ŻADNEGO minimum — przechodziło hasło "1".
   // Żaden algorytm hashujący tego nie naprawi, więc długość jest tu ważniejsza
   // niż liczba iteracji PBKDF2. Bez wymogów na klasy znaków: przy wymuszonej

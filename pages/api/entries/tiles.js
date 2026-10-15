@@ -2,7 +2,7 @@ import { getActiveToken } from "../../../services/session";
 import { saveTilePrefs } from "../../../services/resumeTiles";
 import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks } from "../../../services/roles";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Ustawienia kafelków "Wznów": ile ich pokazywać i co jest przypięte na stałe.
 //
@@ -74,6 +74,6 @@ export default async (req, res) => {
     logApiError("api/entries/tiles", error, 422, { userID: token.userID });
     return res
       .status(422)
-      .json({ status: "not_saved", error: error.code || "invalid", message: error.message });
+      .json({ status: "not_saved", error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

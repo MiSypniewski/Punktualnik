@@ -9,7 +9,7 @@ import { canEditTimes } from "../../../services/roles";
 import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyCorrectionDecided } from "../../../services/notifyMail";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Decyzja o zgłoszeniu korekty karty. Kolejność sprawdzeń jak w
 // pages/api/overtime/[id].js: token → akcja → (anulowanie pracownika) → rola
@@ -83,6 +83,6 @@ export default async (req, res) => {
   } catch (error) {
     const status = CORRECTION_STATUS_FOR[error.code] ?? 422;
     logApiError("api/corrections/[id]", error, status, { correctionID: Number(id), by: token.userID });
-    return res.status(status).json({ error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

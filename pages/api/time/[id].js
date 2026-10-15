@@ -8,7 +8,7 @@ import {
   updateCardFromKiosk,
   STATUS_FOR,
 } from "../../../services/punchCard";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Karty czasu z kiosku: odczyt karty pracownika (GET), odbicie wejścia (POST)
 // i kolejne dotknięcia kafelka (PUT).
@@ -74,7 +74,7 @@ export default async (req, res) => {
           param: req.query.id,
           by: token.userID,
         });
-        return res.status(status).json({ error: error.code || "invalid", message: error.message });
+        return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
       }
     }
 

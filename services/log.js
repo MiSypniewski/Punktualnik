@@ -69,6 +69,23 @@ export const logApiError = (scope, err, status, extra) => {
   }
 };
 
+/**
+ * Wyjątek w postaci, którą wolno pokazać klientowi.
+ *
+ * Bloki catch odsyłają `error.message`, bo przewidziane odmowy niosą tam kod
+ * albo zdanie dla człowieka ("email_taken", "Konto pracownika jest nieaktywne").
+ * Ta sama ścieżka odsyłała jednak treść awarii, której nikt nie przewidział,
+ * np. "SQLITE_CONSTRAINT: UNIQUE constraint failed: Users.email" albo
+ * TypeError z nazwą zmiennej. To kawałki schematu bazy i kodu, które nie
+ * powinny trafiać do przeglądarki. Szczegóły i tak idą do logu (logApiError).
+ */
+const INTERNAL_ERRORS = new Set(["SqliteError", "TypeError", "RangeError", "ReferenceError", "SyntaxError"]);
+
+export const publicError = (err) =>
+  INTERNAL_ERRORS.has(err?.name) || INTERNAL_ERRORS.has(err?.constructor?.name)
+    ? { code: "server_error", message: "Błąd serwera. Spróbuj ponownie za chwilę." }
+    : err;
+
 /** Zdarzenie informacyjne — używać oszczędnie, dysk Mikrusa ma 10 GB. */
 export const logInfo = (scope, message, extra) => {
   const tail = meta(extra);

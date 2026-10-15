@@ -3,7 +3,7 @@ import { getCard, correctCard, deleteCard, STATUS_FOR } from "../../../../servic
 import { canEditTimes } from "../../../../services/roles";
 import { canSeeSection, noteSelfDecision } from "../../../../services/scope";
 import { notifyCardChanged } from "../../../../services/notifyMail";
-import { logApiError } from "../../../../services/log";
+import { logApiError, publicError } from "../../../../services/log";
 
 // Korekta (PUT) i usunięcie (DELETE) pojedynczej karty czasu. `id` to Times.id.
 //
@@ -83,6 +83,6 @@ export default async (req, res) => {
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;
     logApiError("api/time/manage/[id]", error, status, { cardID: Number(id), by: token.userID });
-    return res.status(status).json({ error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

@@ -82,5 +82,10 @@ export const boundByEditWindow = (role) => !canSeeTeamTasks(role);
 // zasad w jednym z modułów kazałaby zgadywać, którego z nich dotyczy.
 export const canApproveLeave = (role) => role === "manager";
 
+// Stan procesu (/api/health): pamięć, opóźnienie pętli zdarzeń, liczniki
+// limitera logowania. Nie zawiera danych osobowych, ale opisuje instalację,
+// więc nie jest dla kiosku ani dla każdego pracownika.
+export const canSeeHealth = (role) => role === "manager";
+
 // Kto może zobaczyć cudze salda urlopowe i eksport nieobecności.
 export const canExportLeave = (role) => role === "manager";
