@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { getProject, updateProject, setProjectActive, projectScope } from "../../../services/projects";
 import { canManageProjects } from "../../../services/roles";
 import { logApiError } from "../../../services/log";
@@ -9,7 +9,7 @@ const ALLOWED_ACTIONS = ["update", "archive", "restore"];
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }

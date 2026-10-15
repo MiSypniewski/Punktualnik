@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import db from "../../services/db";
 import { maxEventLoopLag } from "../../services/runtime";
 import { loginLimiterStats } from "../../services/loginRateLimit";
@@ -20,7 +20,7 @@ const countRunning = db.prepare(`SELECT COUNT(*) AS n FROM TaskEntries WHERE end
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }

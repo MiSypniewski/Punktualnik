@@ -6,7 +6,8 @@
 //            widzi salda wszystkich pracowników. Ma też dostęp do eksportu.
 //
 // Rolę nadaje się z linii poleceń: npm run admin -- role <email|id> manager
-// Uwaga: rola siedzi w tokenie JWT, więc po zmianie trzeba się przelogować.
+// Rola jest czytana z bazy przy każdym żądaniu (services/session.js), więc
+// zmiana działa od razu, bez przelogowania.
 
 export const ROLES = ["user", "editor", "manager"];
 

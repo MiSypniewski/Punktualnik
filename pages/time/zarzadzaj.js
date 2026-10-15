@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
@@ -57,7 +57,7 @@ const listKey = ({ from, to, userID }) => {
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
 
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };

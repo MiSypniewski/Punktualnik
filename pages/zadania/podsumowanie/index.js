@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
@@ -28,7 +28,7 @@ dayjs.locale("pl");
 const apiKey = (month) => `/api/report/miesieczny?miesiac=${month}`;
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
 
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };

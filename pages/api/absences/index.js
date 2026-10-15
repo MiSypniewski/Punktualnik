@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import dayjs from "dayjs";
 import createAbsence from "../../../services/createAbsence";
 import { getAbsences } from "../../../services/getAbsences";
@@ -16,7 +16,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }

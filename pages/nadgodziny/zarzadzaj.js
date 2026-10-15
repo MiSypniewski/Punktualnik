@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import { mutate } from "swr";
 import classNames from "classnames";
 import BaseLayout from "../../components/baseLayout";
@@ -36,7 +36,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Dwuwarstwowe zabezpieczenie, tak jak przy eksporcie CSV: tu blokujemy wejście
 // na stronę, a /api/overtime niezależnie blokuje same dane i decyzje.
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
 
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };

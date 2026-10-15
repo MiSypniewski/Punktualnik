@@ -15,6 +15,7 @@
  *   node scripts/admin.js section    <email|id> <slugSekcji>
  *   node scripts/admin.js sections   <email|id> [sekcja1,sekcja2]
  *   node scripts/admin.js passwd     <email|id> <noweHaslo>
+ *   node scripts/admin.js logout     <email|id>
  *   node scripts/admin.js passwd-audit
  *   node scripts/admin.js user-delete <email|id> [--force | --scal-z <email|id>]
  *   node scripts/admin.js section-list [--all]
@@ -107,6 +108,16 @@ const ensurePasswordParams = () => {
   if (!columns.includes("passwordParams")) {
     db.exec(`ALTER TABLE Users ADD COLUMN passwordParams TEXT NOT NULL DEFAULT '${PW.LEGACY_PARAMS}'`);
     console.log(`Dodano kolumnę Users.passwordParams (domyślnie ${PW.LEGACY_PARAMS}).`);
+  }
+};
+
+// Lustrzane wobec migrateUserSessionVersion w services/db.js — skrypt bywa
+// odpalany na bazie, której aplikacja po wdrożeniu jeszcze nie otwierała.
+const ensureSessionVersion = () => {
+  const columns = db.prepare(`PRAGMA table_info(Users)`).all().map((c) => c.name);
+  if (!columns.includes("sessionVersion")) {
+    db.exec(`ALTER TABLE Users ADD COLUMN sessionVersion INTEGER NOT NULL DEFAULT 0`);
+    console.log("Dodano kolumnę Users.sessionVersion.");
   }
 };
 
@@ -265,6 +276,18 @@ switch (cmd) {
     db.prepare("UPDATE Users SET isActive = 0 WHERE id = ?").run(u.id);
     console.log("Dezaktywowano:");
     console.log(fmt(findUser(String(u.id))));
+    break;
+  }
+
+  // Wylogowanie konta ze wszystkich urządzeń bez zmiany hasła, np. po zgubieniu
+  // telefonu albo przy kiosku, do którego dostał się ktoś postronny.
+  // Dezaktywacja i zmiana roli NIE potrzebują tej komendy: services/session.js
+  // czyta isActive i rolę z bazy przy każdym żądaniu.
+  case "logout": {
+    const u = findUser(selector);
+    ensureSessionVersion();
+    db.prepare("UPDATE Users SET sessionVersion = sessionVersion + 1 WHERE id = ?").run(u.id);
+    console.log(`Wylogowano ze wszystkich urządzeń: #${u.id} <${u.email}>.`);
     break;
   }
 
@@ -431,8 +454,12 @@ switch (cmd) {
     const passwordHash = crypto
       .pbkdf2Sync(extra, passwordSalt, PW.PBKDF2_ITERATIONS, PW.PBKDF2_KEYLEN, PW.PBKDF2_DIGEST)
       .toString("hex");
+    ensureSessionVersion();
+    // sessionVersion + 1 wylogowuje wszystkie urządzenia konta
+    // (services/session.js). Reset hasła przez admina zwykle oznacza, że stare
+    // wyciekło albo zostało zapomniane, a w obu przypadkach stare sesje mają zniknąć.
     db.prepare(
-      "UPDATE Users SET passwordHash = ?, passwordSalt = ?, passwordParams = ? WHERE id = ?"
+      "UPDATE Users SET passwordHash = ?, passwordSalt = ?, passwordParams = ?, sessionVersion = sessionVersion + 1 WHERE id = ?"
     ).run(passwordHash, passwordSalt, PW.CURRENT_PARAMS, u.id);
     console.log(`Zmieniono hasło użytkownika #${u.id} <${u.email}> (${PW.CURRENT_PARAMS}).`);
     break;

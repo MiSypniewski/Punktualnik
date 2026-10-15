@@ -28,8 +28,9 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     // refetchOnWindowFocus={false}: każde przełączenie karty odpytywało
     // /api/auth/session, a ten endpoint przy każdym wywołaniu deszyfruje
     // i ponownie szyfruje token JWE oraz wystawia nowe ciastko. Czysty koszt CPU
-    // bez żadnego zysku — rola i sekcja siedzą w tokenie i tak nie zmienią się
-    // bez przelogowania.
+    // bez żadnego zysku. Uprawnienia i tak sprawdza serwer przy każdym żądaniu,
+    // czytając rolę z bazy (services/session.js), więc odświeżanie sesji
+    // w przeglądarce niczego nie zabezpiecza.
     <SessionProvider session={session} refetchOnWindowFocus={false}>
       <Head>
         <title>Punktualnik</title>

@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import { getPendingCounts } from "../../services/pendingCounts";
 import { canApproveLeave } from "../../services/roles";
 import { visibleSections } from "../../services/scope";
@@ -12,7 +12,7 @@ import { visibleSections } from "../../services/scope";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }

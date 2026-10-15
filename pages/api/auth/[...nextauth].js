@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 // import authorizeUser from "services/users/authorize";
 import authorizeUser from "../../../services/authorizeUser";
+import { loadSessionUser, withCurrentUser } from "../../../services/session";
 // import EmailProvider from "next-auth/providers/email";
 
 export default NextAuth({
@@ -62,9 +63,23 @@ export default NextAuth({
         token.section = user?.section;
         token.location = user?.location;
         token.userID = user?.userID;
+        token.sv = user?.sessionVersion ?? 0;
+        return token;
       }
 
-      return token;
+      // Odświeżenie sesji (/api/auth/session, czyli useSession w przeglądarce).
+      // Bez tego interfejs pokazywałby rolę z dnia logowania, a odnawiane
+      // ciasteczko żyłoby dalej mimo dezaktywacji konta.
+      //
+      // Wyjątek jest tu sposobem na wylogowanie, nie awarią: next-auth 4
+      // (core/routes/session.js) czyści wtedy ciasteczka sesji i zwraca pustą
+      // sesję, więc strona przechodzi do ekranu logowania. API i tak już odmawia
+      // (services/session.js: getActiveToken).
+      const current = loadSessionUser(token);
+      if (!current) {
+        throw new Error("session_revoked");
+      }
+      return withCurrentUser(token, current);
     },
 
     async session({ session, token }) {

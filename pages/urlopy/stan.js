@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import classNames from "classnames";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import BaseLayout from "../../components/baseLayout";
 import DayNav from "../../components/dayNav";
 import DayTimeline from "../../components/dayTimeline";
@@ -62,7 +62,7 @@ const tasksKey = (day) => `/api/entries/day?dzien=${encodeURIComponent(day)}`;
 const SHOW_TASKS_KEY = "punktualnik:stan:zadania";
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
 
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };

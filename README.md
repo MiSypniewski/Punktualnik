@@ -85,7 +85,13 @@ npm run admin -- sections michal@example.pl spedycja,magazyn   # kierownik od ra
 # Nowy kierownik
 npm run admin -- role michal@example.pl manager
 npm run admin -- sections michal@example.pl spedycja,cns
-# ...i powiedz mu, żeby się przelogował
+# rola działa od razu, bez przelogowania (services/session.js)
+
+# Zwolnienie pracownika: od następnego żądania nie ma dostępu
+npm run admin -- deactivate jan@example.pl
+
+# Wylogowanie ze wszystkich urządzeń bez zmiany hasła (zgubiony telefon)
+npm run admin -- logout jan@example.pl
 
 # Likwidacja działu
 npm run admin -- section <email> <inny_slug>   # najpierw przenieś ludzi

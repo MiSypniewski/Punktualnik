@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import classNames from "classnames";
 import BaseLayout from "../../components/baseLayout";
 import { projectColor, ProjectMark, COLOR_KEYS } from "../../components/projectColors";
@@ -16,7 +16,7 @@ import { canManageProjects } from "../../services/roles";
 // Dwuwarstwowe zabezpieczenie, jak przy nadgodzinach i eksporcie: tu blokujemy
 // wejście na stronę, a /api/projects niezależnie blokuje same dane.
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
 
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import dayjs from "dayjs";
 import BaseLayout from "../../components/baseLayout";
 import OvertimeBadge from "../../components/overtimeBadge";
@@ -19,7 +19,7 @@ import { CORRECTION_REASON_MAX, formatCardSpan, formatDate, formatDateTime } fro
 // TEN stan, a nie godziny wpisane z pamięci w próżnię.
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }

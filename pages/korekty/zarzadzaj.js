@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import { mutate } from "swr";
 import Link from "next/link";
 import BaseLayout from "../../components/baseLayout";
@@ -21,7 +21,7 @@ import { PENDING_KEY } from "../../utils/live";
 // robi w Kartach czasu (/time/zarzadzaj), a zgłoszenie odrzuca z notatką.
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }

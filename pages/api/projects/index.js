@@ -1,11 +1,11 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { listProjects, createProject, projectScope } from "../../../services/projects";
 import { canTrackTasks, canManageProjects } from "../../../services/roles";
 import { logApiError } from "../../../services/log";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
