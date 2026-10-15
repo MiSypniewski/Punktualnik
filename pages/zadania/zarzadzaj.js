@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { getToken } from "next-auth/jwt";
 import classNames from "classnames";
@@ -8,7 +8,7 @@ import BaseLayout from "../../components/baseLayout";
 import LiveBoard from "../../components/liveBoard";
 import { projectColor, ProjectMark } from "../../components/projectColors";
 import Button, { IconButton } from "../../components/ui/button";
-import { Input, Select } from "../../components/ui/field";
+import { Input, Select, Checkbox } from "../../components/ui/field";
 import Plate from "../../components/ui/plate";
 import Alert from "../../components/ui/alert";
 import Stat from "../../components/ui/stat";
@@ -19,7 +19,7 @@ import UserOptions from "../../components/ui/userOptions";
 import { TableWrap, Table as UiTable, Th as UiTh, Td as UiTd } from "../../components/ui/table";
 import { PencilIcon, TrashIcon, DownloadIcon } from "../../components/ui/icons";
 import { listProjects, projectScope } from "../../services/projects";
-import { getSummary, getByProject, getByUser, getEntries } from "../../services/entryStats";
+import { getSummary, getByProject, getByProjectUser, getByUser, getEntries } from "../../services/entryStats";
 import { getLiveBoard } from "../../services/liveBoard";
 import { sweepStaleEntries } from "../../services/taskEntries";
 import getAllUsers from "../../services/getAllUsers";
@@ -37,6 +37,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // kierownika jest miejscem, w którym takie wpisy da się posprzątać — poprawka
 // wymusza wybór projektu, bo zamknięty wpis musi go mieć.
 const NO_PROJECT = "(bez projektu)";
+
+// Checkbox "Pokaż osoby w projektach" pamiętany per przeglądarka — ten sam
+// zabieg co "Pokaż zadania na osi" w pages/urlopy/stan.js. Preferencja
+// oglądającego, nie dana do bazy.
+const SHOW_PEOPLE_KEY = "punktualnik:zadania:osoby";
 
 export async function getServerSideProps(ctx) {
   const token = await getToken({ req: ctx.req });
@@ -102,6 +107,10 @@ export async function getServerSideProps(ctx) {
       currentUserID: Number(token.userID),
       summary,
       byProject: getByProject(query),
+      // Liczone zawsze, nie leniwie po zaznaczeniu checkboxa: widok odświeża
+      // propsy przez router.replace po każdej poprawce wpisu, a osobny fetch
+      // by się wtedy nie przeliczył. To jedno GROUP BY po tych samych wierszach.
+      byProjectUser: getByProjectUser(query),
       byUser: getByUser(query),
       // Podsumowanie podane z zewnątrz — getEntries potrzebuje z niego tylko
       // liczby wpisów i bez tego policzyłoby ten sam agregat drugi raz.
@@ -137,6 +146,7 @@ export default function ZarzadzajZadaniami({
   currentUserID,
   summary,
   byProject,
+  byProjectUser,
   byUser,
   detail,
   projects,
@@ -243,6 +253,38 @@ export default function ZarzadzajZadaniami({
   };
 
   const maxSeconds = byProject[0]?.seconds || 1;
+
+  // Start zawsze od "wyłączony", decyzja z localStorage dopiero w useEffect —
+  // render serwera i pierwszy render klienta muszą być identyczne.
+  const [showPeople, setShowPeople] = useState(false);
+  useEffect(() => {
+    try {
+      setShowPeople(localStorage.getItem(SHOW_PEOPLE_KEY) === "1");
+    } catch {
+      // Tryb prywatny albo zablokowane dane witryny — zostaje wyłączony.
+    }
+  }, []);
+  const togglePeople = (event) => {
+    const next = event.target.checked;
+    setShowPeople(next);
+    try {
+      localStorage.setItem(SHOW_PEOPLE_KEY, next ? "1" : "0");
+    } catch {
+      // j.w.
+    }
+  };
+
+  // Osoby pogrupowane pod projekt. Klucz jak klucz wiersza projektu niżej:
+  // zbiorczy "(bez projektu)" ma id = null.
+  const peopleByProject = useMemo(() => {
+    const map = new Map();
+    byProjectUser.forEach((row) => {
+      const key = row.projectID ?? "none";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    });
+    return map;
+  }, [byProjectUser]);
 
   if (sections.length === 0) {
     return (
@@ -384,7 +426,12 @@ export default function ZarzadzajZadaniami({
 
         <QualityBar summary={summary} />
 
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-signage">Wg projektów</h2>
+        <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-signage">Wg projektów</h2>
+          {byProject.length > 0 && (
+            <Checkbox label="Pokaż osoby w projektach" checked={showPeople} onChange={togglePeople} />
+          )}
+        </div>
         {byProject.length === 0 ? (
           <p className="mb-8 text-sm text-muted">Brak wpisów w tym zakresie.</p>
         ) : (
@@ -409,7 +456,8 @@ export default function ZarzadzajZadaniami({
               {byProject.map((p) => (
                 // Wiersz bez id to zbiorczy "(bez projektu)" z LEFT JOIN-a
                 // w services/entryStats.js — klucz Reacta musi go przeżyć.
-                <tr key={p.id ?? "none"} className="border-b border-line-subtle">
+                <Fragment key={p.id ?? "none"}>
+                <tr className="border-b border-line-subtle">
                   <Td>
                     <span className="flex items-center">
                       <ProjectMark color={p.color} className="mr-2" />
@@ -438,6 +486,36 @@ export default function ZarzadzajZadaniami({
                     </span>
                   </Td>
                 </tr>
+                {showPeople &&
+                  (peopleByProject.get(p.id ?? "none") || []).map((o) => (
+                    // Udział osoby liczony względem czasu TEGO projektu, nie
+                    // całego okresu — procenty pod jednym projektem dają ~100%.
+                    <tr key={o.id} className="border-b border-line-subtle text-xs">
+                      <Td className="pl-8">
+                        {o.surname} {o.name}
+                      </Td>
+                      <Td className="text-muted">{o.section}</Td>
+                      <Td />
+                      <Td className="font-mono text-right tabular-nums text-muted">{o.entries}</Td>
+                      <Td className="font-mono text-right tabular-nums whitespace-nowrap">
+                        {formatDuration(o.seconds)}
+                      </Td>
+                      <Td>
+                        <span className="flex items-center gap-2">
+                          <span className="flex-grow bg-raised rounded h-1.5 overflow-hidden">
+                            <span
+                              className={`block h-1.5 opacity-60 ${projectColor(p.color).bar}`}
+                              style={{ width: `${Math.max(2, percent(o.seconds, p.seconds))}%` }}
+                            />
+                          </span>
+                          <span className="font-mono text-xs text-muted tabular-nums w-10 text-right">
+                            {percent(o.seconds, p.seconds)}%
+                          </span>
+                        </span>
+                      </Td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </UiTable>

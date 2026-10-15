@@ -173,6 +173,33 @@ export const getByProject = (filters) => {
   ).all(paramsOf(filters));
 };
 
+/**
+ * Skład osobowy projektów: czas każdej osoby w każdym projekcie, jednym
+ * zapytaniem dla całego widoku zamiast osobnego na projekt.
+ *
+ * Ten sam LEFT JOIN i to samo grupowanie po p.id co w getByProject — wpisy
+ * bez projektu wpadają w grupę z projectID = NULL i trafiają pod zbiorczy
+ * wiersz "(bez projektu)". Te same filtry, więc suma osób w projekcie równa
+ * się czasowi projektu.
+ */
+export const getByProjectUser = (filters) => {
+  if (noScope(filters)) return [];
+
+  return prepared(
+    "projUser",
+    shapeOf(filters),
+    (where) => `
+      SELECT p.id AS projectID, u.id, u.name, u.surname, u.section,
+             SUM(e.seconds) AS seconds,
+             COUNT(*)       AS entries
+        FROM TaskEntries e
+        LEFT JOIN Projects p ON p.id = e.projectID
+        JOIN Users u ON u.id = e.userID${where}
+       GROUP BY p.id, u.id
+       ORDER BY seconds DESC`
+  ).all(paramsOf(filters));
+};
+
 const stmtAttendanceCache = new Map();
 
 /**
