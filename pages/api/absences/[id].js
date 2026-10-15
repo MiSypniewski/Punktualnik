@@ -4,7 +4,7 @@ import cancelAbsence from "../../../services/cancelAbsence";
 import revokeAbsence from "../../../services/revokeAbsence";
 import findAbsence from "../../../services/getAbsenceById";
 import { canApproveLeave } from "../../../services/roles";
-import { canSeeUser } from "../../../services/scope";
+import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyAbsenceApproved, notifyAbsenceRejected } from "../../../services/notifyMail";
 
@@ -85,6 +85,7 @@ export default async (req, res) => {
       return res.status(409).json({ error: "already_revoked" });
     }
 
+    noteSelfDecision(token, target.userID, "absence:revoke", { absenceID: Number(id) });
     return res.status(200).json({ status: "revoked", absence });
   }
 
@@ -110,5 +111,6 @@ export default async (req, res) => {
     notifyAbsenceRejected(absence, author).catch(() => {});
   }
 
+  noteSelfDecision(token, target.userID, `absence:${action}`, { absenceID: Number(id) });
   return res.status(200).json({ status: DECISIONS[action], absence });
 };

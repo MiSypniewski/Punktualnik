@@ -6,7 +6,7 @@ import {
   CORRECTION_STATUS_FOR,
 } from "../../../services/cardCorrections";
 import { canEditTimes } from "../../../services/roles";
-import { canSeeUser } from "../../../services/scope";
+import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyCorrectionDecided } from "../../../services/notifyMail";
 import { logApiError } from "../../../services/log";
@@ -78,6 +78,7 @@ export default async (req, res) => {
 
     notifyCorrectionDecided(result.request, author, result.card).catch(() => {});
 
+    noteSelfDecision(token, target.userID, `correction:${action}`, { correctionID: Number(id) });
     return res.status(200).json({ status: DECISIONS[action], request: result.request, card: result.card });
   } catch (error) {
     const status = CORRECTION_STATUS_FOR[error.code] ?? 422;

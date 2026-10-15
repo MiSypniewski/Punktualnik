@@ -10,6 +10,7 @@ import AbsenceBadge from "../../components/absenceBadge";
 import { Input, Select, Textarea } from "../../components/ui/field";
 import Button, { IconButton } from "../../components/ui/button";
 import Plate from "../../components/ui/plate";
+import Badge from "../../components/ui/badge";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
@@ -493,6 +494,11 @@ export default function Nieobecnosci({
                           {decisionVerb(a.status)}: {a.decidedByName},{" "}
                           {formatDateTime(a.decidedAt)}
                         </span>
+                      )}
+                      {a.decidedBy != null && Number(a.decidedBy) === Number(a.userID) && (
+                        <Badge tone="signal" className="mt-1">
+                          Samozatwierdzone
+                        </Badge>
                       )}
                       {a.decisionNote && <span className="block text-xs italic">„{a.decisionNote}”</span>}
                     </Td>

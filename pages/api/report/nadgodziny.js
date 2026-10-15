@@ -108,6 +108,7 @@ export default async (req, res) => {
     "Zdecydował",
     "Data decyzji",
     "Notatka do decyzji",
+    "Samozatwierdzone",
   ];
 
   const lines = rows.map((r) => [
@@ -123,6 +124,8 @@ export default async (req, res) => {
     r.decidedByName,
     r.decidedAt ? appTime(r.decidedAt, "YYYY-MM-DD HH:mm") : "",
     r.decisionNote,
+    // Kierownik zdecydował o własnym wniosku (services/scope.js: isSelf).
+    r.decidedBy != null && Number(r.decidedBy) === Number(r.userID) ? "tak" : "",
   ]);
 
   const zakres = from || to ? `_${from || "poczatek"}_${to || "dzis"}` : "";

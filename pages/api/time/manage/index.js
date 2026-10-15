@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import getSectionTimes from "../../../../services/getSectionTimes";
 import { createCardForUser, STATUS_FOR } from "../../../../services/manageTime";
 import { canEditTimes } from "../../../../services/roles";
-import { visibleSections, canSeeUser } from "../../../../services/scope";
+import { visibleSections, canSeeUser, noteSelfDecision } from "../../../../services/scope";
 import getUserData from "../../../../services/getUserData";
 import { notifyCardChanged } from "../../../../services/notifyMail";
 import { logApiError } from "../../../../services/log";
@@ -81,6 +81,7 @@ export default async (req, res) => {
     // nie dowie, bo na tablicy kiosku widzi wyłącznie dzisiejszy dzień.
     notifyCardChanged(card, "created", { userID: token.userID, name: token.name }).catch(() => {});
 
+    noteSelfDecision(token, owner.id, "card:create", { day });
     return res.status(200).json({ status: "created", card });
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;

@@ -2,7 +2,7 @@ import { getActiveToken } from "../../../../services/session";
 import { getPersonHistory } from "../../../../services/monthlyReport";
 import { REVIEW_TEXT_MAX, saveReview } from "../../../../services/monthlyReview";
 import { canSeeMonthlyReports } from "../../../../services/roles";
-import { canSeeSection } from "../../../../services/scope";
+import { canSeeSection, noteSelfDecision } from "../../../../services/scope";
 import { MONTH_RE } from "../../../../utils/monthlyReport";
 
 // Ocena miesiąca wpisywana przez kierownika.
@@ -67,5 +67,6 @@ export default async (req, res) => {
     { id: Number(token.userID), name: token.name }
   );
 
+  noteSelfDecision(token, userID, "review:save", { month: miesiac });
   return res.status(200).json({ review });
 };

@@ -1,7 +1,7 @@
 import { getActiveToken } from "../../../../services/session";
 import { getCard, correctCard, deleteCard, STATUS_FOR } from "../../../../services/manageTime";
 import { canEditTimes } from "../../../../services/roles";
-import { canSeeSection } from "../../../../services/scope";
+import { canSeeSection, noteSelfDecision } from "../../../../services/scope";
 import { notifyCardChanged } from "../../../../services/notifyMail";
 import { logApiError } from "../../../../services/log";
 
@@ -48,6 +48,7 @@ export default async (req, res) => {
     // Wiadomość niesie dane wiersza SPRZED skasowania — po DELETE nie ma już
     // czego odczytać, a pracownik ma prawo wiedzieć, jaka dniówka zniknęła.
     if (removed) {
+      noteSelfDecision(token, card.userID, "card:delete", { cardID: Number(id) });
       notifyCardChanged(card, "deleted", actor).catch(() => {});
     }
 
@@ -77,6 +78,7 @@ export default async (req, res) => {
     // zmiana jest tą, o którą pracownik prosił.
     notifyCardChanged(updated, "corrected", actor, card).catch(() => {});
 
+    noteSelfDecision(token, card.userID, "card:correct", { cardID: Number(id) });
     return res.status(200).json({ status: "updated", card: updated });
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;

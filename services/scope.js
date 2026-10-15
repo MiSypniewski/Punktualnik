@@ -1,5 +1,6 @@
 import { getManagerSections } from "./managerSections";
 import { canApproveOvertime, isStaff } from "./roles";
+import { logWarn } from "./log";
 
 // Jedno miejsce odpowiadające na pytanie "czyje dane wolno oglądać temu
 // zalogowanemu". Każda trasa, która pokazuje cudze dane, pyta właśnie tutaj —
@@ -32,4 +33,22 @@ export const canSeeUser = (token, user) => {
   if (!user) return false;
   if (Number(token.userID) === Number(user.id)) return true;
   return canSeeSection(token, user.section);
+};
+
+/** Czy chodzi o konto samego zalogowanego. */
+export const isSelf = (token, userID) => Number(token?.userID) === Number(userID);
+
+/**
+ * Ślad w logu, gdy kierownik decyduje we WŁASNEJ sprawie: zatwierdza swój
+ * urlop, nadgodziny albo korektę, dopisuje sobie dni do puli, poprawia własną
+ * kartę albo wystawia sobie ocenę.
+ *
+ * Celowo bez blokady. canSeeUser przepuszcza własne konto, a kierownik
+ * jedynej osoby w sekcji nie ma komu oddać decyzji. Zamiast zakazu jest ślad:
+ * ten wpis oraz znacznik „Samozatwierdzone” w panelach i eksportach (liczony
+ * z decidedBy === userID, bez osobnej kolumny).
+ */
+export const noteSelfDecision = (token, ownerID, action, extra = {}) => {
+  if (!isSelf(token, ownerID)) return;
+  logWarn("audit", "samozatwierdzenie", { action, userID: Number(token.userID), ...extra });
 };

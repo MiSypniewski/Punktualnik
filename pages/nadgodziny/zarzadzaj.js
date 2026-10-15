@@ -9,6 +9,7 @@ import OvertimeBadge from "../../components/overtimeBadge";
 import Button, { IconButton } from "../../components/ui/button";
 import { Input, Select } from "../../components/ui/field";
 import Plate from "../../components/ui/plate";
+import Badge from "../../components/ui/badge";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
@@ -465,6 +466,11 @@ export default function ZarzadzajNadgodzinami({ pending, balances, history, hist
                           {decisionVerb(r.status)}: {r.decidedByName},{" "}
                           {formatDateTime(r.decidedAt)}
                         </span>
+                      )}
+                      {r.decidedBy != null && Number(r.decidedBy) === Number(r.userID) && (
+                        <Badge tone="signal" className="mt-1">
+                          Samozatwierdzone
+                        </Badge>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}
                     </Td>

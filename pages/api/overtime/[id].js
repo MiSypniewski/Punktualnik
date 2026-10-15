@@ -3,7 +3,7 @@ import decideOvertimeRequest from "../../../services/decideOvertimeRequest";
 import cancelOvertimeRequest from "../../../services/cancelOvertimeRequest";
 import revokeOvertimeRequest from "../../../services/revokeOvertimeRequest";
 import { canApproveOvertime } from "../../../services/roles";
-import { canSeeUser } from "../../../services/scope";
+import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import findOvertimeRequest from "../../../services/getOvertimeRequestById";
 import { notifyOvertimeApproved, notifyOvertimeRejected } from "../../../services/notifyMail";
@@ -88,6 +88,7 @@ export default async (req, res) => {
       return res.status(409).json({ error: "already_revoked" });
     }
 
+    noteSelfDecision(token, target.userID, "overtime:revoke", { overtimeID: Number(id) });
     return res.status(200).json({ status: "revoked", request });
   }
 
@@ -112,5 +113,6 @@ export default async (req, res) => {
     notifyOvertimeRejected(request, author).catch(() => {});
   }
 
+  noteSelfDecision(token, target.userID, `overtime:${action}`, { overtimeID: Number(id) });
   return res.status(200).json({ status: DECISIONS[action], request });
 };
