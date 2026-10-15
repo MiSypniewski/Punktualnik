@@ -1,6 +1,6 @@
 import { kindLabel, signedMinutes } from "./overtimeKinds";
 import { absenceKindLabel } from "./absenceKinds";
-import { formatMinutes, formatDate, formatDateRange } from "../utils";
+import { formatMinutes, formatDate, formatDateRange, formatCardSpan } from "../utils";
 
 // Powiadomienia na Google Chat przez webhook przestrzeni.
 //
@@ -97,6 +97,32 @@ export const notifyNewAbsenceRequest = async (absence, user) => {
 
   const panel = process.env.NEXTAUTH_URL
     ? `${process.env.NEXTAUTH_URL.replace(/\/$/, "")}/urlopy/zarzadzaj`
+    : null;
+  if (panel) lines.push(panel);
+
+  await sendMessage(lines.join("\n"));
+};
+
+/**
+ * Zgłoszenie korekty dzisiejszej karty. Jak wyżej — nigdy nie rzuca.
+ *
+ * @param {object} request zgłoszenie w kształcie z services/cardCorrections.js
+ * @param {{name: string, surname: string, section: string}} user autor
+ */
+export const notifyNewCardCorrection = async (request, user) => {
+  const who = user ? `${user.name} ${user.surname}` : `użytkownik #${request.userID}`;
+  const sekcja = user?.section ? ` (${user.section})` : "";
+
+  const lines = [
+    `*Korekta karty pracy*`,
+    `${who}${sekcja}`,
+    `Teraz: ${formatCardSpan(request.beforeStartHm, request.beforeEndHm, request.beforeOpen)}`,
+    `Zgłoszone: *${formatCardSpan(request.startHm, request.endHm, request.open)}*`,
+    `Powód: ${request.reason}`,
+  ];
+
+  const panel = process.env.NEXTAUTH_URL
+    ? `${process.env.NEXTAUTH_URL.replace(/\/$/, "")}/korekty/zarzadzaj`
     : null;
   if (panel) lines.push(panel);
 

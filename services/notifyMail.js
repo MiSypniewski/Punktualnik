@@ -12,7 +12,7 @@ import {
   EMPTY_DESCRIPTION,
   EMPTY_PROJECT_NAME,
 } from "../utils/emptyTimer";
-import { formatMinutes, formatDuration, formatDate, formatDateRange, hhmm } from "../utils";
+import { formatMinutes, formatDuration, formatDate, formatDateRange, formatCardSpan, hhmm } from "../utils";
 
 dayjs.locale("pl");
 
@@ -458,6 +458,75 @@ export const notifyOvertimePending = async (request, user) => {
     cc,
     subject: `Punktualnik: ${kindLabel(request.kind).toLowerCase()} — do rozpatrzenia`,
     kind: "nadgodziny-do-rozpatrzenia",
+    ...body,
+  });
+};
+
+/**
+ * Zgłoszenie korekty dzisiejszej karty (services/cardCorrections.js).
+ * Wyłącznie do kierowników — jak pozostałe "do rozpatrzenia".
+ */
+export const notifyCorrectionPending = async (request, user) => {
+  const { to, cc } = managersOf(user?.section);
+  const dzienKarty = formatDate(request.day);
+
+  const body = compose([
+    `Pracownik zgłasza korektę dzisiejszej karty pracy.`,
+    null,
+    ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${request.userID}`],
+    ["Dzień", dzienKarty],
+    ["Teraz", formatCardSpan(request.beforeStartHm, request.beforeEndHm, request.beforeOpen)],
+    ["Zgłoszone", formatCardSpan(request.startHm, request.endHm, request.open)],
+    ["Powód", request.reason],
+    null,
+    linkLine("/korekty/zarzadzaj", "Rozpatrz zgłoszenie"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: korekta karty do rozpatrzenia — ${dzienKarty}`,
+    kind: "korekta-do-rozpatrzenia",
+    ...body,
+  });
+};
+
+/**
+ * Decyzja o zgłoszeniu korekty. Przy zatwierdzeniu "Jest" bierzemy z karty PO
+ * zapisie, nie ze zgłoszenia — to ma być potwierdzenie stanu ewidencji.
+ * Mail zastępuje notifyCardChanged: ta sama zmiana nie powinna przyjść dwa razy.
+ */
+export const notifyCorrectionDecided = async (request, user, card) => {
+  const { to, cc } = recipients(request.userID, user?.section);
+  const dzienKarty = formatDate(request.day);
+  const approved = request.status === "approved";
+  const jest = card
+    ? formatCardSpan(
+        godzinaKarty(card.startTime),
+        card.status === "finishWork" ? godzinaKarty(card.endTime) : null,
+        card.status !== "finishWork"
+      )
+    : null;
+
+  const body = compose([
+    approved ? `Zgłoszenie korekty karty zostało zatwierdzone.` : `Zgłoszenie korekty karty zostało odrzucone.`,
+    null,
+    ["Pracownik", user ? `${user.name} ${user.surname}` : `użytkownik #${request.userID}`],
+    ["Dzień", dzienKarty],
+    ["Było", formatCardSpan(request.beforeStartHm, request.beforeEndHm, request.beforeOpen)],
+    ["Zgłoszone", formatCardSpan(request.startHm, request.endHm, request.open)],
+    ...(jest ? [["Jest", jest]] : []),
+    ...(request.decidedByName ? [[approved ? "Zatwierdził" : "Odrzucił", request.decidedByName]] : []),
+    ...(request.decisionNote ? [["Uwagi", request.decisionNote]] : []),
+    null,
+    linkLine("/korekty", "Moje zgłoszenia"),
+  ]);
+
+  return sendMail({
+    to,
+    cc,
+    subject: `Punktualnik: korekta karty — ${approved ? "zatwierdzona" : "odrzucona"} — ${dzienKarty}`,
+    kind: approved ? "korekta-zatwierdzona" : "korekta-odrzucona",
     ...body,
   });
 };

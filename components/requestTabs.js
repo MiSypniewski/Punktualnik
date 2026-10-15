@@ -2,7 +2,7 @@ import useSWR from "swr";
 import TabNav from "./ui/tabNav";
 import { fetchLive, PENDING_KEY, PENDING_POLL_MS } from "../utils/live";
 
-// Zakładki pozycji „Wnioski”: Urlopy | Nadgodziny.
+// Zakładki pozycji „Wnioski”: Urlopy | Nadgodziny | Karty.
 //
 // Jedna lista w jednym pliku — oba panele (pages/urlopy/zarzadzaj.js
 // i pages/nadgodziny/zarzadzaj.js) renderują ten sam komponent, więc kolejność
@@ -21,6 +21,7 @@ const RequestTabs = ({ className = "mb-6" }) => {
       items={[
         { href: "/urlopy/zarzadzaj", label: "Urlopy", count: data?.absences },
         { href: "/nadgodziny/zarzadzaj", label: "Nadgodziny", count: data?.overtime },
+        { href: "/korekty/zarzadzaj", label: "Karty", count: data?.corrections },
       ]}
     />
   );

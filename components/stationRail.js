@@ -68,6 +68,10 @@ const navItems = (user, pending) => {
 
   items.push({ href: "/nadgodziny", match: "/nadgodziny", label: "Nadgodziny", group: "moje" });
 
+  // Zgłoszenie korekty dzisiejszej karty — z tego samego powodu co zadania
+  // bez kiosku: zgłoszenie ze współdzielonego konta nie miałoby właściciela.
+  if (canTrackTasks(role)) items.push({ href: "/korekty", match: "/korekty", label: "Korekta karty", group: "moje" });
+
   // Kiosk dostaje tę pozycję razem z resztą: konto jest wprawdzie współdzielone,
   // ale strona pokazuje wyłącznie własne wnioski, a tych kiosk po prostu nie ma
   // — zobaczy pustą historię, nie cudze dane.
@@ -92,12 +96,20 @@ const navItems = (user, pending) => {
   if (canApproveLeave(role) || canApproveOvertime(role)) {
     const absences = pending?.absences ?? 0;
     const overtime = pending?.overtime ?? 0;
+    const corrections = pending?.corrections ?? 0;
     items.push({
-      href: absences === 0 && overtime > 0 ? "/nadgodziny/zarzadzaj" : "/urlopy/zarzadzaj",
-      match: ["/urlopy/zarzadzaj", "/nadgodziny/zarzadzaj"],
+      href:
+        absences > 0
+          ? "/urlopy/zarzadzaj"
+          : overtime > 0
+          ? "/nadgodziny/zarzadzaj"
+          : corrections > 0
+          ? "/korekty/zarzadzaj"
+          : "/urlopy/zarzadzaj",
+      match: ["/urlopy/zarzadzaj", "/nadgodziny/zarzadzaj", "/korekty/zarzadzaj"],
       label: "Wnioski",
       group: "zespol",
-      count: absences + overtime,
+      count: absences + overtime + corrections,
     });
   }
 
