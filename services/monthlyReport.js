@@ -246,8 +246,10 @@ const parse = ({ payload, ...row }) => ({ ...row, ...JSON.parse(payload) });
 
 // Wersja kształtu migawki (pole `v` z utils/monthlyReport.js). Wiersz w starszym
 // kształcie traktujemy jak brak raportu: ekran pokaże „wygeneruj”, zamiast
-// wywrócić się na polu, którego w starym JSON-ie nie ma.
-const PAYLOAD_VERSION = 2;
+// wywrócić się na polu, którego w starym JSON-ie nie ma. Wersję podbija też
+// zmiana ZNACZENIA pola (v3: frekwencja liczona od wszystkich dni roboczych) —
+// stara liczba pod nową etykietą byłaby gorsza niż jej brak.
+const PAYLOAD_VERSION = 3;
 const current = (row) => row.v === PAYLOAD_VERSION;
 
 const readCache = new Map();

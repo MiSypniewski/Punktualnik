@@ -1754,7 +1754,7 @@ w `services/monthlyReport.js` — siedem zapytań na cały miesiąc, nie na osob
 | Dni przepracowane | dni robocze z odbitą kartą czasu **albo** z zaraportowanym zadaniem |
 | Nieobecności | dni robocze bez pracy objęte zatwierdzonym wnioskiem, z podziałem na rodzaje; także dzień wolny odebrany z nadgodzin |
 | Dni bez ewidencji | dni robocze bez karty, bez wpisów i bez nieobecności |
-| Frekwencja | przepracowane / (robocze − nieobecności) — urlop jej nie obniża |
+| Frekwencja | przepracowane / robocze — każda nieobecność, także urlop i L4, ją obniża; luki pokazują „dni bez ewidencji” |
 | Łączne godziny | cały zaraportowany czas miesiąca, z weekendami |
 | Średnia dzienna | czas zaraportowany w dni robocze / dni przepracowane |
 | Średnia zespołu | suma czasu sekcji / suma przepracowanych dni sekcji (ważona; tylko osoby, które zadania raportują; bez kierowników — ci widzą swoją średnią na tle zespołu, ale jej nie tworzą) |

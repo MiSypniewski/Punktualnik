@@ -470,7 +470,7 @@ export default function MonthlyReport({
           label="Dni robocze"
           value={`${person.workedDays} / ${person.workingDays}`}
           tone={statTone(attendanceTone(person.attendance))}
-          hint={person.attendance !== null ? `frekwencja ${person.attendance}%` : "cały miesiąc nieobecności"}
+          hint={person.attendance !== null ? `frekwencja ${person.attendance}%` : "—"}
         />
         <Stat
           label="Czas prywatny"
@@ -711,7 +711,7 @@ export default function MonthlyReport({
             </p>
           )}
           <p className="mt-3 text-xs text-muted">
-            Frekwencja = przepracowane / (robocze − nieobecności). Zespół: {team.attendance !== null ? `${team.attendance}%` : "—"}.
+            Frekwencja = przepracowane / robocze (nieobecności ją obniżają). Zespół: {team.attendance !== null ? `${team.attendance}%` : "—"}.
           </p>
         </Panel>
 
