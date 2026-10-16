@@ -1,8 +1,8 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { saveTilePrefs } from "../../../services/resumeTiles";
 import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks } from "../../../services/roles";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Ustawienia kafelków "Wznów": ile ich pokazywać i co jest przypięte na stałe.
 //
@@ -17,7 +17,7 @@ import { logApiError } from "../../../services/log";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -74,6 +74,6 @@ export default async (req, res) => {
     logApiError("api/entries/tiles", error, 422, { userID: token.userID });
     return res
       .status(422)
-      .json({ status: "not_saved", error: error.code || "invalid", message: error.message });
+      .json({ status: "not_saved", error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

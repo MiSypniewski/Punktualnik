@@ -85,7 +85,13 @@ npm run admin -- sections michal@example.pl spedycja,magazyn   # kierownik od ra
 # Nowy kierownik
 npm run admin -- role michal@example.pl manager
 npm run admin -- sections michal@example.pl spedycja,cns
-# ...i powiedz mu, żeby się przelogował
+# rola działa od razu, bez przelogowania (services/session.js)
+
+# Zwolnienie pracownika: od następnego żądania nie ma dostępu
+npm run admin -- deactivate jan@example.pl
+
+# Wylogowanie ze wszystkich urządzeń bez zmiany hasła (zgubiony telefon)
+npm run admin -- logout jan@example.pl
 
 # Likwidacja działu
 npm run admin -- section <email> <inny_slug>   # najpierw przenieś ludzi
@@ -197,7 +203,7 @@ kilka sekund. Wszystko powyżej sekundy warto zestawić z `/api/health`.
 | `pm2 describe Punktualnik` | `restarts` (powinno stać w miejscu) i zużycie pamięci |
 | `pm2 logs Punktualnik --lines 200 --nostream` | wpisy `[error]` i `[warn]` |
 | `pm2 logs Punktualnik \| grep eventloop` | ostrzeżenia o zablokowanej pętli zdarzeń |
-| `/api/health` w przeglądarce (po zalogowaniu) | `eventLoop.maxLagMs` i `db.probeMs` |
+| `/api/health` w przeglądarce (po zalogowaniu jako kierownik) | `eventLoop.maxLagMs` i `db.probeMs` |
 
 `eventLoop.maxLagMs` to najdłuższa chwila od startu procesu, w której serwer nie
 odpowiadał **nikomu**. Kilkanaście milisekund to norma. Wartości rzędu sekund

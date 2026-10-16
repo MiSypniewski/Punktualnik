@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import { mutate } from "swr";
 import classNames from "classnames";
 import dayjs from "dayjs";
@@ -10,6 +10,7 @@ import AbsenceBadge from "../../components/absenceBadge";
 import { Input, Select, Textarea } from "../../components/ui/field";
 import Button, { IconButton } from "../../components/ui/button";
 import Plate from "../../components/ui/plate";
+import Badge from "../../components/ui/badge";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
@@ -38,7 +39,7 @@ import { now as appNow } from "../../services/workday";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
 
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
@@ -493,6 +494,11 @@ export default function Nieobecnosci({
                           {decisionVerb(a.status)}: {a.decidedByName},{" "}
                           {formatDateTime(a.decidedAt)}
                         </span>
+                      )}
+                      {a.decidedBy != null && Number(a.decidedBy) === Number(a.userID) && (
+                        <Badge tone="signal" className="mt-1">
+                          Samozatwierdzone
+                        </Badge>
                       )}
                       {a.decisionNote && <span className="block text-xs italic">„{a.decisionNote}”</span>}
                     </Td>

@@ -1,9 +1,9 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../../services/session";
 import { getCard, correctCard, deleteCard, STATUS_FOR } from "../../../../services/manageTime";
 import { canEditTimes } from "../../../../services/roles";
-import { canSeeSection } from "../../../../services/scope";
+import { canSeeSection, noteSelfDecision } from "../../../../services/scope";
 import { notifyCardChanged } from "../../../../services/notifyMail";
-import { logApiError } from "../../../../services/log";
+import { logApiError, publicError } from "../../../../services/log";
 
 // Korekta (PUT) i usunięcie (DELETE) pojedynczej karty czasu. `id` to Times.id.
 //
@@ -13,7 +13,7 @@ import { logApiError } from "../../../../services/log";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -48,6 +48,7 @@ export default async (req, res) => {
     // Wiadomość niesie dane wiersza SPRZED skasowania — po DELETE nie ma już
     // czego odczytać, a pracownik ma prawo wiedzieć, jaka dniówka zniknęła.
     if (removed) {
+      noteSelfDecision(token, card.userID, "card:delete", { cardID: Number(id) });
       notifyCardChanged(card, "deleted", actor).catch(() => {});
     }
 
@@ -77,10 +78,11 @@ export default async (req, res) => {
     // zmiana jest tą, o którą pracownik prosił.
     notifyCardChanged(updated, "corrected", actor, card).catch(() => {});
 
+    noteSelfDecision(token, card.userID, "card:correct", { cardID: Number(id) });
     return res.status(200).json({ status: "updated", card: updated });
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;
     logApiError("api/time/manage/[id]", error, status, { cardID: Number(id), by: token.userID });
-    return res.status(status).json({ error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

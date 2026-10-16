@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { getRunningEntryDetail, runningSeconds, sweepStaleEntries } from "../../../services/taskEntries";
 import { canTrackTasks } from "../../../services/roles";
 import { isEmptyTimer } from "../../../utils/emptyTimer";
@@ -17,7 +17,7 @@ import { isEmptyTimer } from "../../../utils/emptyTimer";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }

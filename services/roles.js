@@ -6,7 +6,8 @@
 //            widzi salda wszystkich pracowników. Ma też dostęp do eksportu.
 //
 // Rolę nadaje się z linii poleceń: npm run admin -- role <email|id> manager
-// Uwaga: rola siedzi w tokenie JWT, więc po zmianie trzeba się przelogować.
+// Rola jest czytana z bazy przy każdym żądaniu (services/session.js), więc
+// zmiana działa od razu, bez przelogowania.
 
 export const ROLES = ["user", "editor", "manager"];
 
@@ -80,6 +81,11 @@ export const boundByEditWindow = (role) => !canSeeTeamTasks(role);
 // nie mają powoływać się na predykat o nazwie "overtime", bo pierwsza zmiana
 // zasad w jednym z modułów kazałaby zgadywać, którego z nich dotyczy.
 export const canApproveLeave = (role) => role === "manager";
+
+// Stan procesu (/api/health): pamięć, opóźnienie pętli zdarzeń, liczniki
+// limitera logowania. Nie zawiera danych osobowych, ale opisuje instalację,
+// więc nie jest dla kiosku ani dla każdego pracownika.
+export const canSeeHealth = (role) => role === "manager";
 
 // Kto może zobaczyć cudze salda urlopowe i eksport nieobecności.
 export const canExportLeave = (role) => role === "manager";

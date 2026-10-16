@@ -1,10 +1,10 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import decideAbsence from "../../../services/decideAbsence";
 import cancelAbsence from "../../../services/cancelAbsence";
 import revokeAbsence from "../../../services/revokeAbsence";
 import findAbsence from "../../../services/getAbsenceById";
 import { canApproveLeave } from "../../../services/roles";
-import { canSeeUser } from "../../../services/scope";
+import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyAbsenceApproved, notifyAbsenceRejected } from "../../../services/notifyMail";
 
@@ -18,7 +18,7 @@ const NOTE_MAX = 300;
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -85,6 +85,7 @@ export default async (req, res) => {
       return res.status(409).json({ error: "already_revoked" });
     }
 
+    noteSelfDecision(token, target.userID, "absence:revoke", { absenceID: Number(id) });
     return res.status(200).json({ status: "revoked", absence });
   }
 
@@ -110,5 +111,6 @@ export default async (req, res) => {
     notifyAbsenceRejected(absence, author).catch(() => {});
   }
 
+  noteSelfDecision(token, target.userID, `absence:${action}`, { absenceID: Number(id) });
   return res.status(200).json({ status: DECISIONS[action], absence });
 };

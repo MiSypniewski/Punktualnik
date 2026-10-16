@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import getUserData from "../../services/getUserData";
 import BaseLayout from "../../components/baseLayout";
 import Spinner from "../../components/spinner";
@@ -6,7 +6,7 @@ import Button from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/field";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
@@ -19,7 +19,7 @@ dayjs.locale("pl");
 // niezalogowanej. Sprawdzenie w `useEffect` przekierowywało dopiero
 // w przeglądarce, czyli PO wysłaniu danych.
 export const getServerSideProps = async (context) => {
-  const token = await getToken({ req: context.req });
+  const token = await getActiveToken(context.req);
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }
@@ -103,7 +103,15 @@ export default function UserData({ userData, id }) {
     });
 
     if (response.ok) {
-      router.push("/users/password");
+      // Zmiana hasła unieważnia wszystkie sesje konta, także tę. Logujemy od razu
+      // nowym hasłem, żeby osoba, która je zmieniła, nie wylądowała na ekranie
+      // logowania. Inne urządzenia zostają wylogowane i o to chodzi.
+      const relogin = await signIn("credentials", {
+        email: user.email,
+        password: payload.newPassword,
+        redirect: false,
+      });
+      router.push(relogin?.ok ? "/users/password" : "/users/signin");
     } else {
       const body = await response.json();
       setFormProcessing(false);

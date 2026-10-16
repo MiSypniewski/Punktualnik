@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { getAbsences } from "../../../services/getAbsences";
 import { getLeaveBalances } from "../../../services/leaveBalance";
 import {
@@ -17,7 +17,7 @@ const MODES = ["nieobecnosci", "salda"];
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -122,6 +122,7 @@ export default async (req, res) => {
     "Zdecydował",
     "Data decyzji",
     "Notatka do decyzji",
+    "Samozatwierdzone",
   ];
 
   const lines = rows.map((r) => [
@@ -141,6 +142,9 @@ export default async (req, res) => {
     r.decidedByName,
     r.decidedAt ? appTime(r.decidedAt, "YYYY-MM-DD HH:mm") : "",
     r.decisionNote,
+    // Kierownik zdecydował o własnym wniosku albo sam wpisał sobie nieobecność
+    // (services/scope.js: isSelf). Nie blokujemy tego, ale ma być widoczne.
+    r.decidedBy != null && Number(r.decidedBy) === Number(r.userID) ? "tak" : "",
   ]);
 
   const zakres = from || to ? `_${from || "poczatek"}_${to || "dzis"}` : "";

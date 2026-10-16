@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import { mutate } from "swr";
 import Link from "next/link";
 import BaseLayout from "../../components/baseLayout";
 import RequestTabs from "../../components/requestTabs";
 import OvertimeBadge from "../../components/overtimeBadge";
-import { Alert, EmptyState, Input, PageHeader, Plate } from "../../components/ui";
+import { Alert, Badge, EmptyState, Input, PageHeader, Plate } from "../../components/ui";
 import { TableWrap, Table, Th, Td, Tr } from "../../components/ui/table";
 import { listForManager } from "../../services/cardCorrections";
 import { canEditTimes } from "../../services/roles";
@@ -21,7 +21,7 @@ import { PENDING_KEY } from "../../utils/live";
 // robi w Kartach czasu (/time/zarzadzaj), a zgłoszenie odrzuca z notatką.
 
 export async function getServerSideProps(ctx) {
-  const token = await getToken({ req: ctx.req });
+  const token = await getActiveToken(ctx.req);
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }
@@ -203,6 +203,11 @@ export default function ZarzadzajKorektami({ pending, history, sections }) {
                         <span className="block text-xs mt-1">
                           {decisionVerb(r.status)}: {r.decidedByName}, {formatDateTime(r.decidedAt)}
                         </span>
+                      )}
+                      {r.decidedBy != null && Number(r.decidedBy) === Number(r.userID) && (
+                        <Badge tone="signal" className="mt-1">
+                          Samozatwierdzone
+                        </Badge>
                       )}
                       {r.decisionNote && <span className="block text-xs italic mt-1">„{r.decisionNote}”</span>}
                     </Td>

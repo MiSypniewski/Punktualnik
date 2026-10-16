@@ -1,11 +1,11 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { listProjects, createProject, projectScope } from "../../../services/projects";
 import { canTrackTasks, canManageProjects } from "../../../services/roles";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -48,7 +48,7 @@ export default async (req, res) => {
       return res.status(201).json({ status: "created", project });
     } catch (error) {
       logApiError("api/projects", error, 422, { userID: token.userID });
-      return res.status(422).json({ status: "not_created", error: error.message });
+      return res.status(422).json({ status: "not_created", error: publicError(error).message });
     }
   }
 

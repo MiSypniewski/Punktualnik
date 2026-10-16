@@ -1,7 +1,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../services/session";
 import useSWR, { useSWRConfig } from "swr";
 import { getSectionBoard } from "../../services/sectionBoard";
 import { canSeeSection } from "../../services/scope";
@@ -22,7 +22,7 @@ export const getServerSideProps = async (context) => {
   // Kontrola po stronie serwera. Wcześniej strona nie sprawdzała sesji w ogóle
   // — karty całej sekcji trafiały do propsów każdemu, kto wpisał adres,
   // a przekierowanie działało dopiero w przeglądarce (czyli po wysłaniu danych).
-  const token = await getToken({ req: context.req });
+  const token = await getActiveToken(context.req);
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }

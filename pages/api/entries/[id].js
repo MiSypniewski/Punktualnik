@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import {
   getEntry,
   stopEntry,
@@ -12,7 +12,7 @@ import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../serv
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyTaskEntryChanged } from "../../../services/notifyMail";
-import { logApiError, logInfo } from "../../../services/log";
+import { logApiError, logInfo, publicError } from "../../../services/log";
 
 // "retag" to opis i projekt biegnącego timera, "setstart" — jego godzina
 // rozpoczęcia; "update" to cały zamknięty wpis razem z czasami. Rozdzielone, bo
@@ -75,7 +75,7 @@ const withProjectName = (entry) => ({
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -180,7 +180,7 @@ export default async (req, res) => {
       logApiError("api/entries/[id]", error, status, { action, id, userID: token.userID });
       return res
         .status(status)
-        .json({ status: "not_updated", error: error.code || "invalid", message: error.message });
+        .json({ status: "not_updated", error: publicError(error).code || "invalid", message: publicError(error).message });
     }
   }
 
@@ -238,6 +238,6 @@ export default async (req, res) => {
   } catch (error) {
     const status = CONFLICT_CODES.includes(error.code) ? 409 : 422;
     logApiError("api/entries/[id]", error, status, { action, id, userID: token.userID });
-    return res.status(status).json({ status: "not_updated", error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ status: "not_updated", error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

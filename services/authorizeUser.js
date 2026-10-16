@@ -17,7 +17,7 @@ const schema = Joi.object({
 // logowania. Hash, sól i parametry są potrzebne — reszta wraca do next-auth jako
 // treść tokenu.
 const findByEmail = db.prepare(
-  `SELECT id, email, name, role, section, location, isActive,
+  `SELECT id, email, name, role, section, location, isActive, sessionVersion,
           passwordHash, passwordSalt, passwordParams
      FROM Users WHERE email = ?`
 );
@@ -174,6 +174,9 @@ const authorizeUser = async (payload) => {
     role: user.role,
     section: user.section,
     location: user.location,
+    // Wersja sesji z chwili logowania (services/session.js). Token z innym
+    // numerem niż w bazie jest odrzucany.
+    sessionVersion: user.sessionVersion,
   };
 };
 

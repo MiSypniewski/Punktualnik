@@ -262,6 +262,29 @@ const migrateUserPasswordParams = (db) => {
 };
 
 /**
+ * Users dostaje sessionVersion — licznik, który unieważnia wszystkie wydane
+ * sesje konta naraz (services/session.js).
+ *
+ * Sesja to JWT w ciasteczku, którego serwer nie przechowuje, więc nie da się
+ * go "usunąć". Da się za to zapisać w tokenie numer wersji i odrzucać tokeny
+ * ze starym numerem. Podbija go zmiana hasła (w aplikacji i w admin.js) oraz
+ * `admin.js logout`.
+ *
+ * DEFAULT 0, bo tokeny wydane przed tą zmianą nie mają pola `sv`, a
+ * services/session.js czyta jego brak jako 0. Wdrożenie nikogo więc nie wylogowuje.
+ *
+ * Idempotentna i sterowana STANEM SCHEMATU, jak migracje wyżej.
+ */
+const migrateUserSessionVersion = (db) => {
+  const columns = db.prepare(`PRAGMA table_info(Users)`).all().map((c) => c.name);
+
+  if (!columns.includes("sessionVersion")) {
+    db.exec(`ALTER TABLE Users ADD COLUMN sessionVersion INTEGER NOT NULL DEFAULT 0`);
+    logInfo("db", "migracja: dodano Users.sessionVersion");
+  }
+};
+
+/**
  * Pusty timer: TaskEntries.emptyStage i Projects.isSystem, plus sam projekt
  * systemowy "do usunięcia" (services/emptyTimerJob.js).
  *
@@ -784,6 +807,7 @@ const createDb = () => {
   migrateTimesAudit(db);
   migrateUserResumeTiles(db);
   migrateUserPasswordParams(db);
+  migrateUserSessionVersion(db);
   migrateEmptyTimer(db);
   migrateEntryOrigin(db);
 

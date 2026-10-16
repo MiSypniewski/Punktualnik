@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import {
   startEntry,
   switchEntry,
@@ -9,7 +9,7 @@ import { getProject, canUseProject } from "../../../services/projects";
 import { canTrackTasks, canSeeTeamTasks, boundByEditWindow } from "../../../services/roles";
 import { canSeeUser } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 const ALLOWED_ACTIONS = ["start", "manual"];
 
@@ -19,7 +19,7 @@ const CONFLICT_CODES = ["overlap", "already_running", "edit_window_closed"];
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -133,6 +133,6 @@ export default async (req, res) => {
   } catch (error) {
     const status = CONFLICT_CODES.includes(error.code) ? 409 : 422;
     logApiError("api/entries", error, status, { action, userID: token.userID });
-    return res.status(status).json({ status: "not_created", error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ status: "not_created", error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

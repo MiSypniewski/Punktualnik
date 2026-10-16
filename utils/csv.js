@@ -19,9 +19,32 @@ export const num = (value, decimals = 2) => ({ num: Number(value), decimals });
 
 export const isNumCell = (v) => typeof v === "object" && v !== null && "num" in v;
 
+// Liczba albo czas ze znakiem, np. "-1:30" albo "+2:15" w saldzie nadgodzin
+// (formatMinutes z withSign). Taki napis może zaczynać się od znaku: składa
+// się z samych cyfr i separatorów, więc Excel nie wykona z niego niczego
+// poza arytmetyką.
+const SIGNED_VALUE = /^[-+][\d\s:,.]+$/;
+
+/**
+ * Ochrona przed CSV/formula injection.
+ *
+ * Opis zadania, powód urlopu albo nazwę projektu wpisuje pracownik. Pole
+ * zaczynające się od =, +, - albo @ Excel wykona jako formułę, także wewnątrz
+ * cudzysłowów. Wtedy np. =HYPERLINK(...) w eksporcie otwartym przez kierownika
+ * wyśle dane arkusza na obcy serwer. Apostrof na początku każe arkuszowi
+ * traktować komórkę jako tekst (zalecenie OWASP).
+ *
+ * Komórki liczbowe (num) tu nie trafiają, mają własną ścieżkę.
+ */
+export const neutralizeFormula = (text) => {
+  if (SIGNED_VALUE.test(text)) return text;
+  if (/^[=+\-@\t\r]/.test(text)) return `'${text}`;
+  return text;
+};
+
 // Cudzysłów wokół każdego pola + podwojenie cudzysłowów w środku (RFC 4180).
 export const csvCell = (v) => {
-  const text = isNumCell(v) ? plNumber(v.num, v.decimals) : String(v ?? "");
+  const text = isNumCell(v) ? plNumber(v.num, v.decimals) : neutralizeFormula(String(v ?? ""));
   return `"${text.replace(/"/g, '""')}"`;
 };
 

@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import {
   createCorrection,
   getTodayCard,
@@ -11,7 +11,7 @@ import getUserData from "../../../services/getUserData";
 import { notifyNewCardCorrection } from "../../../services/notifyGChat";
 import { notifyCorrectionPending } from "../../../services/notifyMail";
 import { visibleSections } from "../../../services/scope";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Zgłoszenia korekty dzisiejszej karty (services/cardCorrections.js).
 //
@@ -21,7 +21,7 @@ import { logApiError } from "../../../services/log";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -59,7 +59,7 @@ export default async (req, res) => {
     } catch (error) {
       const status = CORRECTION_STATUS_FOR[error.code] ?? 422;
       logApiError("api/corrections", error, status, { userID: token.userID });
-      return res.status(status).json({ error: error.code || "invalid", message: error.message });
+      return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
     }
   }
 

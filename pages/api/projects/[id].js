@@ -1,7 +1,7 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import { getProject, updateProject, setProjectActive, projectScope } from "../../../services/projects";
 import { canManageProjects } from "../../../services/roles";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Lista, nie obiekt — `in` przepuściłby własności odziedziczone z prototypu
 // (ten sam zabieg co w pages/api/overtime/[id].js).
@@ -9,7 +9,7 @@ const ALLOWED_ACTIONS = ["update", "archive", "restore"];
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -71,6 +71,6 @@ export default async (req, res) => {
     return res.status(200).json({ status: "ok", project: updated });
   } catch (error) {
     logApiError("api/projects/[id]", error, 422, { id, userID: token.userID });
-    return res.status(422).json({ status: "not_updated", error: error.message });
+    return res.status(422).json({ status: "not_updated", error: publicError(error).message });
   }
 };

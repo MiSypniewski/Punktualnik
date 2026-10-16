@@ -1,12 +1,12 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../../services/session";
 import dayjs from "dayjs";
 import getSectionTimes from "../../../../services/getSectionTimes";
 import { createCardForUser, STATUS_FOR } from "../../../../services/manageTime";
 import { canEditTimes } from "../../../../services/roles";
-import { visibleSections, canSeeUser } from "../../../../services/scope";
+import { visibleSections, canSeeUser, noteSelfDecision } from "../../../../services/scope";
 import getUserData from "../../../../services/getUserData";
 import { notifyCardChanged } from "../../../../services/notifyMail";
-import { logApiError } from "../../../../services/log";
+import { logApiError, publicError } from "../../../../services/log";
 
 // Panel korekty kart czasu: lista (GET) i dopisanie brakującej karty (POST).
 //
@@ -17,7 +17,7 @@ import { logApiError } from "../../../../services/log";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -81,10 +81,11 @@ export default async (req, res) => {
     // nie dowie, bo na tablicy kiosku widzi wyłącznie dzisiejszy dzień.
     notifyCardChanged(card, "created", { userID: token.userID, name: token.name }).catch(() => {});
 
+    noteSelfDecision(token, owner.id, "card:create", { day });
     return res.status(200).json({ status: "created", card });
   } catch (error) {
     const status = STATUS_FOR[error.code] ?? 422;
     logApiError("api/time/manage", error, status, { userID, day, by: token.userID });
-    return res.status(status).json({ error: error.code || "invalid", message: error.message });
+    return res.status(status).json({ error: publicError(error).code || "invalid", message: publicError(error).message });
   }
 };

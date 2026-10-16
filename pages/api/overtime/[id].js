@@ -1,9 +1,9 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import decideOvertimeRequest from "../../../services/decideOvertimeRequest";
 import cancelOvertimeRequest from "../../../services/cancelOvertimeRequest";
 import revokeOvertimeRequest from "../../../services/revokeOvertimeRequest";
 import { canApproveOvertime } from "../../../services/roles";
-import { canSeeUser } from "../../../services/scope";
+import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import findOvertimeRequest from "../../../services/getOvertimeRequestById";
 import { notifyOvertimeApproved, notifyOvertimeRejected } from "../../../services/notifyMail";
@@ -19,7 +19,7 @@ const NOTE_MAX = 300;
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -88,6 +88,7 @@ export default async (req, res) => {
       return res.status(409).json({ error: "already_revoked" });
     }
 
+    noteSelfDecision(token, target.userID, "overtime:revoke", { overtimeID: Number(id) });
     return res.status(200).json({ status: "revoked", request });
   }
 
@@ -112,5 +113,6 @@ export default async (req, res) => {
     notifyOvertimeRejected(request, author).catch(() => {});
   }
 
+  noteSelfDecision(token, target.userID, `overtime:${action}`, { overtimeID: Number(id) });
   return res.status(200).json({ status: DECISIONS[action], request });
 };

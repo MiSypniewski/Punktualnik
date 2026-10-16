@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import dayjs from "dayjs";
 import { getByProject, getByUser, getSummary, iterateAllEntries } from "../../../services/entryStats";
 import { sweepStaleEntries } from "../../../services/taskEntries";
@@ -33,7 +33,7 @@ const hoursPair = (seconds) => [
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }

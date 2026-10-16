@@ -23,7 +23,11 @@ const findById = db.prepare(
 );
 const updatePassword = db.prepare(
   `UPDATE Users
-      SET passwordHash = @passwordHash, passwordSalt = @passwordSalt, passwordParams = @passwordParams
+      SET passwordHash = @passwordHash, passwordSalt = @passwordSalt, passwordParams = @passwordParams,
+          -- Unieważnia WSZYSTKIE wydane sesje konta (services/session.js). Zmiana
+          -- hasła po wycieku ma wylogować osobę, która je przejęła. Bieżącą
+          -- przeglądarkę strona loguje od razu ponownie (pages/users/[id].js).
+          sessionVersion = sessionVersion + 1
     WHERE id = @id`
 );
 

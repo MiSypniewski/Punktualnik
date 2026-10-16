@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import createOvertimeRequest from "../../../services/createOvertimeRequest";
 import getOvertimeBalance from "../../../services/getOvertimeBalance";
 import getOvertimeForUser from "../../../services/getOvertimeForUser";
@@ -9,13 +9,13 @@ import getUserData from "../../../services/getUserData";
 import { notifyNewOvertimeRequest } from "../../../services/notifyGChat";
 import { notifyOvertimePending } from "../../../services/notifyMail";
 import { visibleSections } from "../../../services/scope";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -89,7 +89,7 @@ export default async (req, res) => {
       return res.status(201).json({ status: "created", request });
     } catch (error) {
       logApiError("api/overtime", error, 422, { userID: token.userID });
-      return res.status(422).json({ status: "not_created", error: error.message });
+      return res.status(422).json({ status: "not_created", error: publicError(error).message });
     }
   }
 

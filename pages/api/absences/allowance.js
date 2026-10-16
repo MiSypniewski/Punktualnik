@@ -1,17 +1,17 @@
-import { getToken } from "next-auth/jwt";
+import { getActiveToken } from "../../../services/session";
 import addLeaveAllowance from "../../../services/addLeaveAllowance";
 import { canApproveLeave } from "../../../services/roles";
-import { canSeeUser } from "../../../services/scope";
+import { canSeeUser, noteSelfDecision } from "../../../services/scope";
 import getUserData from "../../../services/getUserData";
 import { notifyAllowanceAdded } from "../../../services/notifyMail";
-import { logApiError } from "../../../services/log";
+import { logApiError, publicError } from "../../../services/log";
 
 // Przydzielanie dni urlopu. Wyłącznie kierownik i wyłącznie własnym
 // pracownikom — nikt nie dopisuje dni sam sobie.
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default async (req, res) => {
-  const token = await getToken({ req });
+  const token = await getActiveToken(req);
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
@@ -65,9 +65,10 @@ export default async (req, res) => {
     // ustawia — o jej zmianie musi się dowiedzieć w chwili, gdy zachodzi.
     notifyAllowanceAdded(allowance, target, { userID: token.userID, name: token.name }).catch(() => {});
 
+    noteSelfDecision(token, target.id, "allowance:add", { year: Number(year), days: Number(days) });
     return res.status(201).json({ status: "created", allowance });
   } catch (error) {
     logApiError("api/absences/allowance", error, 422, { userID: token.userID });
-    return res.status(422).json({ status: "not_created", error: "invalid", message: error.message });
+    return res.status(422).json({ status: "not_created", error: "invalid", message: publicError(error).message });
   }
 };
