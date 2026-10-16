@@ -9,11 +9,20 @@ const WIDTHS = {
   page: "max-w-page", // domyślna
   wide: "max-w-wide", // raport zadań, panel wniosków
   full: "max-w-none", // kiosk — kafelki mają wypełnić tablet
+  // Tablica kiosku: pełna szerokość ORAZ dokładnie wysokość okna. Strona się
+  // nie przewija, kafelki dzielą resztę ekranu między siebie
+  // (components/kioskGrid.js), a stopka znika — na tablecie 1024×768 jej
+  // czterdzieści pikseli to pół rzędu kafelków.
+  kiosk: "max-w-none",
 };
 
 export default function AppShell({ user, width = "page", children }) {
+  const fit = width === "kiosk";
+
   return (
-    <div className="min-h-screen flex flex-col">
+    // `h-screen` przed `h-[100dvh]`: stara przeglądarka bez jednostki dvh
+    // zignoruje drugą deklarację i zostanie przy pierwszej.
+    <div className={classNames("flex flex-col", fit ? "h-screen h-[100dvh] overflow-hidden" : "min-h-screen")}>
       {/* `contents`, żeby owijka nie stała się rodzicem lepkiego paska (sticky
           trzyma się rodzica, a ten miałby wysokość samego paska). Na wydruku
           raportu miesięcznego nawigacja znika w całości. */}
@@ -21,7 +30,13 @@ export default function AppShell({ user, width = "page", children }) {
         <StationRail user={user} />
       </div>
 
-      <main className={classNames("w-full mx-auto px-4 py-6 sm:py-8 flex-grow", WIDTHS[width])}>
+      <main
+        className={classNames(
+          "w-full mx-auto px-4",
+          fit ? "flex-1 min-h-0 flex flex-col py-3" : "py-6 sm:py-8 flex-grow",
+          WIDTHS[width]
+        )}
+      >
         {children}
       </main>
 
@@ -34,14 +49,16 @@ export default function AppShell({ user, width = "page", children }) {
         <InstallHint />
       </div>
 
-      <footer className="border-t border-line-subtle print:hidden">
-        <div className="mx-auto max-w-wide px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-faint">
-          <span className="uppercase tracking-signage">Punktualnik</span>
-          {/* Fakt z services/workday.js, o który ludzie pytają najczęściej —
-              tu kosztuje jedną linijkę, a oszczędza pytanie. */}
-          <span>Doba robocza liczona od 3:00</span>
-        </div>
-      </footer>
+      {!fit && (
+        <footer className="border-t border-line-subtle print:hidden">
+          <div className="mx-auto max-w-wide px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-faint">
+            <span className="uppercase tracking-signage">Punktualnik</span>
+            {/* Fakt z services/workday.js, o który ludzie pytają najczęściej —
+                tu kosztuje jedną linijkę, a oszczędza pytanie. */}
+            <span>Doba robocza liczona od 3:00</span>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

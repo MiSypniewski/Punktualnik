@@ -96,7 +96,13 @@ const STATES = {
   },
 };
 
-const Card = ({ data, onSaved }) => {
+// `density` ustawia wyłącznie siatka kiosku (components/kioskGrid.js), która
+// sama narzuca wysokość rzędu — stąd wtedy `h-full` zamiast minimalnej
+// wysokości. "compact" to ten sam kafelek ściśnięty do ok. 130 px, żeby
+// czternaście osób zmieściło się na tablecie 1024×768. Bez `density` (kierownik,
+// pracownik) kafelek wygląda dokładnie jak dotąd.
+const Card = ({ data, onSaved, density }) => {
+  const compact = density === "compact";
   const { data: session } = useSession();
   const [airtableID, setAirtableID] = useState(data.airtableID);
   const [status, setStatus] = useState(data.status);
@@ -323,11 +329,19 @@ const Card = ({ data, onSaved }) => {
   const exitStamp = status === "finishWork" ? (autoClosed ? null : endTime) : punched ? target : null;
 
   const shiftNote = shiftMin < 0 ? `wcześniej o ${formatMinutes(-shiftMin)}` : `dłużej o ${formatMinutes(shiftMin)}`;
+
+  // W wariancie kompaktowym podpis ma jedną linię i ucięcie zjadłoby właśnie
+  // końcówkę — a tam stoi to, co najważniejsze. Data powrotu przenosi się więc
+  // do nagłówka (`returnNote`), a przy zgodzie odpada instrukcja dotknięcia:
+  // planowane wyjście i tak stoi w rogu kafelka.
+  const returnNote = stateKey === "absence" ? `do ${dayjs(absence.dateTo).format("DD.MM")}` : null;
   const caption =
     stateKey === "absence"
-      ? `${state.caption[canPunch ? "punch" : "watch"]} · do ${dayjs(absence.dateTo).format("DD.MM")}`
+      ? compact
+        ? state.caption[canPunch ? "punch" : "watch"]
+        : `${state.caption[canPunch ? "punch" : "watch"]} · ${returnNote}`
       : stateKey === "workInProgress" && shiftMin !== 0
-      ? canPunch
+      ? canPunch && !compact
         ? `Do wyjścia · ${shiftNote} · dotknij, aby wyjść`
         : `Do wyjścia · ${shiftNote}`
       : state.caption[canPunch ? "punch" : "watch"];
@@ -335,7 +349,9 @@ const Card = ({ data, onSaved }) => {
   return (
     <div
       className={classNames(
-        "flex flex-col justify-between min-h-[8.5rem] p-4 border-2 rounded",
+        "flex flex-col justify-between border-2 rounded",
+        density ? "h-full overflow-hidden" : "min-h-[8.5rem]",
+        compact ? "p-3" : "p-4",
         state.plate,
         canPunch ? "cursor-pointer" : "cursor-default"
       )}
@@ -354,9 +370,18 @@ const Card = ({ data, onSaved }) => {
       tabIndex={canPunch ? 0 : undefined}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-signage">
+        {/* W kompaktowym wariancie etykieta nie łamie się: „Niepełna dniówka”
+            w dwóch liniach obok godzin zabierała rząd, którego kafelek nie ma.
+            Węższe światło liter wystarcza, żeby zmieściła się w jednej. */}
+        <span
+          className={classNames(
+            "flex items-center gap-2 text-xs font-bold uppercase min-w-0",
+            compact ? "tracking-wide whitespace-nowrap" : "tracking-signage"
+          )}
+        >
           {state.live && <LiveDot tone="current" />}
           {label}
+          {compact && returnNote && <span className="font-mono font-medium normal-case tracking-normal opacity-80">{returnNote}</span>}
         </span>
         <span className="flex items-center gap-2">
           {/* Znacznik zostaje także po odbiciu karty: „w pracy, choć miał być na
@@ -366,7 +391,15 @@ const Card = ({ data, onSaved }) => {
               {absenceKindShort(absence.kind)}
             </span>
           )}
-          {punched && (
+          {/* W wariancie kompaktowym godziny stoją w jednym rzędzie: dwie linie
+              „od/do” to wysokość, której przy czterech rzędach kafelków nie ma. */}
+          {punched && compact && (
+            <span className="font-mono text-xs tabular-nums opacity-80 whitespace-nowrap">
+              {dayjs(startTime).format("HH:mm")}
+              {exitStamp && `–${dayjs(exitStamp).format("HH:mm")}`}
+            </span>
+          )}
+          {punched && !compact && (
             <span className="flex flex-col items-end font-mono text-xs tabular-nums opacity-80">
               <span>od {dayjs(startTime).format("HH:mm")}</span>
               {exitStamp && <span>do {dayjs(exitStamp).format("HH:mm")}</span>}
@@ -375,18 +408,33 @@ const Card = ({ data, onSaved }) => {
         </span>
       </div>
 
-      <div className="mt-3">
-        <p className="text-lg font-bold uppercase tracking-wide leading-tight truncate" title={`${data.surname} ${data.name}`}>
+      <div className={compact ? "mt-0.5" : "mt-3"}>
+        <p
+          className={classNames(
+            "font-bold uppercase tracking-wide leading-tight truncate",
+            compact ? "text-base" : "text-lg"
+          )}
+          title={`${data.surname} ${data.name}`}
+        >
           {data.surname}
         </p>
-        <p className="text-sm opacity-80 truncate">{data.name}</p>
+        <p className={classNames("opacity-80 truncate", compact ? "text-xs" : "text-sm")}>{data.name}</p>
       </div>
 
-      <div className="mt-3">
-        <p className="font-mono text-3xl sm:text-4xl font-medium tabular-nums leading-none">
+      <div className={compact ? "mt-0.5" : "mt-3"}>
+        <p
+          className={classNames(
+            "font-mono font-medium tabular-nums leading-none",
+            compact ? "text-3xl" : "text-3xl sm:text-4xl"
+          )}
+        >
           {displayTime || "--:--:--"}
         </p>
-        <p className="mt-1.5 text-xs opacity-80">{caption}</p>
+        {/* Kompaktowy podpis w jednej linii: dłuższy („Do wyjścia · wcześniej
+            o 1 h 30 min · dotknij…”) łamałby się i wypychał licznik z ramki. */}
+        <p className={classNames("text-xs opacity-80", compact ? "mt-1 truncate" : "mt-1.5")} title={compact ? caption : undefined}>
+          {caption}
+        </p>
       </div>
     </div>
   );
