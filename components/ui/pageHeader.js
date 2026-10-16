@@ -4,17 +4,28 @@ import classNames from "classnames";
 // belka w znaku, ale neutralna — bursztyn zostaje przy stanie „teraz”),
 // tytuł wersalikami, pod nim jedno zdanie kontekstu, po prawej miejsce
 // na działania strony.
-const PageHeader = ({ title, description, actions, className }) => (
-  <div className={classNames("mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3", className)}>
-    <div className="flex items-start gap-3 min-w-0">
-      <span aria-hidden="true" className="mt-1 block w-1 h-6 rounded-sm bg-accent shrink-0" />
-      <div className="min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold uppercase tracking-signage leading-tight">{title}</h1>
-        {description && <p className="mt-1.5 text-sm text-muted">{description}</p>}
-      </div>
+//
+// `compact` — tytuł i kontekst w JEDNYM niskim rzędzie. Dla tablicy kiosku,
+// gdzie każdy piksel wysokości odbiera miejsce kafelkom (pages/time/[id].js).
+const PageHeader = ({ title, description, actions, className, compact = false }) =>
+  compact ? (
+    <div className={classNames("mb-3 flex items-center gap-3 min-w-0", className)}>
+      <span aria-hidden="true" className="block w-1 h-5 rounded-sm bg-accent shrink-0" />
+      <h1 className="text-lg font-bold uppercase tracking-signage leading-tight truncate">{title}</h1>
+      {description && <p className="text-sm text-muted truncate">{description}</p>}
+      {actions && <div className="ml-auto flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
-    {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-  </div>
-);
+  ) : (
+    <div className={classNames("mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3", className)}>
+      <div className="flex items-start gap-3 min-w-0">
+        <span aria-hidden="true" className="mt-1 block w-1 h-6 rounded-sm bg-accent shrink-0" />
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold uppercase tracking-signage leading-tight">{title}</h1>
+          {description && <p className="mt-1.5 text-sm text-muted">{description}</p>}
+        </div>
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
 
 export default PageHeader;

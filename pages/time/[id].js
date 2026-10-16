@@ -5,10 +5,12 @@ import { getActiveToken } from "../../services/session";
 import useSWR, { useSWRConfig } from "swr";
 import { getSectionBoard } from "../../services/sectionBoard";
 import { canSeeSection } from "../../services/scope";
+import { canPunchCards } from "../../services/roles";
 import { getSection } from "../../services/sections";
 import { LIVE_POLL_MS, fetchLive } from "../../utils/live";
 import BaseLayout from "../../components/baseLayout";
 import Card from "../../components/card";
+import KioskGrid from "../../components/kioskGrid";
 import Spinner from "../../components/spinner";
 import PageHeader from "../../components/ui/pageHeader";
 import EmptyState from "../../components/ui/emptyState";
@@ -51,7 +53,7 @@ export const getServerSideProps = async (context) => {
 };
 
 export default function Home({ board, id, sectionLabel }) {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const { mutate } = useSWRConfig();
 
@@ -85,11 +87,44 @@ export default function Home({ board, id, sectionLabel }) {
   const cards = (data ?? board).cards ?? [];
   const workdayLabel = (data ?? board).workdayLabel;
 
+  // Stanowisko kiosku: tablet 1024×768 na ścianie, którego nikt nie przewija.
+  // Cała sekcja ma stanąć na jednym ekranie — powłoka na wysokość okna, niski
+  // nagłówek, kafelki dopasowane do miejsca (components/kioskGrid.js).
+  // Kierownik i pracownik oglądają tę samą tablicę w zwykłej, przewijanej
+  // siatce: u nich ekran bywa dowolny, a przewinięcie nic nie kosztuje.
+  const isKiosk = canPunchCards(session?.user?.role);
+
+  // Klucz niesie SYGNATURĘ danych z serwera, nie samo userID.
+  //
+  // components/card.js kopiuje propsy do useState przy montowaniu
+  // i potem ich nie czyta, więc bez tego świeże dane z pollingu nigdy
+  // nie weszłyby na ekran. Zmiana stanu po stronie serwera przemontowuje
+  // kafelek; kliknięcie na TYM ekranie propsów nie rusza, więc sygnatura
+  // zostaje ta sama i odpowiedź pollingu wysłana przed odbiciem nie cofa
+  // tego, co pracownik przed chwilą dotknął.
+  //
+  // Zgody (`shift`) też są w sygnaturze: zatwierdzone w ciągu dnia
+  // wcześniejsze wyjście przesuwa cel odliczania, a bez przemontowania
+  // kafelek liczyłby do starego aż do przeładowania o 3:30.
+  //
+  // `density` NIE wchodzi do klucza: zmiana wariantu (np. obrót tabletu) ma
+  // przemalować kafelek, a nie przemontować go i zgubić stan licznika.
+  const renderCards = (density) =>
+    cards.map((card) => (
+      <Card
+        data={card}
+        density={density}
+        key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}:${card.autoClosed ? 1 : 0}:${card.shift?.earlyLeaveMin ?? 0}:${card.shift?.stayLongerMin ?? 0}`}
+        onSaved={() => mutate(boardKey(id))}
+      />
+    ));
+
   return (
-    <BaseLayout width="full">
+    <BaseLayout width={isKiosk ? "kiosk" : "full"}>
       <PageHeader
         title={sectionLabel}
         description={<span className="first-letter:uppercase">{workdayLabel}</span>}
+        compact={isKiosk}
       />
 
       {cards.length === 0 ? (
@@ -97,29 +132,13 @@ export default function Home({ board, id, sectionLabel }) {
           title="Nikogo tu nie ma"
           description="W tym dziale nie ma aktywnych pracowników. Konta zakłada się przez rejestrację, a aktywuje poleceniem `npm run admin -- activate`."
         />
+      ) : isKiosk ? (
+        <KioskGrid count={cards.length}>{renderCards}</KioskGrid>
       ) : (
         // Cztery kolumny od 1280 px: tablet kiosku stoi zwykle w poziomie,
         // a przy kilkunastu osobach trzy kolumny zeszły poniżej krawędzi ekranu.
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {cards.map((card) => (
-            // Klucz niesie SYGNATURĘ danych z serwera, nie samo userID.
-            //
-            // components/card.js kopiuje propsy do useState przy montowaniu
-            // i potem ich nie czyta, więc bez tego świeże dane z pollingu nigdy
-            // nie weszłyby na ekran. Zmiana stanu po stronie serwera przemontowuje
-            // kafelek; kliknięcie na TYM ekranie propsów nie rusza, więc sygnatura
-            // zostaje ta sama i odpowiedź pollingu wysłana przed odbiciem nie cofa
-            // tego, co pracownik przed chwilą dotknął.
-            //
-            // Zgody (`shift`) też są w sygnaturze: zatwierdzone w ciągu dnia
-            // wcześniejsze wyjście przesuwa cel odliczania, a bez przemontowania
-            // kafelek liczyłby do starego aż do przeładowania o 3:30.
-            <Card
-              data={card}
-              key={`${card.userID}:${card.airtableID ?? "empty"}:${card.status}:${card.endTime}:${card.autoClosed ? 1 : 0}:${card.shift?.earlyLeaveMin ?? 0}:${card.shift?.stayLongerMin ?? 0}`}
-              onSaved={() => mutate(boardKey(id))}
-            />
-          ))}
+          {renderCards()}
         </div>
       )}
     </BaseLayout>
