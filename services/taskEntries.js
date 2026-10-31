@@ -332,8 +332,8 @@ const assertComplete = (entry) => {
 // w services/db.js. Kolumny NIE MA w COLS: pochodzenie wpisu widzi wyłącznie
 // panel kierownika, a getEntry zasila odpowiedzi API samego pracownika.
 const stmtInsert = db.prepare(`
-  INSERT INTO TaskEntries (userID, projectID, description, data, startedAt, endedAt, seconds, section, createdAt, origin)
-  VALUES (@userID, @projectID, @description, @data, @startedAt, @endedAt, @seconds, @section, @createdAt, @origin)`);
+  INSERT INTO TaskEntries (userID, projectID, description, data, startedAt, endedAt, seconds, section, createdAt, origin, apiKeyID)
+  VALUES (@userID, @projectID, @description, @data, @startedAt, @endedAt, @seconds, @section, @createdAt, @origin, @apiKeyID)`);
 
 const descSchema = Joi.string().trim().max(200).allow("").default("");
 
@@ -342,7 +342,7 @@ const descSchema = Joi.string().trim().max(200).allow("").default("");
  * idx_entries_running — łapiemy SQLITE_CONSTRAINT i tłumaczymy na 409,
  * zamiast sprawdzać wcześniej SELECT-em (ten przegrałby z wyścigiem dwóch zakładek).
  */
-export const startEntry = ({ userID, projectID, description, section }, now = appNow()) => {
+export const startEntry = ({ userID, projectID, description, section, apiKeyID = null }, now = appNow()) => {
   const desc = Joi.attempt(description ?? "", descSchema);
   const startedAt = toStamp(now);
 
@@ -365,6 +365,7 @@ export const startEntry = ({ userID, projectID, description, section }, now = ap
       section: String(section),
       createdAt: startedAt,
       origin: "timer",
+      apiKeyID,
     });
     return getEntry(info.lastInsertRowid);
   } catch (error) {
@@ -531,7 +532,7 @@ const MIN_KEEP_SECONDS = 10;
  *   `stopped` to zamknięty wpis (null, gdy nic nie biegło albo wpis odrzucono),
  *   `discarded` mówi, że poprzedni wpis był krótszy niż MIN_KEEP_SECONDS.
  */
-export const switchEntry = ({ userID, projectID, description, section }, now = appNow()) =>
+export const switchEntry = ({ userID, projectID, description, section, apiKeyID = null }, now = appNow()) =>
   db.transaction(() => {
     const current = getRunningEntry(userID);
     const tooShort = current && secondsBetween(current.startedAt, toStamp(now)) < MIN_KEEP_SECONDS;
@@ -547,7 +548,7 @@ export const switchEntry = ({ userID, projectID, description, section }, now = a
     }
 
     return {
-      entry: startEntry({ userID, projectID, description, section }, now),
+      entry: startEntry({ userID, projectID, description, section, apiKeyID }, now),
       stopped,
       discarded,
     };
@@ -611,7 +612,7 @@ const spanFromParts = ({ data, from, to }) => {
  */
 export const createManualEntry = (
   payload,
-  { userID, section, enforceWindow = true, origin = "manual", now = appNow() }
+  { userID, section, enforceWindow = true, origin = "manual", apiKeyID = null, now = appNow() }
 ) => {
   const { projectID, description, data, from, to } = Joi.attempt(payload, manualSchema);
   if (enforceWindow) assertInWindow(data, now);
@@ -631,6 +632,7 @@ export const createManualEntry = (
       section: String(section),
       createdAt: toStamp(now),
       origin: origin === "manager" ? "manager" : "manual",
+      apiKeyID,
     });
     return getEntry(info.lastInsertRowid);
   })();
