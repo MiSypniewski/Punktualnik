@@ -243,6 +243,38 @@ export const notifyEmptyTimer = async (entry) => {
   });
 };
 
+// --- 2b. nowy klucz API --------------------------------------------------------
+
+/**
+ * Sygnał dla właściciela, że na jego koncie powstał klucz. Klucz daje dostęp bez
+ * hasła, więc jeśli to nie on go tworzył, ta wiadomość jest jedyną szansą, żeby się
+ * o tym dowiedział. Treść NIGDY nie zawiera samego klucza, tylko prefiks.
+ * Do wiadomości nie idzie kopia dla kierowników: to sprawa konta, nie ewidencji.
+ */
+export const notifyApiKeyCreated = async (key, userID) => {
+  const to = userEmail(userID);
+
+  const body = compose([
+    `Na Twoim koncie w Punktualniku utworzono klucz API.`,
+    null,
+    ["Nazwa", key.name],
+    ["Początek klucza", `${key.prefix}…`],
+    ["Uprawnienia", key.scopes.join(", ")],
+    ["Ważny do", key.expiresAt.slice(0, 10)],
+    null,
+    `Jeśli to nie Ty, zmień hasło. Zmiana hasła unieważnia wszystkie klucze konta i wszystkie inne sesje.`,
+    linkLine("/users/klucze-api", "Klucze API"),
+  ]);
+
+  return sendMail({
+    to: to ? [to] : [],
+    cc: [],
+    subject: `Punktualnik: nowy klucz API — ${key.name}`,
+    kind: "klucz-api",
+    ...body,
+  });
+};
+
 // --- 3. zatwierdzony urlop --------------------------------------------------
 
 /**
