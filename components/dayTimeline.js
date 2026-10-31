@@ -190,6 +190,7 @@ const TaskTooltip = ({ hovered, drift }) => {
           {TASK_FLAG[entry.category].text}
         </p>
       )}
+      {entry.viaApi && <p className="mt-1 text-xs text-muted">Utworzony przez API.</p>}
       {entry.editedByName && <p className="mt-1 text-xs text-muted">Poprawił: {entry.editedByName}</p>}
     </div>
   );
