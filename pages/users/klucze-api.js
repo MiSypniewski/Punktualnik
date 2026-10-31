@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import BaseLayout from "../../components/baseLayout";
 import Alert from "../../components/ui/alert";
@@ -77,6 +78,11 @@ const NewKeyNotice = ({ token, onClose }) => {
       <code className="block mt-1 p-2 rounded bg-surface font-mono text-xs break-all">
         curl -H &quot;Authorization: Bearer $PUNKTUALNIK_KEY&quot; {origin}/api/v1/me
       </code>
+      <p className="mt-3 text-sm">
+        <Link href="/users/klucze-api/instrukcja">
+          <a className="text-accent-strong hover:underline">Co dalej: instrukcja API</a>
+        </Link>
+      </p>
     </div>
   );
 };
@@ -162,6 +168,12 @@ export default function ApiKeys() {
         title="Klucze API"
         description="Sterowanie własnymi zadaniami i timerem ze skryptów, skrótów i innych programów."
       />
+
+      <p className="mb-4 text-sm">
+        <Link href="/users/klucze-api/instrukcja">
+          <a className="text-accent-strong hover:underline">Instrukcja: jak korzystać z API</a>
+        </Link>
+      </p>
 
       <Alert tone="info" className="mb-6">
         Klucz działa jak dostęp do Twoich zadań, bez hasła. Nie wklejaj go do repozytorium ani do czatu. Dane, które

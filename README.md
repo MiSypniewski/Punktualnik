@@ -1722,6 +1722,10 @@ Każdy pracownik z własnym kontem może sterować **własnymi** zadaniami ze sk
 agenta AI albo innego systemu. Klucze tworzy się na stronie `/users/klucze-api`, do której
 prowadzi link z profilu. Kiosk nie ma kluczy, bo jego konto jest współdzielone.
 
+Instrukcja dla pracownika jest w aplikacji: `/users/klucze-api/instrukcja`. Ta sekcja opisuje
+API od strony utrzymania. Przykłady z instrukcji uruchamia `scripts/apidocs-check.js`, więc po
+zmianie zachowania API trzeba zmienić obie strony.
+
 ```bash
 curl -H "Authorization: Bearer $PUNKTUALNIK_KEY" https://opss.pl/api/v1/timer
 curl -X POST -H "Authorization: Bearer $PUNKTUALNIK_KEY" -H "Content-Type: application/json" \
