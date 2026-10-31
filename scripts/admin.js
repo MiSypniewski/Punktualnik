@@ -273,7 +273,10 @@ switch (cmd) {
 
   case "deactivate": {
     const u = findUser(selector);
-    db.prepare("UPDATE Users SET isActive = 0 WHERE id = ?").run(u.id);
+    ensureSessionVersion();
+    // sessionVersion + 1: samo isActive = 0 odcina dostęp tylko do czasu reaktywacji.
+    // Bez podbicia po `activate` wracałyby stare sesje i klucze API sprzed blokady.
+    db.prepare("UPDATE Users SET isActive = 0, sessionVersion = sessionVersion + 1 WHERE id = ?").run(u.id);
     console.log("Dezaktywowano:");
     console.log(fmt(findUser(String(u.id))));
     break;
