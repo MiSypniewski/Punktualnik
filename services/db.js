@@ -382,6 +382,52 @@ const migrateEntryOrigin = (db) =>
     })
     .immediate();
 
+/**
+ * Klucze API: tabela ApiKeys i TaskEntries.apiKeyID (services/apiKeys.js).
+ *
+ * W bazie leży wyłącznie SHA-256 klucza. Klucz ma 256 losowych bitów, więc skrótu
+ * nie da się odwrócić słownikiem i PBKDF2 nic by tu nie dodał, a liczony przy
+ * każdym żądaniu byłby tanim DoS-em na jedyny proces.
+ *
+ * sessionVersion to wersja konta z chwili utworzenia klucza. Zmiana hasła,
+ * `admin.js logout` i dezaktywacja podbijają wersję konta, więc klucze wydane
+ * wcześniej przestają działać razem z sesjami.
+ *
+ * TaskEntries.apiKeyID celowo NIE ma klucza obcego: usunięcie konta albo scalenie
+ * duplikatu kasuje klucze, a to nie powód, żeby ruszać historię wpisów. Kolumny
+ * nie ma w COLS w services/taskEntries.js, bo znacznik widzi wyłącznie kierownik.
+ *
+ * Transakcja IMMEDIATE z tego samego powodu co w migrateEmptyTimer.
+ */
+const migrateApiKeys = (db) =>
+  db
+    .transaction(() => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ApiKeys (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          userID         INTEGER NOT NULL,
+          name           TEXT    NOT NULL,
+          tokenHash      TEXT    NOT NULL UNIQUE,
+          prefix         TEXT    NOT NULL,
+          scopes         TEXT    NOT NULL,
+          sessionVersion INTEGER NOT NULL,
+          createdAt      TEXT    NOT NULL,
+          expiresAt      TEXT    NOT NULL,
+          lastUsedAt     TEXT,
+          revokedAt      TEXT,
+          FOREIGN KEY (userID) REFERENCES Users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_apikeys_user ON ApiKeys(userID);
+      `);
+
+      const columns = db.prepare(`PRAGMA table_info(TaskEntries)`).all().map((c) => c.name);
+      if (!columns.includes("apiKeyID")) {
+        db.exec(`ALTER TABLE TaskEntries ADD COLUMN apiKeyID INTEGER`);
+        logInfo("db", "migracja: dodano ApiKeys i TaskEntries.apiKeyID");
+      }
+    })
+    .immediate();
+
 const createDb = () => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
@@ -810,6 +856,7 @@ const createDb = () => {
   migrateUserSessionVersion(db);
   migrateEmptyTimer(db);
   migrateEntryOrigin(db);
+  migrateApiKeys(db);
 
   // Ten wpis ma być w logu DOKŁADNIE RAZ na uruchomienie procesu. Więcej niż
   // jeden oznacza, że singleton na globalThis przestał działać i wróciliśmy do

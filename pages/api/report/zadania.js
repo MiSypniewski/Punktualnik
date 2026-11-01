@@ -161,6 +161,7 @@ export default async (req, res) => {
     ...hoursPair(r.seconds),
     r.autoClosed ? "tak" : "nie",
     CATEGORY_LABEL[r.category] ?? "",
+    r.viaApi ? "tak" : "nie",
     r.editedByName || "",
   ];
 
@@ -178,6 +179,7 @@ export default async (req, res) => {
     "Czas",
     "Domknięty automatycznie",
     "Pochodzenie",
+    "Przez API",
     "Poprawił",
   ];
 

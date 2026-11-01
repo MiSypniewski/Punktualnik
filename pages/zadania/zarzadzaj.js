@@ -1136,11 +1136,17 @@ const QualityBar = ({ summary }) => {
  */
 const CategoryTag = ({ entry }) => {
   const tag = entry.category === "auto" && !entry.autoClosed ? "auto" : CATEGORY_TAG[entry.category];
-  if (!tag) return null;
   return (
-    <span className={classNames("ml-2 text-xs font-semibold uppercase tracking-signage", CATEGORY_TONE[entry.category].text)}>
-      {tag}
-    </span>
+    <>
+      {tag && (
+        <span className={classNames("ml-2 text-xs font-semibold uppercase tracking-signage", CATEGORY_TONE[entry.category].text)}>
+          {tag}
+        </span>
+      )}
+      {/* Wpis utworzony kluczem API. Neutralny kolor, bo to informacja, nie zarzut:
+          nie zmienia kategorii ani paska jakości wyżej. */}
+      {entry.viaApi && <span className="ml-2 text-xs font-semibold uppercase tracking-signage text-muted">API</span>}
+    </>
   );
 };
 

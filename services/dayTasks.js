@@ -36,6 +36,7 @@ const stmtEntries = (count) => {
         SELECT e.id, e.userID, e.description, e.startedAt, e.endedAt, e.seconds,
                e.autoClosed, e.editedByName,
                ${CATEGORY_SQL} AS category,
+               e.apiKeyID IS NOT NULL AS viaApi,
                p.name AS projectName, p.client AS projectClient, p.color AS projectColor
           FROM TaskEntries e
           JOIN Users u         ON u.id = e.userID
@@ -120,6 +121,7 @@ export const getDayTasks = ({ day, sections }) => {
         // Tylko to, co tor pokazuje własnym znacznikiem. "auto" ma już swoje
         // przygaszenie (autoClosed wyżej), a "clean" nie potrzebuje niczego.
         category: e.category === "manual" || e.category === "edited" ? e.category : null,
+        viaApi: Boolean(e.viaApi),
       };
     });
 

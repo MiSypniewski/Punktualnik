@@ -2,6 +2,7 @@ import { getActiveToken } from "../../services/session";
 import db from "../../services/db";
 import { maxEventLoopLag } from "../../services/runtime";
 import { loginLimiterStats } from "../../services/loginRateLimit";
+import { apiLimiterStats } from "../../services/apiRateLimit";
 import { canSeeHealth } from "../../services/roles";
 
 // Stan procesu — do zajrzenia, gdy ktoś zgłasza, że "aplikacja muli".
@@ -55,5 +56,7 @@ export default async (req, res) => {
     // zablokowanych. `emails`/`ips` mają po kwadransie ciszy SPADAĆ — inaczej
     // przemiatanie map przestało działać i rosną w kontenerze bez swapu.
     login: loginLimiterStats(),
+    // Limiter API: te same uwagi. Liczniki mają spadać po kilkunastu minutach ciszy.
+    api: apiLimiterStats(),
   });
 };

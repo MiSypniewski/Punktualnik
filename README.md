@@ -26,6 +26,8 @@ zmiany widać od razu po odświeżeniu strony.
 | `npm run admin -- passwd <email\|id> <noweHaslo>` | ustawia nowe hasło (min. 10 znaków) |
 | `npm run admin -- passwd-audit` | kto ma jeszcze hasło policzone starymi parametrami ([szczegóły](#hasła)) |
 | `npm run admin -- section <email\|id> <slug>` | przenosi pracownika do innej sekcji |
+| `npm run admin -- api-keys <email\|id>` | klucze API konta: nazwa, uprawnienia, stan, ostatnie użycie ([szczegóły](#api-zadań)) |
+| `npm run admin -- api-key-revoke <numer>` | odwołuje jeden klucz API |
 | `npm run admin -- user-delete <email\|id>` | liczy wpisy konta; z `--force` kasuje je razem z kontem, z `--scal-z <email\|id>` przepina na inne konto ([szczegóły](#usuwanie-konta)) |
 
 ### Role i dostępy
@@ -66,6 +68,7 @@ Szczegóły: [Sekcje (działy)](#sekcje-działy).
 | `npm run start` | uruchamia zbudowaną aplikację |
 | `npm run lint` | ESLint |
 | `node scripts/loadtest.js` | test obciążeniowy uruchomionej aplikacji (patrz niżej) |
+| `APITEST_DB=<kopia> node scripts/apitest.js` | test API zadań na lokalnej kopii bazy ([szczegóły](#api-zadań)) |
 | `npm run migrate:airtable -- --dry-run` | jednorazowa migracja kont z Airtable (podgląd) |
 | `npm run mail:test -- adres@example.pl` | test poczty wychodzącej: sprawdza logowanie do SMTP-a i wysyła jedną wiadomość |
 
@@ -1712,6 +1715,91 @@ jego sekcji, nawet gdy jawnie poda `userID` kogoś z zewnątrz.
 Czas jest w dwóch kolumnach: godziny dziesiętnie (`2,50` — do sumowania
 w arkuszu) i tekst `2h 30min` dla człowieka. Tryb `wpisy` jako jedyny nie ma
 limitu wierszy, więc oba formaty zapisuje STRUMIENIOWO.
+
+## API zadań
+
+Każdy pracownik z własnym kontem może sterować **własnymi** zadaniami ze skryptu, skrótu,
+agenta AI albo innego systemu. Klucze tworzy się na stronie `/users/klucze-api`, do której
+prowadzi link z profilu. Kiosk nie ma kluczy, bo jego konto jest współdzielone.
+
+Instrukcja dla pracownika jest w aplikacji: `/users/klucze-api/instrukcja`. Ta sekcja opisuje
+API od strony utrzymania. Przykłady z instrukcji uruchamia `scripts/apidocs-check.js`, więc po
+zmianie zachowania API trzeba zmienić obie strony.
+
+```bash
+curl -H "Authorization: Bearer $PUNKTUALNIK_KEY" https://opss.pl/api/v1/timer
+curl -X POST -H "Authorization: Bearer $PUNKTUALNIK_KEY" -H "Content-Type: application/json" \
+     -d '{"projectID": 3, "description": "Przegląd umowy"}' https://opss.pl/api/v1/timer/start
+```
+
+| Metoda i ścieżka | Uprawnienie | Co robi |
+|---|---|---|
+| `GET /api/v1/me` | dowolne | dane konta i klucza |
+| `GET /api/v1/projects` | `read` | projekty, na które można raportować |
+| `GET /api/v1/entries?from=&to=` | `read` | własne wpisy, najwyżej 31 dni; domyślnie dziś |
+| `GET /api/v1/entries/:id` | `read` | jeden własny wpis |
+| `POST /api/v1/entries` | `entries:write` | wpis ręczny: `projectID`, `description`, `data`, `from`, `to` |
+| `PUT /api/v1/entries/:id` | `entries:write` | pełna podmiana zamkniętego wpisu, te same pola |
+| `DELETE /api/v1/entries/:id` | `entries:delete` | skasowanie wpisu, nieodwracalne |
+| `GET /api/v1/timer` | `read` | biegnący timer albo `null` |
+| `POST /api/v1/timer/start` | `timer` | `projectID`, `description`; `replaceRunning: true` przełącza zadanie |
+| `PATCH /api/v1/timer` | `timer` | `projectID`, `description`, `from`; pola pominięte zostają bez zmian |
+| `POST /api/v1/timer/stop` | `timer` | zatrzymanie; bez opisu albo projektu daje 422, a licznik biegnie dalej |
+
+Godziny (`startedAt`, `endedAt`, `from`, `to`) są w czasie aplikacji, bez strefy. Doba robocza
+(`data`) zaczyna się o 3:00.
+
+| Kod | `error` | Znaczenie |
+|---|---|---|
+| 400 | `bad_project`, `bad_range`, `range_too_long`, `nothing_to_change`, `bad_body` | złe parametry |
+| 401 | `invalid_api_key` | klucz nieznany, odwołany, wygasły albo unieważniony; powodu celowo nie podajemy |
+| 403 | `insufficient_scope`, `project_out_of_scope` | brak uprawnienia klucza albo projekt poza zasięgiem |
+| 404 | `not_found`, `project_not_found` | także wpis innej osoby |
+| 409 | `already_running`, `not_running`, `entry_running`, `overlap`, `edit_window_closed` | konflikt ze stanem danych |
+| 415 | `json_required` | body nie jest JSON-em |
+| 422 | `incomplete`, `invalid`, `future_entry`, `bad_time`, `bad_range` | dane niezgodne z regułami; `message` po polsku |
+| 429 | `rate_limited`, `too_many_failures` | patrz `Retry-After` |
+| 503 | `busy` | baza chwilowo zajęta; ponów po `Retry-After` |
+
+### Zasady bezpieczeństwa
+
+- **Klucz działa wyłącznie w `/api/v1`.** Nie daje dostępu do kart czasu, urlopów, nadgodzin ani
+  kont. `getActiveToken` celowo nie zna kluczy. **Nie dodawaj ich tam**: to jedyna granica między
+  kluczem a resztą aplikacji.
+- **Tylko własne wpisy i tylko dziś i wczoraj, także dla kierownika.** Wyciek jego klucza nie może
+  pozwolić na przepisanie historii sekcji. Do korekt służy panel.
+- **W bazie leży SHA-256 klucza.** Klucz ma 256 losowych bitów, więc to wystarcza, a PBKDF2 przy
+  każdym żądaniu byłby tanim DoS-em na jedyny proces.
+- **Utworzenie klucza wymaga hasła i wysyła mail do właściciela.** Inaczej przejęta na chwilę sesja
+  dawałaby dostęp, który przeżywa wylogowanie.
+- **Zmiana hasła, `admin.js logout`, `passwd` i `deactivate` unieważniają wszystkie klucze konta.**
+  Obowiązuje też data ważności: 30, 90, 180 albo 365 dni.
+- **Limity na użytkownika:** 120 odczytów i 30 zapisów na minutę, 5 aktywnych kluczy, body do 16 kB.
+  Liczniki są w pamięci procesu (`/api/health`, pole `api`).
+- **Klucz wyłącznie w nagłówku.** Parametr w adresie trafiłby do logów Cloudflare. Nie ma też CORS:
+  klucz nie powinien lądować w JS na stronach.
+- **Ślad:** `pm2 logs Punktualnik | grep '\[audit\]'` pokazuje numer klucza przy każdym utworzeniu,
+  zmianie i skasowaniu wpisu oraz przy utworzeniu i odwołaniu klucza. Sam klucz nigdy nie trafia do
+  logu.
+
+### Znacznik „API” u kierownika
+
+`TaskEntries.apiKeyID` wskazuje klucz, który utworzył wpis. Kierownik widzi znacznik w
+`/zadania/zarzadzaj`, w kolumnie „Przez API” eksportu i w dymku na osi `/urlopy/stan`. Znacznik
+**nie zmienia kategorii ani odsetka prawidłowych wpisów**: start i stop z API to „z timera”, a wpis
+ręczny z API to „ręczny”. Kolumny nie ma w `COLS`, więc pracownik jej nie dostaje.
+
+### Czego klucz nie rozwiązuje
+
+Klucz z uprawnieniem `timer` pozwala skryptowi symulować pracę w raporcie zadań. Znacznik to
+pokazuje, ale nie blokuje. Program z kluczem wysyła nazwy projektów, klientów i opisy tam, dokąd
+sam zechce, także do dostawcy modelu AI. To sprawa zasad w firmie, nie kodu.
+
+### Test
+
+`scripts/apitest.js` sprawdza na żywej aplikacji izolację, uprawnienia, unieważnianie i limity.
+Pisze do bazy, więc odmawia pracy poza lokalnym adresem. Sposób uruchomienia opisuje nagłówek
+pliku. Liczniki limitów żyją w procesie, więc przed kolejnym przebiegiem zrestartuj aplikację.
 
 ## Podsumowania miesięczne — `/zadania/podsumowanie`
 

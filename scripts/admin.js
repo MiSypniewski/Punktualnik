@@ -121,6 +121,31 @@ const ensureSessionVersion = () => {
   }
 };
 
+// Lustrzane wobec migrateApiKeys w services/db.js.
+const ensureApiKeys = () => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ApiKeys (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      userID         INTEGER NOT NULL,
+      name           TEXT    NOT NULL,
+      tokenHash      TEXT    NOT NULL UNIQUE,
+      prefix         TEXT    NOT NULL,
+      scopes         TEXT    NOT NULL,
+      sessionVersion INTEGER NOT NULL,
+      createdAt      TEXT    NOT NULL,
+      expiresAt      TEXT    NOT NULL,
+      lastUsedAt     TEXT,
+      revokedAt      TEXT,
+      FOREIGN KEY (userID) REFERENCES Users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_apikeys_user ON ApiKeys(userID);
+  `);
+  const columns = db.prepare(`PRAGMA table_info(TaskEntries)`).all().map((c) => c.name);
+  if (columns.length > 0 && !columns.includes("apiKeyID")) {
+    db.exec(`ALTER TABLE TaskEntries ADD COLUMN apiKeyID INTEGER`);
+  }
+};
+
 const ROLES = ["user", "editor", "manager"];
 
 // Lustrzane wobec services/sections.js (ten skrypt jest CommonJS, nie zaimportuje ESM).
@@ -189,6 +214,7 @@ const printList = (rows) => {
 // baza sama by o nim nie przypomniała.
 const OWNED = [
   ["TaskEntries", "userID"],
+  ["ApiKeys", "userID"],
   ["Absences", "userID"],
   ["LeaveAllowance", "userID"],
   ["Overtime", "userID"],
@@ -273,9 +299,53 @@ switch (cmd) {
 
   case "deactivate": {
     const u = findUser(selector);
-    db.prepare("UPDATE Users SET isActive = 0 WHERE id = ?").run(u.id);
+    ensureSessionVersion();
+    // sessionVersion + 1: samo isActive = 0 odcina dostęp tylko do czasu reaktywacji.
+    // Bez podbicia po `activate` wracałyby stare sesje i klucze API sprzed blokady.
+    db.prepare("UPDATE Users SET isActive = 0, sessionVersion = sessionVersion + 1 WHERE id = ?").run(u.id);
     console.log("Dezaktywowano:");
     console.log(fmt(findUser(String(u.id))));
+    break;
+  }
+
+  // Klucze API konta. Sam klucz jest nie do odzyskania, w bazie leży tylko skrót.
+  case "api-keys": {
+    const u = findUser(selector);
+    ensureApiKeys();
+    const rows = db
+      .prepare(
+        `SELECT id, name, prefix, scopes, sessionVersion, createdAt, expiresAt, lastUsedAt, revokedAt
+           FROM ApiKeys WHERE userID = ? ORDER BY id DESC`
+      )
+      .all(u.id);
+    const current = db.prepare("SELECT sessionVersion FROM Users WHERE id = ?").get(u.id).sessionVersion;
+    if (rows.length === 0) console.log(`Konto #${u.id} <${u.email}> nie ma kluczy API.`);
+    rows.forEach((k) => {
+      const status = k.revokedAt
+        ? `odwołany ${k.revokedAt}`
+        : k.sessionVersion !== current
+          ? "unieważniony zmianą hasła lub wylogowaniem"
+          : `ważny do ${k.expiresAt}`;
+      console.log(`#${k.id}  ${k.prefix}…  ${k.name}  [${k.scopes}]  ${status}  użyty: ${k.lastUsedAt || "nigdy"}`);
+    });
+    break;
+  }
+
+  case "api-key-revoke": {
+    if (!/^\d+$/.test(String(selector ?? ""))) die("podaj numer klucza, np. api-key-revoke 12");
+    ensureApiKeys();
+    const key = db.prepare("SELECT id, userID, name, prefix, revokedAt FROM ApiKeys WHERE id = ?").get(Number(selector));
+    if (!key) die(`nie ma klucza #${selector}.`);
+    if (key.revokedAt) {
+      console.log(`Klucz #${key.id} był już odwołany (${key.revokedAt}).`);
+      break;
+    }
+    db.prepare("UPDATE ApiKeys SET revokedAt = ? WHERE id = ?").run(
+      // Czas aplikacji, jak w pozostałych znacznikach. Proces na serwerze chodzi w UTC.
+      new Date().toLocaleString("sv-SE", { timeZone: process.env.APP_TZ || "Europe/Warsaw" }),
+      key.id
+    );
+    console.log(`Odwołano klucz #${key.id} ${key.prefix}… „${key.name}” konta #${key.userID}.`);
     break;
   }
 
@@ -518,11 +588,14 @@ switch (cmd) {
 
     db.pragma("foreign_keys = ON");
 
+    ensureApiKeys();
     const owned = OWNED.map(([table, column]) => ({
       table,
       n: db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} = ?`).get(u.id).n,
     }));
     const ownedTotal = owned.reduce((sum, r) => sum + r.n, 0);
+    // Klucze API nie przechodzą na konto docelowe, więc nie liczą się jako przepięte.
+    const movedTotal = ownedTotal - owned.find((r) => r.table === "ApiKeys").n;
 
     // Ślady liczymy z pominięciem wierszy SAMEGO konta (kierownik podpisuje też
     // własne korekty) — inaczej raport pokazywałby dwa razy to samo.
@@ -625,6 +698,10 @@ switch (cmd) {
         ).run({ source: u.id, target: target.id });
         db.prepare("DELETE FROM ManagerSections WHERE managerID = ?").run(u.id);
 
+        // Klucze to poświadczenia duplikatu, nie jego historia, więc nie idą na konto
+        // docelowe. Program z takim kluczem nie zacznie nagle pisać na inne konto.
+        db.prepare("DELETE FROM ApiKeys WHERE userID = ?").run(u.id);
+
         // Podpisy pod cudzymi wpisami wskazują na TĘ SAMĄ osobę, więc idą na konto
         // docelowe, a nie do NULL-a jak przy zwykłym kasowaniu.
         REFS.forEach(([table, column]) => {
@@ -639,7 +716,7 @@ switch (cmd) {
       })();
 
       console.log(
-        `\nPrzepięto ${ownedTotal} ${odmien(ownedTotal, "wpis", "wpisy", "wpisów")} ` +
+        `\nPrzepięto ${movedTotal} ${odmien(movedTotal, "wpis", "wpisy", "wpisów")} ` +
           `na konto #${target.id} i usunięto duplikat.`
       );
       console.log(fmt(findUser(String(target.id))));
@@ -686,6 +763,8 @@ switch (cmd) {
         "  sections   <email|id>                 pokaż sekcje obsługiwane przez kierownika",
         "  sections   <email|id> <a,b,c>         ustaw je ('-' czyści; kierownik bez sekcji nie widzi nikogo)",
         "  passwd     <email|id> <noweHaslo>     ustaw nowe hasło",
+        "  api-keys   <email|id>                 wypisz klucze API konta",
+        "  api-key-revoke <numer>                odwołaj klucz API",
         "",
         "Usuwanie konta (jedyna komenda, która kasuje dane):",
         "  user-delete <email|id>                policz wpisy konta i nic nie rób",

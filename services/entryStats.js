@@ -298,6 +298,9 @@ const detailStatement = (filters, scope) =>
       SELECT e.id, e.data, e.startedAt, e.endedAt, e.seconds, e.description,
              e.autoClosed, e.editedByName, e.section, e.userID, e.projectID,
              ${CATEGORY_SQL} AS category,
+             -- Znacznik obok kategorii, nie kategoria: CATEGORY_SQL i odsetek
+             -- prawidłowych wpisów nie zależą od tego, czy wpis powstał przez API.
+             e.apiKeyID IS NOT NULL AS viaApi,
              u.name, u.surname,
              -- Sekcja KONTA, nie wpisu: przy poprawianiu wpisu o tym, które
              -- projekty wolno wybrać, decyduje dzisiejsza sekcja pracownika
@@ -333,6 +336,7 @@ export const getEntries = (filters, scope = "view", { summary } = {}) => {
     rows: rows.map((r) => ({
       ...r,
       autoClosed: Boolean(r.autoClosed),
+      viaApi: Boolean(r.viaApi),
       projectIsActive: Boolean(r.projectIsActive),
       projectIsSystem: Boolean(r.projectIsSystem),
     })),
@@ -362,6 +366,7 @@ export function* iterateAllEntries(filters) {
     yield {
       ...r,
       autoClosed: Boolean(r.autoClosed),
+      viaApi: Boolean(r.viaApi),
       projectIsActive: Boolean(r.projectIsActive),
       projectIsSystem: Boolean(r.projectIsSystem),
     };

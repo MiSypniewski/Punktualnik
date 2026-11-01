@@ -6,8 +6,10 @@ import Button from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/field";
 import Alert from "../../components/ui/alert";
 import PageHeader from "../../components/ui/pageHeader";
+import { canTrackTasks } from "../../services/roles";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
@@ -169,10 +171,26 @@ export default function UserData({ userData, id }) {
 
         {error && <Alert tone="danger">{error}</Alert>}
 
+        {canTrackTasks(user.role) && (
+          <Alert tone="warn">Zmiana hasła unieważni wszystkie Twoje klucze API. Integracje przestaną działać, dopóki nie wstawisz im nowych kluczy.</Alert>
+        )}
+
         <Button type="submit" size="lg" disabled={formProcessing} className="self-start mt-1">
           {formProcessing ? "Zmieniam…" : "Zmień hasło"}
         </Button>
       </form>
+
+      {canTrackTasks(user.role) && (
+        <>
+          <h2 className="mt-10 mb-2 text-sm font-bold uppercase tracking-signage">Klucze API</h2>
+          <p className="text-sm text-muted">
+            Sterowanie zadaniami ze skryptów i innych programów.{" "}
+            <Link href="/users/klucze-api">
+              <a className="text-accent-strong hover:underline">Zarządzaj kluczami</a>
+            </Link>
+          </p>
+        </>
+      )}
     </BaseLayout>
   );
 }
