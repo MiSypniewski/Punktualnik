@@ -136,7 +136,6 @@ export default function ApiInstructions({ baseUrl, today }) {
         <li>Wpisy nie mogą na siebie nachodzić.</li>
         <li>Opis może mieć najwyżej 200 znaków.</li>
         <li>Limity na osobę: 120 odczytów i 30 zmian na minutę. Możesz mieć {API_KEY_MAX_ACTIVE} aktywnych kluczy.</li>
-        <li>Kierownik widzi przy wpisie utworzonym kluczem znacznik „API”. Nie obniża on oceny poprawności wpisów.</li>
       </ul>
 
       <Heading>Gdy coś nie działa</Heading>
