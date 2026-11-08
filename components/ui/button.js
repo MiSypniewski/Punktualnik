@@ -36,7 +36,10 @@ const Button = ({ variant, size, className, type = "button", ...rest }) => (
  *  żeby zadziałał nagłówek Content-Disposition. */
 export const ButtonLink = ({ href, variant, size, className, external, ...rest }) => {
   const anchor = <a className={buttonClass({ variant, size, className })} href={external ? href : undefined} {...rest} />;
-  return external ? anchor : <Link href={href}>{anchor}</Link>;
+  // passHref, bo <a> ma już klucz `href` (undefined), a Next 12 dokleja adres
+  // tylko dzieciom BEZ tego klucza — bez passHref link wychodził bez href:
+  // kursor tekstowy i brak „otwórz w nowej karcie”.
+  return external ? anchor : <Link href={href} passHref>{anchor}</Link>;
 };
 
 export default Button;

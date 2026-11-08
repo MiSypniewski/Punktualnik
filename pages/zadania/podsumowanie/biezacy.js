@@ -70,7 +70,10 @@ const Person = ({ person, open, onToggle, today, month, viewerID, onCount }) => 
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelID}
-        className="w-full px-3 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-raised"
+        className={classNames(
+          "w-full px-3 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-raised",
+          open && "bg-raised"
+        )}
       >
         <span className="font-semibold">
           {person.surname} {person.name}
@@ -90,7 +93,10 @@ const Person = ({ person, open, onToggle, today, month, viewerID, onCount }) => 
         </span>
       </button>
       {open && (
-        <div id={panelID} className="px-3 pb-4 pt-1">
+        // Wcięcie i linia akcentu oddzielają notatki od nazwiska nad nimi
+        // i od kolejnej osoby pod spodem.
+        <div id={panelID} className="bg-raised px-3 pb-4 pt-1">
+          <div className="ml-1 sm:ml-4 pl-3 sm:pl-4 border-l-2 border-accent">
           <EmployeeNotes
             userID={person.userID}
             month={month}
@@ -98,6 +104,7 @@ const Person = ({ person, open, onToggle, today, month, viewerID, onCount }) => 
             viewerID={viewerID}
             onChange={(notes) => onCount(person.userID, notes)}
           />
+          </div>
         </div>
       )}
     </li>

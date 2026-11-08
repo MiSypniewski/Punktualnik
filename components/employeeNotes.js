@@ -139,9 +139,9 @@ export default function EmployeeNotes({ userID, month, today, viewerID, initialN
       {notes.length === 0 ? (
         <p className="text-sm text-muted">Brak notatek z tego miesiąca.</p>
       ) : (
-        <ul className="divide-y divide-line-subtle">
+        <ul className="space-y-2">
           {notes.map((note) => (
-            <li key={note.id} className="py-3 first:pt-0">
+            <li key={note.id} className="p-3 rounded bg-surface ring-1 ring-line">
               {editing === note.id ? (
                 <NoteForm
                   initial={note}
@@ -154,8 +154,8 @@ export default function EmployeeNotes({ userID, month, today, viewerID, initialN
                 />
               ) : (
                 <>
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <p className="text-sm font-semibold">{dayLabel(note.noteDate)}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-signage text-muted">{dayLabel(note.noteDate)}</p>
                     {Number(note.createdBy) === Number(viewerID) && (
                       <div className="flex gap-1">
                         <Button variant="ghost" size="sm" onClick={() => setEditing(note.id)} disabled={busy}>
@@ -167,8 +167,8 @@ export default function EmployeeNotes({ userID, month, today, viewerID, initialN
                       </div>
                     )}
                   </div>
-                  <p className="mt-1 text-sm leading-relaxed whitespace-pre-line max-w-prose">{note.body}</p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-line max-w-prose">{note.body}</p>
+                  <p className="mt-2 text-xs text-muted">
                     {note.createdByName || "kierownik"} · {note.createdAt.slice(0, 16)}
                     {note.updatedAt ? ` · zmieniono ${note.updatedAt.slice(0, 16)}` : ""}
                   </p>
@@ -182,7 +182,7 @@ export default function EmployeeNotes({ userID, month, today, viewerID, initialN
       <Alert className="mt-3">{err}</Alert>
 
       {first <= today && (
-        <div className="mt-4 pt-4 border-t border-line">
+        <div className="mt-4">
           <NoteForm
             key={`${userID}-${month}`}
             initial={{ noteDate: max, body: "" }}
