@@ -6,7 +6,7 @@ import useSWR from "swr";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../../components/baseLayout";
-import Button, { IconButton } from "../../../components/ui/button";
+import Button, { ButtonLink, IconButton } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/field";
 import Plate, { PlateHeader } from "../../../components/ui/plate";
 import Alert from "../../../components/ui/alert";
@@ -16,6 +16,7 @@ import EmptyState from "../../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../../components/ui/table";
 import { ChevronLeftIcon, ChevronRightIcon } from "../../../components/ui/icons";
 import { lastClosedMonth, listMonth } from "../../../services/monthlyReport";
+import { noteCountsForMonth } from "../../../services/employeeNotes";
 import { listSections } from "../../../services/sections";
 import { canSeeMonthlyReports } from "../../../services/roles";
 import { visibleSections } from "../../../services/scope";
@@ -45,12 +46,18 @@ export async function getServerSideProps(ctx) {
 
   const labels = Object.fromEntries(listSections({ includeInactive: true }).map((s) => [s.slug, s.label]));
 
+  const people = listMonth(month, visibleSections(token));
+
   return {
     props: {
       month,
       lastClosed,
       labels,
-      initial: { month, people: listMonth(month, visibleSections(token)) },
+      initial: {
+        month,
+        people,
+        notes: noteCountsForMonth(month, people.map((p) => p.userID)),
+      },
     },
   };
 }
@@ -67,7 +74,7 @@ const signature = (people) => {
   return `${latest.generatedAt.slice(0, 16)} · ${latest.generatedByName || "automat"}`;
 };
 
-const Row = ({ person, href }) => {
+const Row = ({ person, href, notes }) => {
   const diff =
     person.avgDailySeconds !== null && person.team.avgDailySeconds !== null
       ? person.avgDailySeconds - person.team.avgDailySeconds
@@ -110,7 +117,9 @@ const Row = ({ person, href }) => {
           <span className="font-mono tabular-nums font-medium">{person.score.toFixed(1).replace(".", ",")} / 10</span>
         ) : (
           <Link href={`${href}#ocena`}>
-            <a className="text-xs text-muted underline underline-offset-2">do oceny</a>
+            <a className="text-xs text-muted underline underline-offset-2">
+              do oceny{notes > 0 ? ` · notatki: ${notes}` : ""}
+            </a>
           </Link>
         )}
       </Td>
@@ -167,9 +176,14 @@ export default function MonthlySummary({ month, lastClosed, labels, initial }) {
         title="Podsumowania miesięczne"
         description="Raport miesiąca dla każdego pracownika: obecność z kart czasu, nieobecności, zaraportowany czas i projekty. Zapisywany automatycznie 1. dnia miesiąca — nazwisko otwiera pełny raport."
         actions={
-          <Button variant="secondary" onClick={recalc} disabled={busy}>
-            {busy ? "Przeliczanie…" : people.length ? "Przelicz ponownie" : "Wygeneruj"}
-          </Button>
+          <>
+            <ButtonLink href="/zadania/podsumowanie/biezacy" variant="secondary">
+              Bieżący miesiąc — notatki
+            </ButtonLink>
+            <Button variant="secondary" onClick={recalc} disabled={busy}>
+              {busy ? "Przeliczanie…" : people.length ? "Przelicz ponownie" : "Wygeneruj"}
+            </Button>
+          </>
         }
       />
 
@@ -240,7 +254,12 @@ export default function MonthlySummary({ month, lastClosed, labels, initial }) {
                     </thead>
                     <tbody>
                       {members.map((person) => (
-                        <Row key={person.userID} person={person} href={reportHref(person)} />
+                        <Row
+                          key={person.userID}
+                          person={person}
+                          href={reportHref(person)}
+                          notes={data?.notes?.[person.userID] ?? 0}
+                        />
                       ))}
                     </tbody>
                   </Table>

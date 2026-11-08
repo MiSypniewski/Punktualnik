@@ -6,6 +6,7 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
 import BaseLayout from "../../../components/baseLayout";
+import EmployeeNotes from "../../../components/employeeNotes";
 import { Columns, Donut, Legend, Lines, ShareBar, OTHER_COLOR, SERIES_COUNT, seriesColor } from "../../../components/charts";
 import Button, { ButtonLink } from "../../../components/ui/button";
 import Field, { Input, Textarea } from "../../../components/ui/field";
@@ -17,6 +18,8 @@ import EmptyState from "../../../components/ui/emptyState";
 import { TableWrap, Table, Th, Td, Tr, Num } from "../../../components/ui/table";
 import { getMonth, getPersonHistory, lastClosedMonth } from "../../../services/monthlyReport";
 import { getPreviousReview, getReviewsForUser } from "../../../services/monthlyReview";
+import { listNotes, noteTarget } from "../../../services/employeeNotes";
+import { workDay } from "../../../services/workday";
 import { listSections } from "../../../services/sections";
 import { canSeeMonthlyReports } from "../../../services/roles";
 import { canSeeSection, visibleSections } from "../../../services/scope";
@@ -102,12 +105,19 @@ export async function getServerSideProps(ctx) {
   }));
   const at = roster.findIndex((p) => p.userID === person.userID);
 
+  // Notatki idą za BIEŻĄCĄ sekcją pracownika, raport za sekcją z migawki. Gdy
+  // osoba zmieniła sekcję na spoza zasięgu, raport zostaje, a notatek nie ma.
+  const notes = (await noteTarget(token, person.userID)) ? listNotes(person.userID, month) : null;
+
   return {
     props: {
       month,
       lastClosed,
       userID: person.userID,
       person,
+      notes,
+      today: workDay(),
+      viewerID: Number(token.userID),
       sectionLabel: labels[person.section] || person.section,
       trend,
       review,
@@ -341,6 +351,9 @@ export default function MonthlyReport({
   score,
   observations,
   neighbours,
+  notes,
+  today,
+  viewerID,
 }) {
   const query = (id, m = month) => ({
     pathname: "/zadania/podsumowanie/[id]",
@@ -932,6 +945,22 @@ export default function MonthlyReport({
             </Panel>
           </div>
         </>
+      )}
+
+      {notes && (
+        <div className="print:hidden">
+          <SectionTitle id="notatki">Notatki z miesiąca</SectionTitle>
+          <Panel>
+            <EmployeeNotes
+              key={`${userID}-${month}`}
+              userID={userID}
+              month={month}
+              today={today}
+              viewerID={viewerID}
+              initialNotes={notes}
+            />
+          </Panel>
+        </div>
       )}
 
       <ReviewForm key={`${userID}-${month}`} month={month} userID={userID} review={review} suggestion={suggestion} />

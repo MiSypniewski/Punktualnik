@@ -1,5 +1,6 @@
 import { getActiveToken } from "../../../../services/session";
 import { generateMonth, isClosedMonth, listMonth } from "../../../../services/monthlyReport";
+import { noteCountsForMonth } from "../../../../services/employeeNotes";
 import { canSeeMonthlyReports } from "../../../../services/roles";
 import { visibleSections } from "../../../../services/scope";
 import { MONTH_RE } from "../../../../utils/monthlyReport";
@@ -49,5 +50,7 @@ export default async (req, res) => {
     });
   }
 
-  return res.status(200).json({ month, people: listMonth(month, sections) });
+  const people = listMonth(month, sections);
+  const notes = noteCountsForMonth(month, people.map((p) => p.userID));
+  return res.status(200).json({ month, people, notes });
 };
