@@ -54,6 +54,9 @@ export default function Korekty({ day, today, requests }) {
   const [end, setEnd] = useState(today?.endHm ?? dayjs().format("HH:mm"));
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
+  // Wysłanie potwierdza się samo — formularz ustępuje komunikatowi „czeka na
+  // decyzję”. Anulowanie nie zostawiało śladu poza statusem w tabeli.
+  const [cancelled, setCancelled] = useState("");
   const [busy, setBusy] = useState(false);
 
   const refresh = () => router.replace(router.asPath, undefined, { scroll: false });
@@ -66,6 +69,7 @@ export default function Korekty({ day, today, requests }) {
     if (!reason.trim()) return setErr("Napisz krótko, co się stało.");
 
     setErr("");
+    setCancelled("");
     setBusy(true);
     try {
       const res = await fetch("/api/corrections", {
@@ -89,6 +93,8 @@ export default function Korekty({ day, today, requests }) {
 
   const cancel = async (id) => {
     setBusy(true);
+    setErr("");
+    setCancelled("");
     try {
       const res = await fetch(`/api/corrections/${id}`, {
         method: "PUT",
@@ -97,6 +103,7 @@ export default function Korekty({ day, today, requests }) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) setErr(ERRORS[body.error] || "Nie udało się anulować zgłoszenia.");
+      else setCancelled("Zgłoszenie anulowane.");
       await refresh();
     } finally {
       setBusy(false);
@@ -187,6 +194,9 @@ export default function Korekty({ day, today, requests }) {
         )}
 
         <h2 className="mb-4 text-sm font-bold uppercase tracking-signage">Historia</h2>
+        <Alert tone="ok" className="mb-3">
+          {cancelled}
+        </Alert>
         {requests.length === 0 ? (
           <EmptyState title="Brak zgłoszeń" description="Nie zgłaszałeś jeszcze korekty karty." />
         ) : (

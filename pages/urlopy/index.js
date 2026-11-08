@@ -75,6 +75,11 @@ export default function Urlopy({ year, balance, absences }) {
   const [dateTo, setDateTo] = useState(nextWorkingDay);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
+  // Potwierdzenie stoi nad przyciskiem, tam gdzie pracownik właśnie kliknął.
+  // Wcześniej sukces nie zostawiał śladu poza nowym wierszem w historii,
+  // zwykle poza ekranem — i kusił, żeby wysłać wniosek drugi raz.
+  const [saved, setSaved] = useState("");
+  const [cancelled, setCancelled] = useState("");
   const [busy, setBusy] = useState(false);
   const [format, setFormat] = useState("csv");
 
@@ -87,8 +92,17 @@ export default function Urlopy({ year, balance, absences }) {
   const poolKind = usesPool(kind);
   const afterRequest = balance.left - (poolKind ? workDays : 0);
 
+  // Każda zmiana pola gasi potwierdzenie: „Wysłano” przy innych danych
+  // w formularzu sugerowałoby, że wysłały się właśnie te.
+  const edit = (setter) => (value) => {
+    setSaved("");
+    setter(value);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    setSaved("");
+    setCancelled("");
 
     if (!dateFrom || !dateTo) return setErr("Podaj obie daty.");
     if (dateTo < dateFrom) return setErr("Data „do” jest wcześniejsza niż „od”.");
@@ -112,7 +126,15 @@ export default function Urlopy({ year, balance, absences }) {
         setErr(body.message || "Nie udało się złożyć wniosku.");
         return;
       }
+      // Treść z odpowiedzi serwera, nie z formularza — potwierdzamy to, co
+      // zapisano. O mailu do kierownika nie piszemy: bywa wyłączony.
+      const a = body.absence;
       setReason("");
+      setSaved(
+        a
+          ? `Wysłano wniosek: ${absenceKindLabel(a.kind)}, ${formatDateRange(a.dateFrom, a.dateTo)} (dni roboczych: ${a.workDays}). Czeka na decyzję kierownika.`
+          : "Wysłano wniosek. Czeka na decyzję kierownika."
+      );
       await refresh();
     } catch {
       setErr("Brak połączenia z serwerem.");
@@ -124,6 +146,8 @@ export default function Urlopy({ year, balance, absences }) {
   const cancel = async (id) => {
     setBusy(true);
     setErr("");
+    setSaved("");
+    setCancelled("");
     try {
       const res = await fetch(`/api/absences/${id}`, {
         method: "PUT",
@@ -132,6 +156,8 @@ export default function Urlopy({ year, balance, absences }) {
       });
       if (!res.ok) {
         setErr("Nie udało się anulować — wniosek mógł zostać już rozpatrzony.");
+      } else {
+        setCancelled("Wniosek anulowany.");
       }
       await refresh();
     } finally {
@@ -182,7 +208,7 @@ export default function Urlopy({ year, balance, absences }) {
           {/* Tylko rodzaje, które pracownik zgłasza sam. L4 wpisuje kierownik po
               otrzymaniu zwolnienia, a urlop na żądanie — po telefonie; gdyby
               stały na tej liście, wniosek i tak odbiłby się od API. */}
-          <Select value={kind} onChange={(e) => setKind(e.target.value)} className="mb-4">
+          <Select value={kind} onChange={(e) => edit(setKind)(e.target.value)} className="mb-4">
             {SELF_SERVICE_KINDS.map((k) => (
               <option key={k} value={k}>
                 {ABSENCE_KINDS[k].label}
@@ -198,6 +224,7 @@ export default function Urlopy({ year, balance, absences }) {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => {
+                  setSaved("");
                   setDateFrom(e.target.value);
                   // Data końca idzie za początkiem, dopóki jest wcześniejsza —
                   // inaczej przesunięcie startu zostawiało niemożliwy zakres.
@@ -213,7 +240,7 @@ export default function Urlopy({ year, balance, absences }) {
                 type="date"
                 value={dateTo}
                 min={dateFrom}
-                onChange={(e) => setDateTo(e.target.value)}
+                onChange={(e) => edit(setDateTo)(e.target.value)}
                 className="!w-44"
                 required
               />
@@ -249,7 +276,7 @@ export default function Urlopy({ year, balance, absences }) {
           <Textarea
             rows={2}
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => edit(setReason)(e.target.value)}
             maxLength={500}
             placeholder="np. wyjazd rodzinny"
             className="mb-6"
@@ -260,6 +287,9 @@ export default function Urlopy({ year, balance, absences }) {
               {err}
             </Alert>
           )}
+          <Alert tone="ok" className="mb-4">
+            {saved}
+          </Alert>
 
           <Button type="submit" size="lg" disabled={busy} className="self-start">
             {busy ? "Wysyłam…" : "Wyślij wniosek"}
@@ -284,6 +314,11 @@ export default function Urlopy({ year, balance, absences }) {
             </Button>
           </div>
         </div>
+
+        {/* Anulowanie dzieje się w tabeli, więc i potwierdzenie stoi przy niej. */}
+        <Alert tone="ok" className="mb-3">
+          {cancelled}
+        </Alert>
 
         {absences.length === 0 ? (
           <EmptyState

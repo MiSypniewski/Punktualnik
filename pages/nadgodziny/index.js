@@ -16,7 +16,7 @@ import { DownloadIcon } from "../../components/ui/icons";
 import getOvertimeBalance from "../../services/getOvertimeBalance";
 import getOvertimeForUser from "../../services/getOvertimeForUser";
 import { OVERTIME_KINDS, KIND_KEYS, kindLabel, signedMinutes, requiresReason, decisionVerb } from "../../services/overtimeKinds";
-import { formatMinutes, formatDateTime } from "../../utils";
+import { formatMinutes, formatDate, formatDateTime } from "../../utils";
 
 export async function getServerSideProps(ctx) {
   const token = await getActiveToken(ctx.req);
@@ -45,6 +45,10 @@ export default function Nadgodziny({ balance, requests }) {
   const [minutes, setMinutes] = useState("0");
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
+  // Potwierdzenia wysłania i anulowania — jak w /urlopy. Bez nich jedynym
+  // śladem był nowy wiersz w historii, zwykle poza ekranem.
+  const [saved, setSaved] = useState("");
+  const [cancelled, setCancelled] = useState("");
   const [busy, setBusy] = useState(false);
   const [format, setFormat] = useState("csv");
 
@@ -56,8 +60,17 @@ export default function Nadgodziny({ balance, requests }) {
   // i w walidatorze na serwerze.
   const reasonRequired = requiresReason(kind);
 
+  // Każda zmiana pola gasi potwierdzenie: „Wysłano” przy innych danych
+  // w formularzu sugerowałoby, że wysłały się właśnie te.
+  const edit = (setter) => (e) => {
+    setSaved("");
+    setter(e.target.value);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    setSaved("");
+    setCancelled("");
     const total = Number(hours || 0) * 60 + Number(minutes || 0);
 
     if (!data) return setErr("Podaj datę.");
@@ -82,9 +95,16 @@ export default function Nadgodziny({ balance, requests }) {
         setErr(body.error || "Nie udało się zapisać wniosku.");
         return;
       }
+      // Treść z odpowiedzi serwera — potwierdzamy to, co zapisano.
+      const r = body.request;
       setHours("0");
       setMinutes("0");
       setReason("");
+      setSaved(
+        r
+          ? `Wysłano zgłoszenie: ${kindLabel(r.kind)}, ${formatDate(r.data)}, ${formatMinutes(r.minutes)}. Czeka na decyzję kierownika.`
+          : "Wysłano zgłoszenie. Czeka na decyzję kierownika."
+      );
       await refresh();
     } catch {
       setErr("Brak połączenia z serwerem.");
@@ -95,6 +115,9 @@ export default function Nadgodziny({ balance, requests }) {
 
   const cancel = async (id) => {
     setBusy(true);
+    setErr("");
+    setSaved("");
+    setCancelled("");
     try {
       const res = await fetch(`/api/overtime/${id}`, {
         method: "PUT",
@@ -103,6 +126,8 @@ export default function Nadgodziny({ balance, requests }) {
       });
       if (!res.ok) {
         setErr("Nie udało się anulować — wniosek mógł zostać już rozpatrzony.");
+      } else {
+        setCancelled("Wniosek anulowany.");
       }
       await refresh();
     } finally {
@@ -141,7 +166,7 @@ export default function Nadgodziny({ balance, requests }) {
           <label className="mb-1 text-xs font-semibold uppercase tracking-signage text-muted">Rodzaj</label>
           <Select
             value={kind}
-            onChange={(e) => setKind(e.target.value)}
+            onChange={edit(setKind)}
             className="mb-4"
           >
             {KIND_KEYS.map((k) => (
@@ -156,7 +181,7 @@ export default function Nadgodziny({ balance, requests }) {
           <Input
             type="date"
             value={data}
-            onChange={(e) => setData(e.target.value)}
+            onChange={edit(setData)}
             className="mb-4"
           />
 
@@ -167,7 +192,7 @@ export default function Nadgodziny({ balance, requests }) {
               min="0"
               max="23"
               value={hours}
-              onChange={(e) => setHours(e.target.value)}
+              onChange={edit(setHours)}
               className="!w-24"
             />
             <span className="text-sm">godz.</span>
@@ -177,7 +202,7 @@ export default function Nadgodziny({ balance, requests }) {
               max="59"
               step="5"
               value={minutes}
-              onChange={(e) => setMinutes(e.target.value)}
+              onChange={edit(setMinutes)}
               className="!w-24"
             />
             <span className="text-sm">min.</span>
@@ -192,7 +217,7 @@ export default function Nadgodziny({ balance, requests }) {
           <Textarea
             rows={2}
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={edit(setReason)}
             maxLength={500}
             required={reasonRequired}
             placeholder={
@@ -208,6 +233,9 @@ export default function Nadgodziny({ balance, requests }) {
               {err}
             </Alert>
           )}
+          <Alert tone="ok" className="mb-4">
+            {saved}
+          </Alert>
 
           <button
             type="submit"
@@ -238,6 +266,10 @@ export default function Nadgodziny({ balance, requests }) {
             </>
           )}
         </div>
+        {/* Anulowanie dzieje się w tabeli, więc i potwierdzenie stoi przy niej. */}
+        <Alert tone="ok" className="mb-3">
+          {cancelled}
+        </Alert>
         {requests.length === 0 ? (
           <EmptyState
             title="Brak zgłoszeń"
