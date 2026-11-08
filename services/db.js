@@ -786,6 +786,26 @@ const createDb = () => {
       PRIMARY KEY (month, userID)
     );
 
+    -- Notatki kierownika o pracowniku, prowadzone w trakcie miesiąca
+    -- (services/employeeNotes.js) — materiał do oceny wystawianej po jego końcu.
+    --
+    -- Osobna tabela, nie pole w MonthlyReviews: ocena to jeden wiersz na miesiąc
+    -- i powstaje dopiero po zamknięciu, a notatek jest wiele i zbiera się je
+    -- wcześniej. month to noteDate.slice(0, 7) — kolumna, bo po niej się szuka.
+    CREATE TABLE IF NOT EXISTS EmployeeNotes (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      userID        INTEGER NOT NULL,
+      month         TEXT    NOT NULL,
+      noteDate      TEXT    NOT NULL,
+      body          TEXT    NOT NULL,
+      createdAt     TEXT    NOT NULL,
+      createdBy     INTEGER,
+      createdByName TEXT,
+      updatedAt     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_notes_user_month ON EmployeeNotes(userID, month);
+    CREATE INDEX IF NOT EXISTS idx_notes_month      ON EmployeeNotes(month);
+
     -- Zgłoszenia korekty DZISIEJSZEJ karty przez pracownika (services/cardCorrections.js).
     --
     -- Zgłoszenie nie wskazuje wiersza Times, tylko dzień (data = ta sama kotwica
