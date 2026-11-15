@@ -142,7 +142,7 @@ const navItems = (user, pending) => {
 
   // Miesięczne podsumowania — otwierane raz w miesiącu, więc na samym końcu
   // grupy i `secondary`, jak pozostałe narzędzia doraźne.
-  if (canSeeMonthlyReports(role))
+  if (canSeeMonthlyReports(user))
     items.push({
       href: "/zadania/podsumowanie",
       match: ["/zadania/podsumowanie", "/zadania/podsumowanie/[id]"],
