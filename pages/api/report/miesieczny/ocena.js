@@ -4,6 +4,7 @@ import { REVIEW_TEXT_MAX, saveReview } from "../../../../services/monthlyReview"
 import { canSeeMonthlyReports } from "../../../../services/roles";
 import { canSeeSection, noteSelfDecision } from "../../../../services/scope";
 import { MONTH_RE } from "../../../../utils/monthlyReport";
+import { JUSTIFY_HIGH, JUSTIFY_LOW, needsJustification } from "../../../../utils/monthlyScore";
 
 // Ocena miesiąca wpisywana przez kierownika.
 //
@@ -53,6 +54,14 @@ export default async (req, res) => {
   };
   if (Object.values(scores).some((v) => v === null)) {
     return res.status(400).json({ error: "bad_score", message: "Każda podocena musi być liczbą od 0 do 10." });
+  }
+  // Ten sam warunek co w formularzu — skrajna podocena bez uzasadnienia to
+  // dokładnie ta liczba, której nikt potem nie umie wyjaśnić.
+  if (needsJustification(scores) && !text(req.body.comment)) {
+    return res.status(400).json({
+      error: "missing_comment",
+      message: `Podocena ${JUSTIFY_LOW} lub niższa albo ${JUSTIFY_HIGH} lub wyższa wymaga uzasadnienia.`,
+    });
   }
 
   const review = saveReview(
