@@ -19,6 +19,75 @@ export const MANUAL_CRITERIA = [
   ["initiative", "Inicjatywa / rozwój"],
 ];
 
+/**
+ * Kotwice skali dla podocen kierownika: pytanie, na które odpowiada liczba,
+ * i opis kilku punktów skali. Bez nich „7” znaczyło u każdego kierownika co
+ * innego, a podoceny to ponad połowa oceny ogólnej.
+ *
+ * Punkty kotwic pasują do etykiet oceny ogólnej (scoreLabel): 3 — wymaga
+ * poprawy, 5–6 — dobry, 8 — bardzo dobry, 10 — wyróżniający się. Standardem
+ * stanowiska jest 6; w inicjatywie 5, bo spokojny miesiąc bez niczego
+ * „ponad” nie jest powodem do obniżki.
+ */
+export const SCORE_ANCHORS = {
+  tech: {
+    question: "Jak dobrze i jak samodzielnie robi swoją robotę techniczną?",
+    source: "Lista zadań i projekty w raporcie pokazują, czym się zajmował — nie, jak mu poszło. Reszta: SNOW, reklamacje, własna wiedza.",
+    anchors: [
+      [3, "Typowe zadania (serwis drukarki, pamięć fiskalna, legalizacja) często wymagają pomocy albo poprawek; zdarzają się powtórne wyjazdy z jego winy."],
+      [5, "Typowe zadania robi sam, ale trudniejsze przypadki oddaje dalej albo się w nich gubi. Pojedyncze poprawki."],
+      [6, "Standard: typowe zadania robi sam i poprawnie, poprawki są wyjątkiem."],
+      [8, "Robi też rzeczy nietypowe — awarie bez oczywistej przyczyny, otwarcia i remonty sklepów, namioty. Inni przychodzą do niego po pomoc."],
+      [10, "Rozwiązuje problemy, z którymi nie poradzili sobie inni, albo ma specjalizację, której nikt w zespole nie ma — i w tym miesiącu było to widać na konkretnym przypadku."],
+    ],
+  },
+  docs: {
+    question: "Czy po jego pracy da się bez dopytywania ustalić, co zrobił? (wpisy zadań, GAM/SNOW, maile)",
+    source: "Oceniasz treść opisów. Pokrycie i dni z kartą bez zadań to dyscyplina raportowania — nie karz za nie drugi raz.",
+    anchors: [
+      [3, "Opisy szczątkowe („serwis”, „sklep”) albo żadne; zgłoszenia zamykane bez opisu. Żeby wiedzieć, co się stało, trzeba dzwonić."],
+      [5, "Większość ma opis, ale z lukami — bez numeru sklepu, urządzenia albo wyniku. Uzupełnia po przypomnieniu."],
+      [6, "Standard: wpisy i zgłoszenia mają sklep, co zrobiono i z jakim skutkiem. Dopytywać trzeba rzadko."],
+      [8, "Opisy na tyle dobre, że inny serwisant przejmie temat bez rozmowy. Pisane na bieżąco, nie na koniec dnia."],
+      [10, "Jak 8, a do tego tworzy dokumentację, z której korzystają inni: instrukcje, opis typowej awarii, porządek w GAM."],
+    ],
+  },
+  initiative: {
+    question: "Czy zrobił w tym miesiącu coś ponad przydzielone zadania?",
+    source: "Spokojny miesiąc to 5, nie obniżka. Nie przepisuj liczby z poprzedniego miesiąca — oceniasz ten.",
+    anchors: [
+      [3, "Unika nowych tematów, odmawia zastępstw, nie przekazuje dalej problemów, które zauważył."],
+      [5, "Neutralnie: robi swoje i w tym miesiącu nic ponad to."],
+      [6, "Drobne rzeczy z własnej woli: zgłosił usterkę procesu, pomógł koledze, wziął zastępstwo."],
+      [8, "Konkretny wkład: szkolenie (prowadzone albo ukończone), wdrożenie nowej osoby, usprawnienie, które weszło w życie, nowy obszar."],
+      [10, "Inicjatywa, która zmieniła pracę zespołu albo firmy: nowy proces, rekrutacja, rozwiązanie problemu ciągnącego się od miesięcy."],
+    ],
+  },
+};
+
+/**
+ * Kotwice najbliższe wpisanej wartości — przy remisie (7 między 6 a 8) obie.
+ * @returns {number[]} punkty skali do podświetlenia; pusta, gdy wartość nie jest liczbą 0–10
+ */
+export const nearestAnchors = (key, value) => {
+  const n = typeof value === "string" ? Number(value.replace(",", ".")) : value;
+  if (value === "" || value === null || value === undefined || !Number.isFinite(n) || n < 0 || n > 10) return [];
+  const points = SCORE_ANCHORS[key].anchors.map(([p]) => p);
+  const best = Math.min(...points.map((p) => Math.abs(p - n)));
+  return points.filter((p) => Math.abs(p - n) === best);
+};
+
+/** Podoceny skrajne wymagają uzasadnienia — tam osąd najbardziej rozjeżdża się między kierownikami. */
+export const JUSTIFY_LOW = 4;
+export const JUSTIFY_HIGH = 9;
+
+export const needsJustification = (scores) =>
+  MANUAL_CRITERIA.some(([key]) => {
+    const v = scores[key];
+    const n = typeof v === "string" ? Number(v.replace(",", ".")) : v;
+    return v !== "" && v !== null && v !== undefined && Number.isFinite(n) && (n <= JUSTIFY_LOW || n >= JUSTIFY_HIGH);
+  });
+
 /** Regularność ze średniej dziennej [h]. */
 export const regularityScore = (avgDailySeconds) => {
   if (avgDailySeconds === null || avgDailySeconds === undefined) return null;

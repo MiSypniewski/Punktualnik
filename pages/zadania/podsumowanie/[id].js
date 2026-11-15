@@ -28,12 +28,17 @@ import { kindLabel } from "../../../services/overtimeKinds";
 import { formatDateRange, formatMinutes } from "../../../utils";
 import { MONTH_RE, OVERTIME_OFF } from "../../../utils/monthlyReport";
 import {
+  JUSTIFY_HIGH,
+  JUSTIFY_LOW,
   MANUAL_CRITERIA,
+  SCORE_ANCHORS,
   WEIGHTS,
   attendanceTone,
   averageTone,
   computeScore,
   monthStars,
+  nearestAnchors,
+  needsJustification,
   observe,
   privateTone,
   starString,
@@ -236,6 +241,52 @@ const lines = (text) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
+// Pole podoceny z kotwicami skali obok. Kotwica najbliższa wpisanej liczbie
+// jest podświetlona, żeby było widać, co ta liczba oznacza, zanim się ją zapisze.
+const ScoreField = ({ criterion, label, value, onChange }) => {
+  const { question, source, anchors } = SCORE_ANCHORS[criterion];
+  const active = nearestAnchors(criterion, value);
+  const id = `score-${criterion}`;
+  return (
+    <div className="grid sm:grid-cols-[10rem_1fr] gap-3 pb-3 border-b border-line last:border-b-0">
+      {/* Łączniki wyrazów (U+2060) trzymają „(0–10)” w jednym wierszu w wąskiej kolumnie. */}
+      <Field label={`${label} (0⁠–⁠10)`} htmlFor={id}>
+        <Input
+          id={id}
+          type="number"
+          min="0"
+          max="10"
+          step="0.5"
+          required
+          value={value}
+          onChange={onChange}
+          aria-describedby={`${id}-question`}
+        />
+      </Field>
+      <div className="text-sm">
+        <p id={`${id}-question`} className="font-medium">
+          {question}
+        </p>
+        <ul className="mt-1.5 grid gap-1">
+          {anchors.map(([point, text]) => (
+            <li
+              key={point}
+              className={classNames(
+                "flex gap-2 rounded-sm px-1.5 py-0.5",
+                active.includes(point) ? "bg-raised ring-1 ring-line-strong" : "opacity-75"
+              )}
+            >
+              <span className="font-mono tabular-nums font-semibold w-5 shrink-0 text-right">{point}</span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-1.5 text-xs text-muted">{source}</p>
+      </div>
+    </div>
+  );
+};
+
 const ReviewForm = ({ month, userID, review, suggestion }) => {
   const router = useRouter();
   const base = review || suggestion || {};
@@ -252,6 +303,8 @@ const ReviewForm = ({ month, userID, review, suggestion }) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
+
+  const justify = needsJustification(form);
 
   const set = (key) => (e) => {
     setSaved(false);
@@ -289,25 +342,26 @@ const ReviewForm = ({ month, userID, review, suggestion }) => {
             Podoceny podpowiedziane z oceny za {monthLong(suggestion.month)} — nie są zapisane, dopóki ich nie zatwierdzisz.
           </Alert>
         )}
-        <div className="grid sm:grid-cols-3 gap-3">
+        <p className="mb-3 text-sm text-muted max-w-prose">
+          Standard stanowiska to 6 (w inicjatywie 5). Ocena wyżej albo niżej wymaga konkretnego powodu z tego miesiąca;
+          wartości pośrednie wpisuj połówkami.
+        </p>
+        <div className="grid gap-3">
           {MANUAL_CRITERIA.map(([key, label]) => (
-            <Field key={key} label={`${label} (0–10)`} htmlFor={`score-${key}`}>
-              <Input
-                id={`score-${key}`}
-                type="number"
-                min="0"
-                max="10"
-                step="0.5"
-                required
-                value={form[key]}
-                onChange={set(key)}
-              />
-            </Field>
+            <ScoreField key={key} criterion={key} label={label} value={form[key]} onChange={set(key)} />
           ))}
         </div>
         <div className="mt-3 grid gap-3">
-          <Field label="Uzasadnienie oceny" htmlFor="review-comment" hint="Pokazywane w karcie oceny ogólnej.">
-            <Textarea id="review-comment" rows={3} value={form.comment} onChange={set("comment")} />
+          <Field
+            label="Uzasadnienie oceny"
+            htmlFor="review-comment"
+            hint={
+              justify
+                ? `Wymagane: któraś podocena wynosi ${JUSTIFY_LOW} lub mniej albo ${JUSTIFY_HIGH} lub więcej — podaj konkretną sytuację.`
+                : "Pokazywane w karcie oceny ogólnej."
+            }
+          >
+            <Textarea id="review-comment" rows={3} required={justify} value={form.comment} onChange={set("comment")} />
           </Field>
           <div className="grid sm:grid-cols-2 gap-3">
             <Field label="Działania natychmiastowe" htmlFor="review-actions" hint="Jedna rekomendacja w wierszu.">
