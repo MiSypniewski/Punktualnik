@@ -62,7 +62,19 @@ export const canSeeTeamTasks = (role) => role === "manager";
 // Miesięczne podsumowania pracowników (/zadania/podsumowanie). Osobny predykat,
 // bo ekran zestawia zadania z kartami czasu i nieobecnościami — żaden z trzech
 // modułów nie jest tu "właścicielem". Zasięg sekcyjny nakłada services/scope.js.
-export const canSeeMonthlyReports = (role) => role === "manager";
+//
+// Poza rolą — imienna lista kont. Raport zawiera ocenę pracownika i notatki
+// kierownika, a nie każdy kierownik sekcji ma je oglądać. Adres pochodzi
+// z bazy (services/session.js), nie z ciasteczka, więc zmiana adresu konta
+// albo odebranie roli działa od razu. Dopisanie osoby = zmiana tej listy.
+export const MONTHLY_REPORT_EMAILS = new Set([
+  "michal.sypniewski@forcom.com.pl",
+  "robert.szczepanski@forcom.com.pl",
+]);
+
+/** @param {{role?: string, email?: string}|null|undefined} user token z getActiveToken albo session.user */
+export const canSeeMonthlyReports = (user) =>
+  user?.role === "manager" && MONTHLY_REPORT_EMAILS.has(String(user?.email ?? "").trim().toLowerCase());
 
 // Eksport wpisów — jak przy czasach pracy, wyłącznie kierownik.
 export const canExportTasks = (role) => role === "manager";

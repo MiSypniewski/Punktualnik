@@ -1803,8 +1803,10 @@ pliku. Liczniki limitów żyją w procesie, więc przed kolejnym przebiegiem zre
 
 ## Podsumowania miesięczne — `/zadania/podsumowanie`
 
-Raport miesiąca dla każdego pracownika z osobna, wyłącznie dla kierownika i w jego
-sekcjach (`canSeeMonthlyReports` + `services/scope.js`). Pozycja „Podsumowania”
+Raport miesiąca dla każdego pracownika z osobna, wyłącznie dla kierowników z imiennej
+listy `MONTHLY_REPORT_EMAILS` (`services/roles.js`) i w ich sekcjach
+(`canSeeMonthlyReports` + `services/scope.js`). Pozostali kierownicy nie widzą ani
+pozycji w menu, ani ekranów, ani API. Pozycja „Podsumowania”
 stoi na końcu grupy „Zespół” — to ekran otwierany raz w miesiącu.
 
 Dwa ekrany:

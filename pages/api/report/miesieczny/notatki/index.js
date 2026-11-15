@@ -16,7 +16,7 @@ export default async (req, res) => {
   if (!token) {
     return res.status(401).json({ error: "not_authorized" });
   }
-  if (!canSeeMonthlyReports(token.role)) {
+  if (!canSeeMonthlyReports(token)) {
     return res.status(403).json({ error: "permission_denied" });
   }
   if (req.method !== "GET" && req.method !== "POST") {

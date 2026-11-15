@@ -83,6 +83,10 @@ export default NextAuth({
     },
 
     async session({ session, token }) {
+      // next-auth składa domyślne session.user ze STAREGO tokenu (sprzed jwt()),
+      // więc adres odświeżony z bazy trzeba przepisać jawnie — od niego zależy
+      // pozycja „Podsumowania” w menu (services/roles.js).
+      session.user.email = token?.email;
       session.user.role = token?.role;
       session.user.section = token?.section;
       session.user.id = token?.id;

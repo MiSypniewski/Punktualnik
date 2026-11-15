@@ -29,7 +29,7 @@ export async function getServerSideProps(ctx) {
   if (!token) {
     return { redirect: { destination: "/users/signin", permanent: false } };
   }
-  if (!canSeeMonthlyReports(token.role)) {
+  if (!canSeeMonthlyReports(token)) {
     return { notFound: true };
   }
 

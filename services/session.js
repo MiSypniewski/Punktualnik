@@ -18,7 +18,7 @@ import db from "./db";
 // blokady (README, "Kiedy aplikacja muli").
 
 const findSessionUser = db.prepare(
-  `SELECT id, name, role, section, location, isActive, sessionVersion FROM Users WHERE id = ?`
+  `SELECT id, name, email, role, section, location, isActive, sessionVersion FROM Users WHERE id = ?`
 );
 
 /**
@@ -42,6 +42,8 @@ export const loadSessionUser = (token) => {
 export const withCurrentUser = (token, user) => ({
   ...token,
   name: user.name,
+  // Adres z bazy, bo od niego zależy dostęp do podsumowań (services/roles.js).
+  email: user.email,
   role: user.role,
   section: user.section,
   location: user.location,
